@@ -1,0 +1,9 @@
+[submodule "Jason.cli"]
+	path = Jason.cli
+	url = git@github.com:ExclusiveDisjunction/Jason.cli
+[submodule "Jason.testing"]
+	path = Jason.testing
+	url = git@github.com:ExclusiveDisjunction/Jason.testing
+[submodule "Jason.gui"]
+	path = Jason.gui
+	url = git@github.com:ExclusiveDisjunction/Jason.gui
