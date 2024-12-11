@@ -101,6 +101,11 @@ Logger& Logger::operator<<(const std::string& obj)
     this->Write(obj);
     return *this;
 }
+Logger& Logger::operator<<(const DebugFormat& obj) 
+{
+    this->Write(obj);
+    return *this;
+}
 Logger& Logger::operator<<(Logger& (*func)(Logger&))
 {
     return func(*this);

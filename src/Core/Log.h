@@ -20,10 +20,10 @@ enum LoggerLevel
 };
 
 /// @brief A class that allows specific debugging strings for logging
-class LoggerDisplay
+class DebugFormat
 {
 public:
-    virtual void Display(std::ostream& obj) const noexcept = 0;
+    virtual void dbg_fmt(std::ostream& obj) const noexcept = 0;
 };
 
 class Logger
@@ -73,7 +73,7 @@ public:
     }
 
     Logger& operator<<(const std::string& obj);
-    Logger& operator<<(const LoggerDisplay& obj);
+    Logger& operator<<(const DebugFormat& obj);
     Logger& operator<<(Logger& (*func)(Logger&));
     template<typename T>
     requires (std::is_arithmetic_v<T> && !std::is_pointer_v<T>)
