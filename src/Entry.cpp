@@ -1,6 +1,7 @@
 #include <iostream>
 
-#include "IOTester.h"
+#include "Core/Log.h"
+#include "Core/Version.h"
 
 int main(int, char**)
 {
