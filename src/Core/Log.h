@@ -26,11 +26,17 @@ public:
     virtual void dbg_fmt(std::ostream& obj) const noexcept = 0;
 };
 
+std::ostream& operator<<(std::ostream& out, const DebugFormat& obj) noexcept
+{
+    obj.dbg_fmt(out);
+    return out;
+}
+
 class Logger
 {
 private:
-    bool StartLog(LoggerLevel level);
-    bool EndLog();
+    void StartLog(LoggerLevel level);
+    void EndLog();
 
     std::ofstream Out;
     LoggerLevel State;

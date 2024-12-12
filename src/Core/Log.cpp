@@ -3,6 +3,7 @@
 //
 
 #include "Log.h"
+#include "Errors.h"
 
 Logger logging = Logger();
 
@@ -38,13 +39,16 @@ bool Logger::IsOpen() const noexcept
     return Out.good();
 }
 
-bool Logger::StartLog(LoggerLevel level)
+void Logger::StartLog(LoggerLevel level)
 {
     if (level == LoggerLevel::LL_None)
-        return EndLog();
+    {
+        EndLog();
+        return;
+    }
 
     if (this->State != LoggerLevel::LL_None)
-        return false;
+        throw OperationError("start log", "line already started");
 
     this->State = level;
 
@@ -56,7 +60,7 @@ bool Logger::StartLog(LoggerLevel level)
         switch (level)
         {
             case LoggerLevel::LL_None:
-                return false;
+                throw OperationError("start log", "cannot start a log at level 'NONE'");
             case LoggerLevel::LL_Debug:
                 Out << "DEBUG ";
                 break;
@@ -74,17 +78,14 @@ bool Logger::StartLog(LoggerLevel level)
                 break;
         }
     }
-
-    return true;
 }
-bool Logger::EndLog()
+void Logger::EndLog()
 {
     if (!IsInLog())
-        return false;
+        throw OperationError("end log", "line not started");
 
     Out << '\n';
     this->State = LoggerLevel::LL_None;
-    return true;
 }
 
 bool Logger::IsInLog() const
@@ -113,37 +114,27 @@ Logger& Logger::operator<<(Logger& (*func)(Logger&))
 
 Logger& Debug(Logger& in)
 {
-    if (!in.StartLog(LoggerLevel::LL_Debug))
-        throw std::logic_error("Cannot start log line because another line has not been completed. Please finish that line first.");
-
+    in.StartLog(LoggerLevel::LL_Debug);
     return in;
 }
 Logger& Info(Logger& in)
 {
-    if (!in.StartLog(LoggerLevel::LL_Info))
-        throw std::logic_error("Cannot start log line because another line has not been completed. Please finish that line first.");
-
+    in.StartLog(LoggerLevel::LL_Info);
     return in;
 }
 Logger& Warning(Logger& in)
 {
-    if (!in.StartLog(LoggerLevel::LL_Warning))
-        throw std::logic_error("Cannot start log line because another line has not been completed. Please finish that line first.");
-
+    in.StartLog(LoggerLevel::LL_Warning);
     return in;
 }
 Logger& Error(Logger& in)
 {
-    if (!in.StartLog(LoggerLevel::LL_Error))
-        throw std::logic_error("Cannot start log line because another line has not been completed. Please finish that line first.");
-
+    in.StartLog(LoggerLevel::LL_Error);
     return in;
 }
 Logger& Critical(Logger& in)
 {
-    if (!in.StartLog(LoggerLevel::LL_Critical))
-        throw std::logic_error("Cannot start log line because another line has not been completed. Please finish that line first.");
-
+    in.StartLog(LoggerLevel::LL_Critical);
     return in;
 }
 

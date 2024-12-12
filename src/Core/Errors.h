@@ -54,3 +54,43 @@ public:
     OperatorError(const DebugFormat& oper, const DebugFormat& operand1);
     OperatorError(const DebugFormat& oper, const DebugFormat& operand1, const DebugFormat& operand2);
 };
+
+class UnexepctedError : public ErrorBase {
+public:
+    UnexepctedError(const std::string& reason);
+};
+
+class OperationError : public ErrorBase {
+public:
+    OperationError(const std::string& action, const std::string& reason);
+};
+
+class ConversionError : public ErrorBase {
+public:
+    ConversionError(const std::string& action, const std::string& reason);
+};
+
+enum IOErrorKind {
+    IEK_NotFound,
+    IEK_Permissions,
+    IEK_Invalid
+};
+
+class IOError : public ErrorBase {
+public:
+    IOError(const std::string& location, IOErrorKind kind);
+};
+
+/// @brief A function that converts the arguments into a single string
+/// @tparam ...Args The types of the arguments
+/// @param ...value The values to put into a string
+/// @return A full string that contains the arguments in order
+template<typename... Args>
+std::string reason_formatter(Args... value) noexcept {
+    std::vector<void*> to_print( &(value)... );
+    std::stringstream ss;
+    for (const void*& item : to_print)
+        ss << *item;
+
+    return ss.str();
+}
