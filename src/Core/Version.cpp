@@ -12,11 +12,17 @@ std::istream& operator>>(std::istream& in, Version& obj)
     return in;
 }
 
-bool Version::operator==(const Version& obj) const noexcept
+void Version::dbg_fmt(std::ostream& out) const noexcept 
 {
-    return this->Major == obj.Major && this->Minor == obj.Minor && this->Release == obj.Release;
+    out << *this;
 }
-bool Version::operator!=(const Version& obj) const noexcept
-{  
-    return this->Major != obj.Major || this->Minor != obj.Minor || this->Release != obj.Release;
+
+std::strong_ordering Version::operator<=>(const Version& obj) const noexcept
+{
+    if (this->Major == obj.Major && this->Minor == obj.Minor && this->Release == obj.Release)
+        return std::strong_ordering::equal;
+
+    if (auto cmp = this->Major <=> obj.Major; cmp != 0) return cmp;
+    if (auto cmp = this->Minor <=> obj.Major; cmp != 0) return cmp;
+    return this->Release <=> obj.Release;
 }

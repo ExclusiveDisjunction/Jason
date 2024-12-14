@@ -5,24 +5,6 @@
 #include "BinaryUnit.h"
 
 Unit::Unit() : Data(nullptr), blockSize(0) {}
-Unit::Unit(unsigned char Size) : blockSize(Size), Data(nullptr)
-{
-    if (Size != 0)
-    {
-        this->Data = new char[blockSize];
-        memset(this->Data, 0, sizeof(char) * blockSize);
-    }
-}
-Unit::Unit(char* Data, unsigned char Size, bool Copy) : Data(nullptr), blockSize(Size)
-{
-    if (Copy)
-    {
-        this->Data = new char[blockSize];
-        memcpy(this->Data, Data, sizeof(char) * blockSize);
-    }
-    else 
-        this->Data = Data;
-}
 Unit::Unit(const Unit& obj) noexcept
 {
     Allocate(obj.Data, obj.blockSize, true);
@@ -36,6 +18,25 @@ Unit::Unit(Unit&& obj) noexcept : Data(std::exchange(obj.Data, nullptr)), blockS
 Unit::~Unit()
 {
     Deallocate();
+}
+
+Unit Unit::FromSize(unsigned char size) noexcept
+{
+    Unit result;
+    if (size != 0)
+    {
+        result.Data = new char[size];
+        memset(result.Data, 0, size);
+    }
+
+    return result;
+}
+Unit Unit::FromCharPtr(char* data, unsigned char size, bool copy) noexcept
+{
+    Unit result;
+    result.Allocate(data, size, copy);
+
+    return result;
 }
 
 void Unit::Deallocate()
@@ -85,7 +86,7 @@ const char* Unit::Expose() const noexcept
 {
     return this->Data;
 }
-[[nodiscard]] unsigned char Unit::GetSize() const noexcept
+unsigned char Unit::GetSize() const noexcept
 {
     return this->blockSize;
 }

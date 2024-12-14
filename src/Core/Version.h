@@ -2,8 +2,9 @@
 #define JASON_VERSION
 
 #include <iostream>
+#include "Log.h"
 
-class Version
+class Version : public DebugFormat
 {
 public:
     Version() : Version(0, 0, 0) {}
@@ -13,8 +14,15 @@ public:
     unsigned Minor;
     unsigned Release;
 
-    bool operator==(const Version& obj) const noexcept;
-    bool operator!=(const Version& obj) const noexcept;
+    void dbg_fmt(std::ostream& out) const noexcept override;
+
+    std::strong_ordering operator<=>(const Version& obj) const noexcept;
+    bool operator==(const Version& obj) const noexcept = default;
+    bool operator!=(const Version& obj) const noexcept = default;
+    bool operator<(const Version& obj) const noexcept = default;
+    bool operator<=(const Version& obj) const noexcept = default;
+    bool operator>(const Version& obj) const noexcept = default;
+    bool operator>=(const Version& obj) const noexcept = default;
 };
 std::ostream& operator<<(std::ostream& out, const Version& obj) noexcept;
 std::istream& operator>>(std::istream& in, Version& obj);
