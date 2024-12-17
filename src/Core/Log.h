@@ -24,6 +24,13 @@ class DebugFormat
 {
 public:
     virtual void dbg_fmt(std::ostream& obj) const noexcept = 0;
+    
+    [[nodiscard]] std::string dbg_fmt_string() const noexcept
+    {
+        std::stringstream ss;
+        this->dbg_fmt(ss);
+        return ss.str();
+    }
 };
 
 std::ostream& operator<<(std::ostream& out, const DebugFormat& obj) noexcept

@@ -17,7 +17,7 @@ public:
     void dbg_fmt(std::ostream& out) const noexcept override;
 
     std::strong_ordering operator<=>(const Version& obj) const noexcept;
-    bool operator==(const Version& obj) const noexcept = default;
+    bool operator==(const Version& obj) const noexcept { return this->operator<=>(obj) == 0; }
     bool operator!=(const Version& obj) const noexcept = default;
     bool operator<(const Version& obj) const noexcept = default;
     bool operator<=(const Version& obj) const noexcept = default;

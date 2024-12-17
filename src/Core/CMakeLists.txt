@@ -7,4 +7,5 @@ add_library(Core SHARED DateTime.cpp
     Version.h
     Version.cpp
     BinaryUnit.h
-    BinaryUnit.cpp)
+    BinaryUnit.cpp
+    Errors.cpp)
