@@ -54,7 +54,7 @@ void Logger::StartLog(LoggerLevel level)
 
     if (!CurrentLogIsIgnored())
     {
-        //We need to write the begining of the level.
+        //We need to write the beginning of the level.
 
         Out << DateTime::Now().ToString(DateStringFormat::ShortDate, TimeStringFormat::ExtendedTime, false) << ' ';
         switch (level)
@@ -102,7 +102,7 @@ Logger& Logger::operator<<(const std::string& obj)
     this->Write(obj);
     return *this;
 }
-Logger& Logger::operator<<(const DebugFormat& obj) 
+Logger& Logger::operator<<(const DebugPrint& obj) 
 {
     this->Write(obj);
     return *this;

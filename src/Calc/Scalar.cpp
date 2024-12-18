@@ -6,15 +6,6 @@
 
 #include <iomanip>
 
-VariableTypes Scalar::GetType() const noexcept
-{
-    return VariableTypes::VT_Scalar;
-}
-
-size_t Scalar::RequiredUnits() const noexcept 
-{
-    return 1;
-}
 std::vector<Unit> Scalar::ToBinary() const noexcept
 {
     Unit data = Unit::FromVar(this->Data);
@@ -32,9 +23,9 @@ std::unique_ptr<Scalar> Scalar::FromBinaryPtr(const std::vector<Unit>& in)
 {
     return std::make_unique<Scalar>(std::move(FromBinary(in)));
 }
-std::string Scalar::GetTypeString() const noexcept
+void Scalar::dbg_fmt(std::ostream& out) const noexcept
 {
-    return "(Scalar)";
+    out <<  "(Scalar:" << this->Data << ')';
 }
 
 std::unique_ptr<VariableType> Scalar::Clone() const noexcept
@@ -82,7 +73,7 @@ bool Scalar::operator!=(double obj) const noexcept
     return this->Data != obj;
 }
 
-void Scalar::Print(std::ostream& out) const noexcept
+void Scalar::dsp_fmt(std::ostream& out) const noexcept
 {
     out << this->Data;
 }

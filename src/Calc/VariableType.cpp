@@ -5,10 +5,10 @@
 #include <optional>
 #include "VariableType.h"
 
-#include "Numerics/Scalar.h"
-#include "Numerics/Complex.h"
-#include "Numerics/MathVector.h"
-#include "Numerics/Matrix.h"
+#include "Scalar.h"
+#include "Complex.h"
+#include "MathVector.h"
+#include "Matrix.h"
 
 #include "../Core/Errors.h"
 
@@ -25,6 +25,11 @@ std::unique_ptr<VariableType> VariableType::FromBinary(const std::vector<Unit>& 
     case VT_Complex:
         return Complex::FromBinaryPtr(data);
     }
+}
+
+std::string VariableType::GetTypeString() const noexcept
+{
+    return static_cast<const DebugPrint&>(*this).dbg_fmt_string(); 
 }
 
 /*
@@ -189,8 +194,7 @@ std::unique_ptr<VariableType> VariableType::ApplyOperation(const VariableType& O
  
 std::ostream& operator<<(std::ostream& out, const VariableType& obj)
 {
-    obj.Print(out);
-    return out;
+    return out << display_print(obj);
 }
 
 std::ostream& operator<<(std::ostream& out, const VariableTypes& obj)

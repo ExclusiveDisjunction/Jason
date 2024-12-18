@@ -1,7 +1,10 @@
+#ifndef JASON_ERRORS_H
+#define JASON_ERRORS_H
+
 #include <iostream>
 #include "Log.h"
 
-class ErrorBase : public std::exception, public DebugFormat {
+class ErrorBase : public std::exception, public DebugPrint {
 private:
     std::string contents;
 
@@ -20,7 +23,7 @@ public:
 class ArgumentError : public ErrorBase {
 public:
     ArgumentError(const std::string& name, const std::string& value);
-    ArgumentError(const std::string& name, const DebugFormat& value);
+    ArgumentError(const std::string& name, const DebugPrint& value);
 };
 
 class NullError : public ErrorBase {
@@ -46,18 +49,18 @@ public:
 class NotFoundError : public ErrorBase {
 public:
     NotFoundError(const std::string& identifier);
-    NotFoundError(const DebugFormat& identifier);
+    NotFoundError(const DebugPrint& identifier);
 };
 
 class OperatorError : public ErrorBase {
 public:
     OperatorError(char oper, const std::string& operand1, const std::string& operand2, const std::string& reason = "does not exist");
-    OperatorError(const DebugFormat& oper, const std::string& operand1, const std::string& operand2, const std::string& reason = "does not exist");
+    OperatorError(const DebugPrint& oper, const std::string& operand1, const std::string& operand2, const std::string& reason = "does not exist");
     OperatorError(const std::string& oper, const std::string& operand1, const std::string& operand2, const std::string& reason = "does not exist");
 
-    OperatorError(char oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason = "does not exist");
-    OperatorError(const std::string& oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason = "does not exist");
-    OperatorError(const DebugFormat& oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason = "does not exist");
+    OperatorError(char oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason = "does not exist");
+    OperatorError(const std::string& oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason = "does not exist");
+    OperatorError(const DebugPrint& oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason = "does not exist");
 };
 
 class UnexepctedError : public ErrorBase {
@@ -101,3 +104,5 @@ std::string reason_formatter(Args... value) noexcept {
     return ss.str();
 }
 */
+
+#endif

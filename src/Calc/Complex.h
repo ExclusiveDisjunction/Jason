@@ -5,7 +5,7 @@
 #ifndef JASON_COMPLEX_H
 #define JASON_COMPLEX_H
 
-#include "../VariableType.h"
+#include "VariableType.h"
 #include "Constraints.h"
 
 class Complex : public VariableType
@@ -28,10 +28,11 @@ public:
     double b = 0.00;
     
     [[nodiscard]] constexpr VariableTypes GetType() const noexcept override { return VT_Complex; }
-    [[nodiscard]] std::string GetTypeString() const noexcept override;
     [[nodiscard]] constexpr size_t RequiredUnits() const noexcept override { return 2; }
     [[nodiscard]] static Complex FromBinary(const std::vector<Unit>& in);
     [[nodiscard]] static std::unique_ptr<Complex> FromBinaryPtr(const std::vector<Unit>& in);
+    void dbg_fmt(std::ostream& out) const noexcept override;
+    void dsp_fmt(std::ostream& out) const noexcept override;
     
     [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
 
@@ -56,8 +57,6 @@ public:
     
     bool operator==(const VariableType& obj) const noexcept override;
     bool operator!=(const VariableType& obj) const noexcept override;
-    
-    void Print(std::ostream& obj) const noexcept override;
 };
 
 template<typename T> requires IsScalarOrDouble<T>

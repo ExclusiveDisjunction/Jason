@@ -6,23 +6,29 @@
 #define JASON_SCALAR_H
 
 #include "Constraints.h"
-#include "../VariableType.h"
+#include "VariableType.h"
 
-class MATH_LIB Scalar : public VariableType
+class Scalar : public VariableType
 {
 public:
     Scalar() : Scalar(0) { }
     template<typename T> requires IsScalarOrDouble<T>
     explicit Scalar(const T& Item);
+    Scalar(const Scalar& obj) = default;
+    Scalar(Scalar&& obj) noexcept = default;
+    
+    Scalar& operator=(const Scalar& obj) = default;
+    Scalar& operator=(Scalar&& obj) noexcept = default;
 
     double Data = 0.00;
 
-    [[nodiscard]] VariableTypes GetType() const noexcept override;
-    [[nodiscard]] std::string GetTypeString() const noexcept override;
-    [[nodiscard]] size_t RequiredUnits() const noexcept override;
+    [[nodiscard]] constexpr VariableTypes GetType() const noexcept override { return VT_Scalar; }
+    [[nodiscard]] constexpr size_t RequiredUnits() const noexcept override { return 1; }
     [[nodiscard]] std::vector<Unit> ToBinary() const noexcept override;
     [[nodiscard]] static Scalar FromBinary(const std::vector<Unit>& in);
     [[nodiscard]] static std::unique_ptr<Scalar> FromBinaryPtr(const std::vector<Unit>& in);
+    void dsp_fmt(std::ostream& out) const noexcept override;
+    void dbg_fmt(std::ostream& out) const noexcept override;
 
     [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
 
@@ -54,8 +60,6 @@ public:
     bool operator!=(const VariableType& obj) const noexcept override;
     bool operator==(double obj) const noexcept;
     bool operator!=(double obj) const noexcept;
-
-    void Print(std::ostream& out) const noexcept override;
 
     [[maybe_unused]] constexpr explicit operator double() const noexcept
     {

@@ -2,14 +2,19 @@
 
 //Includes templated functions for MathVector.
 
+#include "../Core/Errors.h"
+#include "Scalar.h"
+
 template<std::convertible_to<double>... Args>
 MathVector MathVector::FromList(Args... Value) noexcept
 {
-    auto ToFill = std::vector<double>({((double) Value)...});
-
     MathVector result;
-    result.Data = ToFill;
-
+    result.Data = std::vector<double>(
+        {
+            static_cast<double>(Value)...
+        }
+    );
+    
     return result;
 }
 
@@ -32,7 +37,7 @@ template<typename T> requires IsScalarOrDouble<T>
 MathVector& MathVector::operator*=(const T& in)
 {
     if (!this->IsValid())
-        throw OperatorException('*', this->GetTypeString(), "(Scalar)", "Cannot multiply an error vector.");
+        throw OperatorError('*', *this, Scalar(in), "cannot multiply an error vector.");
 
     auto fac = static_cast<double>(in);
     for (auto& elem : this->Data)
@@ -44,9 +49,12 @@ template<typename T> requires IsScalarOrDouble<T>
 MathVector& MathVector::operator/=(const T& in)
 {
     if (!this->IsValid())
-        throw OperatorException('*', this->GetTypeString(), "(Scalar)", "Cannot divide an error vector.");
+        throw OperatorError('*', *this, Scalar(in), "cannot divide an error vector.");
 
     auto fac = static_cast<double>(in);
+    if (fac == 0)
+        throw OperatorError('*', *this, Scalar(0), "cannot divide by zero");
+    
     for (auto& elem : this->Data)
         elem /= fac;
 

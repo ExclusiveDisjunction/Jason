@@ -6,16 +6,15 @@
 #define JASON_MATHVECTOR_H
 
 #include "Constraints.h"
-#include "../StdCalc.h"
-#include "../VariableType.h"
-#include "../OperatorException.h"
+#include "VariableType.h"
+#include "../Core/Errors.h"
 
 #include <iostream>
 #include <vector>
 #include <string>
 #include <sstream>
 
-class MATH_LIB MathVector : public VariableType
+class MathVector : public VariableType
 {
 private:
     std::vector<double> Data;
@@ -27,33 +26,32 @@ public:
     MathVector(const MathVector &Obj) noexcept;
     MathVector(MathVector &&Obj) noexcept;
 
-    template<std::convertible_to<double>... Args>
-    static MathVector FromList(Args... Value) noexcept;
-
-    [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
-
-    [[nodiscard]] size_t RequiredUnits() const noexcept override;
-    [[nodiscard]] std::vector<Unit> ToBinary() const noexcept override;
-    [[nodiscard]] static MathVector FromBinary(const std::vector<Unit>& in);
-    [[nodiscard]] static std::unique_ptr<MathVector> FromBinaryPtr(const std::vector<Unit>& in);
-
-    [[nodiscard]] std::string GetTypeString() const noexcept override;
-    void Print(std::ostream& out) const noexcept override;
-
     MathVector& operator=(const MathVector &Obj) noexcept;
     MathVector& operator=(MathVector &&Obj) noexcept;
-    [[nodiscard]] VariableTypes GetType() const noexcept override;
-
-    static MathVector ErrorVector();
-
-    [[nodiscard]] unsigned int Dim() const { return Data.size(); }
-    [[nodiscard]] bool IsValid() const { return !Data.empty(); }
+    
+    [[nodiscard]] static MathVector ErrorVector();
+    template<std::convertible_to<double>... Args>
+    [[nodiscard]] static MathVector FromList(Args... Value) noexcept;
 
     double& operator[](unsigned int Index);
     double operator[](unsigned int Index) const;
 
     [[maybe_unused]] [[nodiscard]] double Magnitude() const;
     [[maybe_unused]] [[nodiscard]] double Angle() const;
+
+    [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
+    
+    [[nodiscard]] size_t RequiredUnits() const noexcept override;
+    [[nodiscard]] std::vector<Unit> ToBinary() const noexcept override;
+    [[nodiscard]] static MathVector FromBinary(const std::vector<Unit>& in);
+    [[nodiscard]] static std::unique_ptr<MathVector> FromBinaryPtr(const std::vector<Unit>& in);
+    
+    [[nodiscard]] constexpr VariableTypes GetType() const noexcept override { return VariableTypes::VT_Vector; }
+    void dsp_fmt(std::ostream& out) const noexcept override;
+    void dbg_fmt(std::ostream& out) const noexcept override;
+    
+    [[nodiscard]] unsigned int Dim() const { return Data.size(); }
+    [[nodiscard]] bool IsValid() const { return !Data.empty(); }
 
     [[maybe_unused]] [[nodiscard]] static MathVector CrossProduct(const MathVector &One, const MathVector &Two);
     [[maybe_unused]] [[nodiscard]] static double DotProduct(const MathVector &One, const MathVector &Two);
@@ -77,8 +75,6 @@ public:
     bool operator==(const MathVector& in) const noexcept;
     bool operator!=(const MathVector& in) const noexcept;
 };
-
-std::istream& operator>>(std::istream& in, MathVector& vec);
 
 #include "MathVectorT.tpp"
 

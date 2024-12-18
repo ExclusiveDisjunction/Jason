@@ -4,7 +4,7 @@
 #include <iostream>
 #include "Log.h"
 
-class Version : public DebugFormat
+class Version : public DebugPrint
 {
 public:
     Version() : Version(0, 0, 0) {}

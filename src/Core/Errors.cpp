@@ -4,7 +4,7 @@
 
 #include "Errors.h"
 
-ArgumentError::ArgumentError(const std::string& name, const DebugFormat& value) : ArgumentError(name, value.dbg_fmt_string())
+ArgumentError::ArgumentError(const std::string& name, const DebugPrint& value) : ArgumentError(name, value.dbg_fmt_string())
 {
     
 }
@@ -23,7 +23,7 @@ NullError::NullError(const std::string& name) : ErrorBase(name + " was null")
     
 }
 
-NotFoundError::NotFoundError(const DebugFormat& identifier) : NotFoundError(identifier.dbg_fmt_string())
+NotFoundError::NotFoundError(const DebugPrint& identifier) : NotFoundError(identifier.dbg_fmt_string())
 {
     
 }
@@ -36,7 +36,7 @@ OperatorError::OperatorError(char oper, const std::string& operand1, const std::
 {
     
 }
-OperatorError::OperatorError(const DebugFormat& oper, const std::string& operand1, const std::string& operand2, const std::string& reason) : OperatorError(oper.dbg_fmt_string(), operand1, operand2, reason)
+OperatorError::OperatorError(const DebugPrint& oper, const std::string& operand1, const std::string& operand2, const std::string& reason) : OperatorError(oper.dbg_fmt_string(), operand1, operand2, reason)
 {
     
 }
@@ -45,15 +45,25 @@ OperatorError::OperatorError(const std::string& oper, const std::string& operand
     
 }
 
-OperatorError::OperatorError(char oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason) : OperatorError(std::string(1, oper), operand1.dbg_fmt_string(), operand2.dbg_fmt_string(), reason)
+OperatorError::OperatorError(char oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason) : OperatorError(std::string(1, oper), operand1.dbg_fmt_string(), operand2.dbg_fmt_string(), reason)
 {
     
 }
-OperatorError::OperatorError(const std::string& oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason) : OperatorError(oper, operand1.dbg_fmt_string(), operand2.dbg_fmt_string(), reason)
+OperatorError::OperatorError(const std::string& oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason) : OperatorError(oper, operand1.dbg_fmt_string(), operand2.dbg_fmt_string(), reason)
 {
     
 }
-OperatorError::OperatorError(const DebugFormat& oper, const DebugFormat& operand1, const DebugFormat& operand2, const std::string& reason) : OperatorError(oper.dbg_fmt_string(), operand1.dbg_fmt_string(), operand2.dbg_fmt_string())
+OperatorError::OperatorError(const DebugPrint& oper, const DebugPrint& operand1, const DebugPrint& operand2, const std::string& reason) : OperatorError(oper.dbg_fmt_string(), operand1.dbg_fmt_string(), operand2.dbg_fmt_string())
+{
+    
+}
+
+UnexepctedError::UnexepctedError(const std::string& reason) : ErrorBase(reason)
+{
+    
+}
+
+OperationError::OperationError(const std::string& action, const std::string& reason) : ErrorBase("could not perform action '" + action + "' because of '" + reason + "'")
 {
     
 }

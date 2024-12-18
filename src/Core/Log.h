@@ -8,6 +8,7 @@
 #include <concepts>
 
 #include "DateTime.h"
+#include "Printing.h"
 
 enum LoggerLevel
 {
@@ -18,26 +19,6 @@ enum LoggerLevel
     LL_Error = 4,
     LL_Critical = 5
 };
-
-/// @brief A class that allows specific debugging strings for logging
-class DebugFormat
-{
-public:
-    virtual void dbg_fmt(std::ostream& obj) const noexcept = 0;
-    
-    [[nodiscard]] std::string dbg_fmt_string() const noexcept
-    {
-        std::stringstream ss;
-        this->dbg_fmt(ss);
-        return ss.str();
-    }
-};
-
-std::ostream& operator<<(std::ostream& out, const DebugFormat& obj) noexcept
-{
-    obj.dbg_fmt(out);
-    return out;
-}
 
 class Logger
 {
@@ -86,7 +67,7 @@ public:
     }
 
     Logger& operator<<(const std::string& obj);
-    Logger& operator<<(const DebugFormat& obj);
+    Logger& operator<<(const DebugPrint& obj);
     Logger& operator<<(Logger& (*func)(Logger&));
     template<typename T>
     requires (std::is_arithmetic_v<T> && !std::is_pointer_v<T>)

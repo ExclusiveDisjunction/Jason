@@ -1,5 +1,8 @@
 #include "Matrix.h"
 
+#include "Scalar.h"
+#include "../Core/Errors.h"
+
 //Includes templated functions for matrix.
 
 template<std::convertible_to<double>... args>
@@ -43,7 +46,7 @@ template<typename T> requires IsScalarOrDouble<T>
 Matrix& Matrix::operator*=(const T& Two)
 {
     if (!this->IsValid())
-        throw OperatorException('*', this->GetTypeString(), "(Scalar)", "Empty Matrix");
+        throw OperatorError('*', *this, Scalar(Two), "empty matrix");
 
     auto fac = static_cast<double>(Two);
     for (auto& row : this->Data)
@@ -56,9 +59,12 @@ template<typename T> requires IsScalarOrDouble<T>
 Matrix& Matrix::operator/=(const T& Two)
 {
     if (!this->IsValid())
-        throw OperatorException('/', this->GetTypeString(), "(Scalar)", "Empty Matrix");
+        throw OperatorError('*', *this, Scalar(Two), "empty matrix");
 
     auto fac = static_cast<double>(Two);
+    if (fac == 0)
+        throw OperatorError('*', *this, Scalar(0), "divide by zero");
+    
     for (auto& row : this->Data)
         for (auto& element : row)
             element /= fac;

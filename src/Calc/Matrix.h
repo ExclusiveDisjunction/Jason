@@ -6,18 +6,17 @@
 #define JASON_MATRIX_H
 
 #include "Constraints.h"
-#include "../StdCalc.h"
-#include "../VariableType.h"
-#include "../OperatorException.h"
+#include "VariableType.h"
+#include "../Core/Errors.h"
 
 #include <vector>
 
-class MATH_LIB MathVector;
+class MathVector;
 
 /// <summary>
 /// Represents a rectangular arrangement of numbers for calculations, given some row and column definition.
 /// </summary>
-class MATH_LIB Matrix : public VariableType
+class Matrix : public VariableType, public UIDisplayPrint
 {
 private:
     /// <summary>
@@ -62,8 +61,9 @@ public:
     [[nodiscard]] static std::unique_ptr<Matrix> FromBinaryPtr(const std::vector<Unit>& in);
 
     [[nodiscard]] VariableTypes GetType() const noexcept override;
-    [[nodiscard]] std::string GetTypeString() const noexcept override;
-    void Print(std::ostream& out) const noexcept override;
+    void dbg_fmt(std::ostream& out) const noexcept override;
+    void dsp_fmt(std::ostream& out) const noexcept override;
+    void ui_dsp_fmt(std::ostream& out) const noexcept override;
 
     [[nodiscard]] static Matrix ErrorMatrix();
     [[nodiscard]] static Matrix Identity(unsigned int Size);
@@ -113,17 +113,6 @@ public:
     bool operator==(const Matrix& two) const noexcept;
     bool operator!=(const Matrix& two) const noexcept;
 };
-
-struct MatrixSingleLinePrint {
-    const Matrix& Target;
-};
-inline MatrixSingleLinePrint PrintMatrixOneLine(const Matrix& obj) noexcept
-{
-    return MatrixSingleLinePrint { obj };
-}
-
-std::ostream& operator<<(std::ostream& out, const MatrixSingleLinePrint& Obj);
-std::istream& operator>>(std::istream& in, Matrix& obj);
 
 #include "MatrixT.tpp"
 

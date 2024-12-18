@@ -1,6 +1,7 @@
 #include "MathVector.h"
 
 #include <utility>
+#include <ranges>
 
 MathVector::MathVector() : Data()
 {
@@ -109,7 +110,7 @@ MathVector MathVector::FromBinary(const std::vector<Unit>& in)
     if (in.empty())
         throw std::logic_error("No data provided");
     
-    unsigned int dim = in[0].Convert<unsigned int>();
+    auto dim = in[0].Convert<unsigned int>();
     if (in.size() < dim + 1)
         throw std::logic_error("Not enough data provided.");
 
@@ -129,26 +130,19 @@ std::unique_ptr<MathVector> MathVector::FromBinaryPtr(const std::vector<Unit>& i
 {
     return std::make_unique<MathVector>(std::move(MathVector::FromBinary(in)));
 }
-VariableTypes MathVector::GetType() const noexcept
+void MathVector::dbg_fmt(std::ostream& out) const noexcept
 {
-    return VariableTypes::VT_Vector;
-}
-std::string MathVector::GetTypeString() const noexcept
-{
-    std::stringstream ss;
-    ss << "(Vector:";
+    out << "(Vector:";
     if (!this->IsValid())
-        ss << "Err)";
+        out << "Err)";
     else
-        ss << this->Dim();
-    ss << ")";
-
-    return ss.str();
+        out << this->Dim();
+    out << ")";
 }
-void MathVector::Print(std::ostream& out) const noexcept
+void MathVector::dsp_fmt(std::ostream& out) const noexcept
 {
     out << "{ ";
-    size_t d = this->Data.size();
+    size_t d = this->Dim();
     for (unsigned i = 0; i < d; i++)
         out << this->Data[i] << (i == d - 1 ? " " : ", ");
     out << '}';
@@ -157,7 +151,7 @@ void MathVector::Print(std::ostream& out) const noexcept
 MathVector MathVector::CrossProduct(const MathVector& One, const MathVector& Two)
 {
     if (Two.Dim() != One.Dim())
-        throw OperatorException('X', One.GetTypeString(), Two.GetTypeString(), "Cannot cross vectors with different dimensions.");
+        throw OperatorError('X', One, Two, "cannot cross vectors with different dimensions");
 
     MathVector A, B;
     switch (One.Dim())
@@ -171,7 +165,7 @@ MathVector MathVector::CrossProduct(const MathVector& One, const MathVector& Two
         B = Two;
         break;
     default:
-        throw OperatorException('X', One.GetTypeString(), Two.GetTypeString(), "Cannot cross with these dimensions.");
+        throw OperatorError('X', One, Two, "cross is only defined for d={2,3}");
     }
 
     return MathVector::FromList((A[1] * B[2]) - (A[2] * B[1]), (A[2] * B[0]) - (A[0] * B[2]), (A[0] * B[1]) - (A[1] * B[0])); //Uses the cross product equation.
@@ -179,8 +173,8 @@ MathVector MathVector::CrossProduct(const MathVector& One, const MathVector& Two
 double MathVector::DotProduct(const MathVector& One, const MathVector& Two)
 {
     if (One.Dim() != Two.Dim())
-        throw std::logic_error("The dimensions of the two vectors do not match.");
-
+        throw OperatorError("dot", One, Two, "dimension mismatch");
+    
     double Return = 0.0;
     for (auto i = One.Data.begin(), j = Two.Data.begin(); i != One.Data.end() && j != Two.Data.end(); i++, j++)
         Return += *i + *j;
@@ -204,10 +198,10 @@ MathVector MathVector::operator-(const MathVector& in) const
 MathVector& MathVector::operator+=(const MathVector& in)
 {
     if (!this->IsValid() || !in.IsValid())
-        throw OperatorException('+', *this, in, "Cannot combine error vectors.");
+        throw OperatorError('+', *this, in, "cannot combine error vectors");
 
     if (this->Dim() != in.Dim())
-        throw OperatorException('+', *this, in, "Dimension mismatch");
+        throw OperatorError('+', *this, in, "dimension mismatch");
 
     auto i = this->Data.begin();
     auto j = in.Data.begin();
@@ -220,10 +214,10 @@ MathVector& MathVector::operator+=(const MathVector& in)
 MathVector& MathVector::operator-=(const MathVector& in)
 {
     if (!this->IsValid() || !in.IsValid())
-        throw OperatorException('-', *this, in, "Cannot combine error vectors.");
+        throw OperatorError('-', *this, in, "cannot combine error vectors");
 
     if (this->Dim() != in.Dim())
-        throw OperatorException('-', *this, in, "Dimension mismatch");
+        throw OperatorError('-', *this, in, "dimension mismatch");
 
     auto i = this->Data.begin();
     auto j = in.Data.begin();

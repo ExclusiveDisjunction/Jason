@@ -1,5 +1,7 @@
 #include "Scalar.h"
 
+#include "../Core/Errors.h"
+
 //Stores templated functions for scalar.
 
 template<typename T> requires IsScalarOrDouble<T>
@@ -32,13 +34,8 @@ Scalar Scalar::operator*(const T& in) const noexcept
 template<typename T> requires IsScalarOrDouble<T>
 Scalar Scalar::operator/(const T& in) const
 {
-    //FIX THIS LATER
-    auto conv = static_cast<double>(in);
-    if (conv == 0) //div by zero
-        throw OperatorException('/', this->GetTypeString(), this->GetTypeString(), "Divide by zero");
-
     Scalar result(*this);
-    result /= conv;
+    result /= in;
     return result;
 }
 
@@ -65,14 +62,14 @@ Scalar& Scalar::operator/=(const T& in)
 {
     auto conv = static_cast<double>(in);
     if (conv == 0)
-        throw OperatorException('/', this->GetTypeString(), this->GetTypeString(), "Divide by zero");
+        throw OperatorError('/', *this, Scalar(0), "Divide by zero");
 
     this->Data /= conv;
     return *this;
 }
 
 template<typename T> requires IsScalarOrDouble<T>
-[[nodiscard]] Scalar Scalar::Pow(const T& in) const noexcept
+Scalar Scalar::Pow(const T& in) const noexcept
 {
     return Scalar { pow(static_cast<double>(*this), static_cast<double>(in)) };
 }

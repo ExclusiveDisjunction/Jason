@@ -184,7 +184,7 @@ Matrix Matrix::FromBinary(const std::vector<Unit>& in)
     if (in.size() < 2)
         throw std::logic_error("No data provided");
     
-    unsigned int rows = in[0].Convert<unsigned int>(), cols = in[1].Convert<unsigned int>();
+    auto rows = in[0].Convert<unsigned int>(), cols = in[1].Convert<unsigned int>();
     if (in.size() < rows * cols + 2)
         throw std::logic_error("Not enough data provided.");
 
@@ -205,12 +205,6 @@ Matrix Matrix::FromBinary(const std::vector<Unit>& in)
 std::unique_ptr<Matrix> Matrix::FromBinaryPtr(const std::vector<Unit>& in)
 {
     return std::make_unique<Matrix>(std::move(Matrix::FromBinary(in)));
-}
-std::string Matrix::GetTypeString() const noexcept
-{
-    std::stringstream ss;
-    ss << "(Matrix:" << rows << "x" << cols << ")";
-    return ss.str();
 }
 
 Matrix Matrix::Extract(unsigned int StartI, unsigned int StartJ, unsigned int RowCount, unsigned int ColumnCount)
@@ -253,7 +247,7 @@ void Matrix::RowAdd(unsigned int OrigRow, double Fac, unsigned int TargetRow)
         Data[TargetRow][j] += Data[OrigRow][j] * Fac;
 }
 
-[[maybe_unused]] double Matrix::Determinant() const
+double Matrix::Determinant() const
 {
     if (this->rows != this->cols)
         throw std::logic_error("The matrix must be square");
@@ -534,7 +528,7 @@ bool Matrix::GetRowString(std::ostream& out, unsigned row, Matrix::ColumnSchema&
     out << close;
     return out.good(); //If out.bad(), this returns false.
 }
-void Matrix::Print(std::ostream& out) const noexcept
+void Matrix::ui_dsp_fmt(std::ostream& out) const noexcept
 {
     if (!this->IsValid())
     {
@@ -575,14 +569,34 @@ void Matrix::Print(std::ostream& out) const noexcept
 
 
 }
+void Matrix::dbg_fmt(std::ostream& out) const noexcept
+{
+    out << "(Matrix:" << rows << "x" << cols << ")";
+}
+void Matrix::dsp_fmt(std::ostream& out) const noexcept
+{
+    if (!this->IsValid())
+        out << "[empty matrix]";
+    else
+    {
+        out << "[ ";
+        for (const auto& row : this->Data)
+        {
+            for (const auto& item : row)
+                out << ' ' << item;
+            out << ";";
+        }
+        out << " ]";
+    }
+}
 
 Matrix Matrix::operator|(const Matrix& Two) const
 {
     if (!IsValid() || !Two.IsValid())
-        throw OperatorException('|', GetTypeString(), Two.GetTypeString(), "Cannot augment empty matrix");
+        throw OperatorError('|', *this, Two, "one or both is empty");
 
-    if (cols != Two.cols)
-        throw OperatorException('|', GetTypeString(), Two.GetTypeString(), "Row dimensions do not match.");
+    if (this->rows != Two.rows)
+        throw OperatorError('|', *this, Two, "row size mismatch");
 
     unsigned int OneRows = rows, OneColumns = cols, TwoColumns = Two.cols;
     Matrix Return(OneRows, OneColumns + TwoColumns);
@@ -628,10 +642,10 @@ Matrix Matrix::operator*(const Matrix& Two) const
 Matrix& Matrix::operator+=(const Matrix& Two)
 {
     if (!this->IsValid() || !Two.IsValid())
-        throw OperatorException('+', this->GetTypeString(), Two.GetTypeString(), "Empty Matrix");
+        throw OperatorError('+', *this, Two, "empty matrix");
 
     if (this->rows != Two.rows || this->cols != Two.cols)
-        throw OperatorException('+', this->GetTypeString(), Two.GetTypeString(), "Dimension Mismatch");
+        throw OperatorError('+', this->GetTypeString(), Two.GetTypeString(), "dimension mismatch");
 
     for (unsigned i = 0; i < this->rows; i++)
         for (unsigned j = 0; j < this->cols; j++)
@@ -642,10 +656,10 @@ Matrix& Matrix::operator+=(const Matrix& Two)
 Matrix& Matrix::operator-=(const Matrix& Two)
 {
     if (!this->IsValid() || !Two.IsValid())
-        throw OperatorException('-', this->GetTypeString(), Two.GetTypeString(), "Empty Matrix");
+        throw OperatorError('-', *this, Two, "empty matrix");
 
     if (this->rows != Two.rows || this->cols != Two.cols)
-        throw OperatorException('-', this->GetTypeString(), Two.GetTypeString(), "Dimension Mismatch");
+        throw OperatorError('-', this->GetTypeString(), Two.GetTypeString(), "dimension mismatch");
 
     for (unsigned i = 0; i < this->rows; i++)
         for (unsigned j = 0; j < this->cols; j++)
@@ -656,10 +670,10 @@ Matrix& Matrix::operator-=(const Matrix& Two)
 Matrix& Matrix::operator*=(const Matrix& Two)
 {
     if (!this->IsValid() || !Two.IsValid())
-        throw OperatorException('*', this->GetTypeString(), Two.GetTypeString(), "Empty Matrix");
+        throw OperatorError('*', *this, Two, "empty matrix");
 
-    if (this->cols != Two.rows)
-        throw OperatorException('*', this->GetTypeString(), Two.GetTypeString(), "Dimension mismatch");
+    if (this->rows != Two.rows || this->cols != Two.cols)
+        throw OperatorError('*', this->GetTypeString(), Two.GetTypeString(), "dimension mismatch");
 
     unsigned r = this->rows, c = Two.cols;
 
@@ -678,10 +692,10 @@ Matrix& Matrix::operator*=(const Matrix& Two)
     return *this;
 }
 
-[[nodiscard]] Matrix Matrix::Pow(unsigned long long Two) const
+Matrix Matrix::Pow(unsigned long long Two) const
 {
     if (!this->IsValid())
-        throw OperatorException('^', this->GetTypeString(), "(Scalar)", "Empty Matrix");
+        throw OperatorError('^', this->GetTypeString(), "(Scalar:" + std::to_string(Two) + ")", "Empty Matrix");
 
     if (Two == 0)
         return Matrix::Identity(this->rows, this->cols);
@@ -689,8 +703,8 @@ Matrix& Matrix::operator*=(const Matrix& Two)
         return *this;
     else
     {
-        if (this->rows != this->cols)
-            throw OperatorException('^', this->GetTypeString(), "(Scalar)", "Non-square matrix does not support powers greater than 1");
+        if (!this->IsSquare())
+            throw OperatorError('^', this->GetTypeString(), "(Scalar:" + std::to_string(Two) + ")", "Non-square matrix does not support powers greater than 1");
 
         Matrix result(*this);
         for (unsigned long long i = 1; i < Two; i++)
@@ -698,22 +712,4 @@ Matrix& Matrix::operator*=(const Matrix& Two)
 
         return result;
     }
-}
-
-std::ostream& operator<<(std::ostream& out, const MatrixSingleLinePrint& Obj)
-{
-    out << '[';
-
-    for (const auto& row : Obj.Target.Data)
-    {
-        const double& last = row.back();
-        for (const auto& elem : row)
-            out << (elem == last ? " " : ", ") << elem;
-
-        out << ';';
-    }
-
-    out << " ]";
-
-    return out;
 }

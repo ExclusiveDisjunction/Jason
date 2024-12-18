@@ -5,9 +5,9 @@
 #ifndef JASON_NUMERICS_H
 #define JASON_NUMERICS_H
 
-#include "Numerics/Scalar.h"
-#include "Numerics/Complex.h"
-#include "Numerics/MathVector.h"
-#include "Numerics/Matrix.h"
+#include "Scalar.h"
+#include "Complex.h"
+#include "MathVector.h"
+#include "Matrix.h"
 
 #endif //JASON_NUMERICS_H
