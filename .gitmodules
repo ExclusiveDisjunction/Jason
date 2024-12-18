@@ -1,6 +1,6 @@
-[submodule "Jason.cli"]
-	path = Jason.cli
-	url = ./Jason.cli
+[submodule "Jason-cli"]
+	path = Jason-cli
+	url = ./Jason-cli
 [submodule "Jason.cli-old"]
 	path = Jason.cli-old
 	url = ./Jason.cli-old
