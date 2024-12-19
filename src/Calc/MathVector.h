@@ -50,7 +50,7 @@ public:
     void dsp_fmt(std::ostream& out) const noexcept override;
     void dbg_fmt(std::ostream& out) const noexcept override;
     
-    [[nodiscard]] unsigned int Dim() const { return Data.size(); }
+    [[nodiscard]] size_t Dim() const { return Data.size(); }
     [[nodiscard]] bool IsValid() const { return !Data.empty(); }
 
     [[maybe_unused]] [[nodiscard]] static MathVector CrossProduct(const MathVector &One, const MathVector &Two);

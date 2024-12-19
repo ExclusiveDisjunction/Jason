@@ -1,4 +1,6 @@
-#include "DateTime.h" 
+#include "DateTime.h"
+
+#include "Errors.h"
 
 #include <sstream>
 #include <chrono>
@@ -48,11 +50,7 @@ DateTime::DateTime(int Month, int Day, int Year, int Hour, int Minute, int Secon
 		throw e;
 	}
 }
-DateTime::DateTime(const duration<double>& Dur) : _Dur(Dur) { }
-DateTime::DateTime(const std::string& sterilized) 
-{
-	*this = DateTime::FromSterilize(sterilized);
-}
+DateTime::DateTime(duration<double> Dur) : _Dur(std::move(Dur)) { }
 
 DateTime DateTime::Today()
 {
@@ -70,90 +68,90 @@ DateTime DateTime::Now()
 	return Return;
 }
 
-int DateTime::Year() const
+long DateTime::Year() const
 {
 	duration<double> This = this->_Dur;
 	return Year(This) + 1970;
 }
-int DateTime::Year(duration<double>& Remain) const
+long DateTime::Year(duration<double>& Remain) const
 {
 	years Return = duration_cast<years>(Remain);
 	Remain -= Return;
 
 	return Return.count();
 }
-int DateTime::Month() const
+long DateTime::Month() const
 {
 	duration<double> This = this->_Dur;
 	Year(This);
 	return Month(This) + 1;
 }
-int DateTime::Month(std::chrono::duration<double>& Remain) const
+long DateTime::Month(std::chrono::duration<double>& Remain) const
 {
 	months Return = duration_cast<months>(Remain);
 	Remain -= Return;
 
 	return Return.count();
 }
-int DateTime::Day() const
+long DateTime::Day() const
 {
 	duration<double> This = this->_Dur;
 	Month(This);
 	return Day(This) + 1;
 }
-int DateTime::Day(std::chrono::duration<double>& Remain) const
+long DateTime::Day(std::chrono::duration<double>& Remain) const
 {
 	days Return = duration_cast<days>(Remain);
 	Remain -= Return;
 
 	return Return.count();
 }
-int DateTime::Hour() const
+long DateTime::Hour() const
 {
 	duration<double> This = this->_Dur;
 	Day(This);
 	return Hour(This);
 }
-int DateTime::Hour(std::chrono::duration<double>& Remain) const
+long DateTime::Hour(std::chrono::duration<double>& Remain) const
 {
 	hours Return = duration_cast<hours>(Remain);
 	Remain -= Return;
 
 	return Return.count();
 }
-int DateTime::Minute() const
+long DateTime::Minute() const
 {
 	duration<double> This = this->_Dur;
 	Hour(This);
 	return Minute(This);
 }
-int DateTime::Minute(std::chrono::duration<double>& Remain) const
+long DateTime::Minute(std::chrono::duration<double>& Remain) const
 {
 	minutes Return = duration_cast<minutes>(Remain);
 	Remain -= Return;
 
 	return Return.count();
 }
-int DateTime::Second() const
+long DateTime::Second() const
 {
 	duration<double> This = this->_Dur;
 	Minute(This);
 	return Second(This);
 }
-int DateTime::Second(std::chrono::duration<double>& Remain) const
+long DateTime::Second(std::chrono::duration<double>& Remain) const
 {
 	seconds Return = duration_cast<seconds>(Remain);
 	Remain -= Return;
 
 	return static_cast<int>(Return.count());
 }
-int DateTime::Millisecond() const
+long DateTime::Millisecond() const
 {
 	duration<double> This = this->_Dur;
 	Second(This);
 	return Millisecond(This);
 }
-int DateTime::Millisecond(duration<double>& Remain) const
+long DateTime::Millisecond(duration<double>& Remain) const
 {
 	milliseconds Return = duration_cast<milliseconds>(Remain);
 	Remain -= Return;
@@ -195,7 +193,7 @@ DateTime DateTime::TimeParts() const
 
 std::string DateTime::ToString(DateStringFormat date) const
 {
-	int Year = this->Year(), Month = this->Month(), Day = this->Day();
+	auto Year = this->Year(), Month = this->Month(), Day = this->Day();
 
 	std::stringstream Return;
 	switch (date)
@@ -313,7 +311,7 @@ std::string DateTime::ToString(DateStringFormat date) const
 }
 std::string DateTime::ToString(TimeStringFormat time) const
 {
-	int Hour = this->Hour(), Minute = this->Minute(), Second = this->Second(), Millisecond = this->Millisecond();
+	auto Hour = this->Hour(), Minute = this->Minute(), Second = this->Second(), Millisecond = this->Millisecond();
 	std::stringstream Return;
 
 	switch (time)
@@ -414,35 +412,71 @@ std::string DateTime::ToString(DateStringFormat date, TimeStringFormat time, boo
 			return datePart + " at " + timePart;
 	}
 }
-std::string DateTime::Sterilize() const
-{
-	return to_string(_Dur.count());
-}
-DateTime DateTime::FromSterilize(const std::string& Value)
-{
-	stringstream Stream(Value);
-	double NumVal = 0.0;
-	Stream >> NumVal;
 
-	return DateTime(duration<double>(NumVal));
+void DateTime::str_serialize(std::ostream &out) const noexcept
+{
+    out << _Dur.count();
+}
+void DateTime::str_deserialize(std::istream &in)
+{
+    std::chrono::duration<double>::rep data;
+    in >> data;
+    this->_Dur = std::chrono::duration<double>(data);
+}
+std::vector<Unit> DateTime::binary_serialize(unsigned char bytes_size) const noexcept
+{
+    return { Unit::FromVar(this->_Dur.count()) };
+}
+void DateTime::binary_deserialize(unsigned char bytes_size, const std::vector<Unit> &data)
+{
+    if (bytes_size != sizeof(std::chrono::duration<double>::rep))
+        throw ConversionError("binary_deserialize", "size mismatch");
+    else if (data.size() < 1)
+        throw ConversionError("binary_deserialize", "not enough data");
+    
+    this->_Dur = std::chrono::duration<double>( data[0].Convert<std::chrono::duration<double>::rep>() );
 }
 
-bool DateTime::operator==(const DateTime& Two) const
+void DateTime::dbg_fmt(std::ostream& out) const noexcept
+{
+    out << this->ToString(DateStringFormat::ShortDate, TimeStringFormat::ExtendedTime, false);
+}
+void DateTime::dsp_fmt(std::ostream& out) const noexcept
+{
+    out << this->ToString(DateStringFormat::ShortDate, TimeStringFormat::ShortTime12H, true);
+}
+void DateTime::ui_dsp_fmt(std::ostream& out) const noexcept
+{
+    out << this->ToString(DateStringFormat::LongDate, TimeStringFormat::ShortTime12H, true);
+}
+
+std::partial_ordering DateTime::operator<=>(const DateTime& two) const noexcept
+{
+    return this->_Dur <=> two._Dur;
+}
+bool DateTime::operator==(const DateTime& Two) const noexcept
 {
 	return _Dur == Two._Dur;
 }
-bool DateTime::operator!=(const DateTime& Two) const
+bool DateTime::operator!=(const DateTime& Two) const noexcept
 {
 	return _Dur != Two._Dur;
 }
-
-bool DateTime::operator<(const DateTime& Two) const
+bool DateTime::operator<(const DateTime& Two) const noexcept
 {
 	return _Dur < Two._Dur;
 }
-bool DateTime::operator>(const DateTime& Two) const
+bool DateTime::operator<=(const DateTime& Two) const noexcept
+{
+    return _Dur <= Two._Dur;
+}
+bool DateTime::operator>(const DateTime& Two) const noexcept
 {
 	return _Dur > Two._Dur;
+}
+bool DateTime::operator>=(const DateTime& Two) const noexcept
+{
+    return _Dur >= Two._Dur;
 }
 
 DateTime DateTime::operator+(const DateTime& Two) const
@@ -462,10 +496,4 @@ DateTime& DateTime::operator-=(const DateTime& Two)
 {
 	_Dur -= Two._Dur;
 	return *this;
-}
-
-std::ostream& operator<<(std::ostream& out, const DateTime& Obj)
-{
-	out << Obj.ToString(DateStringFormat::ShortDate, TimeStringFormat::ShortTime12H);
-	return out;
 }

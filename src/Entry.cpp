@@ -3,6 +3,8 @@
 #include "Core/Log.h"
 #include "Core/Version.h"
 
+#include "Calc/NumericsTester.h"
+
 int main(int, char**)
 {
     std::cout << " Welcome to Jason " << '\n'
@@ -17,7 +19,11 @@ int main(int, char**)
 
     logging << Info << "Starting up Jason" << EndLog;
 
-    //IOTester();
+    if (NumericsTester())
+        std::cout << "All tests passed" << std::endl;
+    else
+        std::cout << "Some tests failed" << std::endl;
+    
 
     logging << Info << "Exiting Jason, Exit Code 0" << EndLog;
     return 0;

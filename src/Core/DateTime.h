@@ -4,6 +4,9 @@
 #include <chrono>
 #include <string>
 
+#include "Printing.h"
+#include "Serialize.h"
+
 enum class DateStringFormat
 {
 	None, //This means there is nothing here.
@@ -22,7 +25,7 @@ enum class TimeStringFormat
 	ExtendedDuration, //## Hours, ## Minutes, ## Seconds, ## Miliseconds
 };
 
-class DateTime
+class DateTime : public DebugPrint, public DisplayPrint, public UIDisplayPrint, public StringSerialize, public StringDeserialize, public BinarySerialize, public BinaryDeserialize
 {
 private:
 	std::chrono::duration<double> _Dur;
@@ -35,25 +38,24 @@ public:
 	DateTime(int Month, int Day, int Year);
 	DateTime(int Hour, int Minute, int Second, int Millisecond);
 	DateTime(int Month, int Day, int Year, int Hour, int Minute, int Second, int Millisecond);
-	DateTime(const std::string& BackString);
-	DateTime(const std::chrono::duration<double>& Tm);
+	DateTime(std::chrono::duration<double> Tm);
 
 	//bool HasValue = true, HasDay = true, HasTime = true;
 
-	int Year() const;
-	int Year(std::chrono::duration<double>& Remain) const;
-	int Month() const;
-	int Month(std::chrono::duration<double>& Remain) const;
-	int Day() const;
-	int Day(std::chrono::duration<double>& Remain) const;
-	int Hour() const;
-	int Hour(std::chrono::duration<double>& Remain) const;
-	int Minute() const;
-	int Minute(std::chrono::duration<double>& Remain) const;
-	int Second() const;
-	int Second(std::chrono::duration<double>& Remain) const;
-	int Millisecond() const;
-	int Millisecond(std::chrono::duration<double>& Remain) const;
+    long Year() const;
+    long Year(std::chrono::duration<double>& Remain) const;
+    long Month() const;
+    long Month(std::chrono::duration<double>& Remain) const;
+    long Day() const;
+    long Day(std::chrono::duration<double>& Remain) const;
+    long Hour() const;
+    long Hour(std::chrono::duration<double>& Remain) const;
+    long Minute() const;
+    long Minute(std::chrono::duration<double>& Remain) const;
+    long Second() const;
+    long Second(std::chrono::duration<double>& Remain) const;
+    long Millisecond() const;
+    long Millisecond(std::chrono::duration<double>& Remain) const;
 
 	DateTime DayParts() const;
 	DateTime TimeParts() const;
@@ -61,15 +63,23 @@ public:
 	std::string ToString(DateStringFormat date) const;
 	std::string ToString(TimeStringFormat time) const;
 	std::string ToString(DateStringFormat date, TimeStringFormat time, bool JoinStrings = true) const;
-	std::string Sterilize() const;
-	static DateTime FromSterilize(const std::string& in);
+    
+    void dbg_fmt(std::ostream& out) const noexcept override;
+    void dsp_fmt(std::ostream& out) const noexcept override;
+    void ui_dsp_fmt(std::ostream& out) const noexcept override;
+    
+    void str_serialize(std::ostream& out) const noexcept override;
+    void str_deserialize(std::istream& in) override;
+    std::vector<Unit> binary_serialize(unsigned char bytes_size) const noexcept override;
+    void binary_deserialize(unsigned char bytes_size, const std::vector<Unit>& data) override;
 
-	friend std::ostream& operator<<(std::ostream& out, const DateTime& Obj); //Uses ToString(ShortDate, ShortTime12HR)
-
-	bool operator==(const DateTime& Obj) const;
-	bool operator!=(const DateTime& Obj) const;
-	bool operator<(const DateTime& Obj) const;
-	bool operator>(const DateTime& Obj) const;
+    std::partial_ordering operator<=>(const DateTime& obj) const noexcept;
+    bool operator==(const DateTime& Obj) const noexcept;
+    bool operator!=(const DateTime& Obj) const noexcept;
+    bool operator<(const DateTime& obj) const noexcept;
+    bool operator<=(const DateTime& obj) const noexcept;
+    bool operator>(const DateTime& obj) const noexcept;
+    bool operator>=(const DateTime& obj) const noexcept;
 
 	DateTime operator-(const DateTime& Obj) const;
 	DateTime operator+(const DateTime& Obj) const;

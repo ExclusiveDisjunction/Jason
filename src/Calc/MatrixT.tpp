@@ -6,7 +6,7 @@
 //Includes templated functions for matrix.
 
 template<std::convertible_to<double>... args>
-Matrix Matrix::FromList(unsigned Rows, unsigned Columns, args... vals)
+Matrix Matrix::FromList(size_t Rows, size_t Columns, args... vals)
 {
     std::vector<double> conv = std::vector<double>({ static_cast<double>(vals)... });
     if (conv.size() != Rows * Columns)

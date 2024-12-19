@@ -61,6 +61,10 @@ Complex Complex::FromPolar(const std::pair<double, double>& polar) noexcept
     return Complex(x, y);
 }
 
+std::vector<Unit> Complex::ToBinary() const noexcept
+{
+    return { Unit::FromVar(this->a), Unit::FromVar(this->b) };
+}
 Complex Complex::FromBinary(const std::vector<Unit>& in)
 {
     if (in.size() < 2)
@@ -165,8 +169,10 @@ Complex& Complex::operator/=(const Complex& b)
 {
     std::pair<double, double> polarA = this->ToPolar(), polarB = b.ToPolar();
     
-    if (polarB.first == 0)
+    if (b.a == 0 && b.b == 0)
         throw OperatorError('/', *this, b, "magnitude of second operand is zero");
+    
+    //Fix division
     
     std::pair<double, double> newPolar =
         std::make_pair<double, double>(

@@ -84,10 +84,6 @@ public:
 
     Unit& operator=(const Unit& obj) noexcept;
     Unit& operator=(Unit&& obj) noexcept;
-    template<typename T> requires is_different_v<T, Unit>
-    Unit& operator=(const T& obj) noexcept;
-    template<typename T> requires is_different_v<T, Unit>
-    Unit& operator=(const std::vector<T>& items);
 
     /// @brief Attempts to convert the unit into a specific output type. Throws `bad_cast` if the conversion is invalid (size mismatch)
     /// @tparam T The type to convert into

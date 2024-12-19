@@ -21,7 +21,7 @@ Scalar Scalar::FromBinary(const std::vector<Unit>& in)
 }
 std::unique_ptr<Scalar> Scalar::FromBinaryPtr(const std::vector<Unit>& in)
 {
-    return std::make_unique<Scalar>(std::move(FromBinary(in)));
+    return std::make_unique<Scalar>( FromBinary(in) );
 }
 void Scalar::dbg_fmt(std::ostream& out) const noexcept
 {

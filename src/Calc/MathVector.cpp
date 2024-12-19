@@ -94,12 +94,12 @@ std::vector<Unit> MathVector::ToBinary() const noexcept
 {
     std::vector<Unit> result;
     result.resize(this->RequiredUnits());
-    result[0] = this->Dim();
+    result[0] = Unit::FromVar(this->Dim());
 
-    auto curr = result.begin() + 1,  end = result.end();
+    auto curr = result.begin() + 1;
     for (const auto& item : this->Data)
     {
-        *curr = item;
+        *curr = Unit::FromVar(item);
         curr++;
     }
 
@@ -128,7 +128,7 @@ MathVector MathVector::FromBinary(const std::vector<Unit>& in)
 }
 std::unique_ptr<MathVector> MathVector::FromBinaryPtr(const std::vector<Unit>& in) 
 {
-    return std::make_unique<MathVector>(std::move(MathVector::FromBinary(in)));
+    return std::make_unique<MathVector>( MathVector::FromBinary(in) );
 }
 void MathVector::dbg_fmt(std::ostream& out) const noexcept
 {
