@@ -22,7 +22,7 @@ private:
     MathVector();
 
 public:
-    explicit MathVector(unsigned int Dim, double Val = 0.0);
+    explicit MathVector(size_t Dim, double Val = 0.0);
     MathVector(const MathVector &Obj) noexcept;
     MathVector(MathVector &&Obj) noexcept;
 
@@ -33,8 +33,8 @@ public:
     template<std::convertible_to<double>... Args>
     [[nodiscard]] static MathVector FromList(Args... Value) noexcept;
 
-    double& operator[](unsigned int Index);
-    double operator[](unsigned int Index) const;
+    double& operator[](size_t Index);
+    double operator[](size_t Index) const;
 
     [[maybe_unused]] [[nodiscard]] double Magnitude() const;
     [[maybe_unused]] [[nodiscard]] double Angle() const;

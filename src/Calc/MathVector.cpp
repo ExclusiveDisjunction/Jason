@@ -7,7 +7,7 @@ MathVector::MathVector() : Data()
 {
 
 }
-MathVector::MathVector(unsigned int Dim, double Val) : MathVector()
+MathVector::MathVector(size_t Dim, double Val) : MathVector()
 {
     if (Dim == 0)
         return; //No allocations take place.
@@ -50,14 +50,14 @@ std::unique_ptr<VariableType> MathVector::Clone() const noexcept
     return std::make_unique<MathVector>(*this);
 }
 
-double& MathVector::operator[](unsigned int Index)
+double& MathVector::operator[](size_t Index)
 {
     if (Index >= Dim())
         throw std::logic_error("The index provided is invalid.");
 
     return Data[Index];
 }
-double MathVector::operator[](unsigned int Index) const
+double MathVector::operator[](size_t Index) const
 {
     if (Index >= Dim())
         throw std::logic_error("The index provided is invalid.");
@@ -110,7 +110,7 @@ MathVector MathVector::FromBinary(const std::vector<Unit>& in)
     if (in.empty())
         throw std::logic_error("No data provided");
     
-    auto dim = in[0].Convert<unsigned int>();
+    auto dim = in[0].Convert<size_t>();
     if (in.size() < dim + 1)
         throw std::logic_error("Not enough data provided.");
 
@@ -177,22 +177,60 @@ double MathVector::DotProduct(const MathVector& One, const MathVector& Two)
     
     double Return = 0.0;
     for (auto i = One.Data.begin(), j = Two.Data.begin(); i != One.Data.end() && j != Two.Data.end(); i++, j++)
-        Return += *i + *j;
+        Return += (*i) * (*j);
 
     return Return;
 }
 
 MathVector MathVector::operator+(const MathVector& in) const
 {
-    MathVector result(*this);
-    result += in;
-    return result;
+    //Because our vectors can be added with different dimensions, we cannot call +=.
+    
+    if (this->Dim() == in.Dim())
+    {
+        MathVector result(*this);
+        result += in;
+        return result;
+    }
+    else
+    {
+        MathVector result(this->Dim() >= in.Dim() ? *this : in);
+        const MathVector& lesser = (this->Dim() < in.Dim() ? *this : in);
+        
+        auto result_iter = result.Data.begin();
+        for (const auto& item : lesser.Data)
+        {
+            *result_iter += item;
+            result_iter++;
+        }
+        
+        return result;
+    }
 }
 MathVector MathVector::operator-(const MathVector& in) const
 {
-    MathVector result(*this);
-    result -= in;
-    return result;
+    //Because our vectors can be added with different dimensions, we cannot call -=.
+    
+    if (this->Dim() == in.Dim())
+    {
+        MathVector result(*this);
+        result -= in;
+        return result;
+    }
+    else
+    {
+        MathVector result(this->Dim() >= in.Dim() ? *this : in);
+        const MathVector& lesser = (this->Dim() < in.Dim() ? *this : in);
+        
+        auto result_iter = result.Data.begin();
+        for (const auto& item : lesser.Data)
+        {
+            *result_iter -= item;
+            result_iter++;
+        }
+        
+        return result;
+    }
 }
 
 MathVector& MathVector::operator+=(const MathVector& in)
