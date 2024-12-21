@@ -423,11 +423,11 @@ void DateTime::str_deserialize(std::istream &in)
     in >> data;
     this->_Dur = std::chrono::duration<double>(data);
 }
-std::vector<Unit> DateTime::binary_serialize(unsigned char bytes_size) const noexcept
+std::vector<BinaryUnit> DateTime::binary_serialize(unsigned char bytes_size) const noexcept
 {
-    return { Unit::FromVar(this->_Dur.count()) };
+    return { BinaryUnit::FromVar(this->_Dur.count()) };
 }
-void DateTime::binary_deserialize(unsigned char bytes_size, const std::vector<Unit> &data)
+void DateTime::binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit> &data)
 {
     if (bytes_size != sizeof(std::chrono::duration<double>::rep))
         throw ConversionError("binary_deserialize", "size mismatch");

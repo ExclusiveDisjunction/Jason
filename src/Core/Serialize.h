@@ -10,26 +10,40 @@
 
 #include "BinaryUnit.h"
 
-class StringSerialize
+class StringSerializable
 {
 public:
     virtual void str_serialize(std::ostream& out) const noexcept = 0;
-};
-class StringDeserialize
-{
-public:
     virtual void str_deserialize(std::istream& in) = 0;
 };
 
-class BinarySerialize
+//string seralalize temporary
+template<typename T>
+struct sst
 {
+private:
+    T& obj;
+    
 public:
-    virtual std::vector<Unit> binary_serialize(unsigned char bytes_size) const noexcept = 0;
+    sst(T& obj) : obj(obj) {}
+    
+    friend std::ostream& operator<<(std::ostream&, const sst<const StringSerializable>&) noexcept;
+    friend std::istream& operator>>(std::istream&, sst<StringSerializable>& obj);
 };
-class BinaryDeserialize
+
+sst<const StringSerializable> StrSerialize(const StringSerializable& obj) noexcept;
+sst<StringSerializable> StrDeserialize(StringSerializable& obj) noexcept;
+
+// I think it would be more worth while to write the binary serializer that will handle this kind of stuff.
+class BinarySerializable
 {
 public:
-    virtual void binary_deserialize(unsigned char bytes_size, const std::vector<Unit>& data) = 0;
+    std::vector<BinaryUnit> distribute_sizes(unsigned char byte_sizes, const std::vector<BinaryUnit>& data) const noexcept;
+    std::vector<BinaryUnit> binary_align(unsigned char byte_sizes, const std::vector<BinaryUnit>& data) const noexcept;
+    std::vector<BinaryUnit> binary_align(const std::vector<unsigned char>& byte_sizes, const std::vector<BinaryUnit>& data) const noexcept;
+    
+    virtual std::vector<BinaryUnit> binary_serialize(unsigned char bytes_size) const noexcept = 0;
+    virtual void binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit>& data) = 0;
 };
 
 #endif

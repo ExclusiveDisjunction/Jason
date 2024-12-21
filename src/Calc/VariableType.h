@@ -30,8 +30,8 @@ public:
     [[nodiscard]] virtual VariableTypes GetType() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<VariableType> Clone() const noexcept = 0;
 
-    [[nodiscard]] virtual std::vector<Unit> ToBinary() const noexcept = 0;
-    [[nodiscard]] static std::unique_ptr<VariableType> FromBinary(const std::vector<Unit>& data, VariableTypes targetType);
+    [[nodiscard]] virtual std::vector<BinaryUnit> ToBinary() const noexcept = 0;
+    [[nodiscard]] static std::unique_ptr<VariableType> FromBinary(const std::vector<BinaryUnit>& data, VariableTypes targetType);
     [[nodiscard]] virtual size_t RequiredUnits() const noexcept = 0;
     [[nodiscard]] std::string GetTypeString() const noexcept;
     

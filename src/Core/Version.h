@@ -2,9 +2,11 @@
 #define JASON_VERSION
 
 #include <iostream>
-#include "Log.h"
 
-class Version : public DebugPrint
+#include "Printing.h"
+#include "Serialize.h"
+
+class Version : public DebugPrint, public DisplayPrint, public StringSerializable, public BinarySerializable
 {
 public:
     Version() : Version(0, 0, 0) {}
@@ -15,6 +17,12 @@ public:
     unsigned Release;
 
     void dbg_fmt(std::ostream& out) const noexcept override;
+    void dsp_fmt(std::ostream& out) const noexcept override { this->dbg_fmt(out); }
+    
+    void str_serialize(std::ostream& out) const noexcept override;
+    void str_deserialize(std::istream& in) override;
+    std::vector<BinaryUnit> binary_serialize(unsigned char bytes_size) const noexcept override;
+    void binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit>& data) override;
 
     std::strong_ordering operator<=>(const Version& obj) const noexcept;
     bool operator==(const Version& obj) const noexcept { return this->operator<=>(obj) == 0; }
@@ -24,8 +32,6 @@ public:
     bool operator>(const Version& obj) const noexcept = default;
     bool operator>=(const Version& obj) const noexcept = default;
 };
-std::ostream& operator<<(std::ostream& out, const Version& obj) noexcept;
-std::istream& operator>>(std::istream& in, Version& obj);
 
 #define JASON_VERSION_1_0_0 (Version(1, 0, 0))
 #define JASON_CURRENT_VERSION JASON_VERSION_1_0_0

@@ -30,9 +30,9 @@ public:
     
     [[nodiscard]] VariableTypes GetType() const noexcept override { return VT_Complex; }
     [[nodiscard]] size_t RequiredUnits() const noexcept override { return 2; }
-    [[nodiscard]] std::vector<Unit> ToBinary() const noexcept override;
-    [[nodiscard]] static Complex FromBinary(const std::vector<Unit>& in);
-    [[nodiscard]] static std::unique_ptr<Complex> FromBinaryPtr(const std::vector<Unit>& in);
+    [[nodiscard]] std::vector<BinaryUnit> ToBinary() const noexcept override;
+    [[nodiscard]] static Complex FromBinary(const std::vector<BinaryUnit>& in);
+    [[nodiscard]] static std::unique_ptr<Complex> FromBinaryPtr(const std::vector<BinaryUnit>& in);
     void dbg_fmt(std::ostream& out) const noexcept override;
     void dsp_fmt(std::ostream& out) const noexcept override;
     

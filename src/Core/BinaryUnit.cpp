@@ -4,25 +4,25 @@
 
 #include "BinaryUnit.h"
 
-Unit::Unit() : Data(nullptr), blockSize(0) {}
-Unit::Unit(const Unit& obj) noexcept
+BinaryUnit::BinaryUnit() : Data(nullptr), blockSize(0) {}
+BinaryUnit::BinaryUnit(const BinaryUnit& obj) noexcept
 {
     Allocate(obj.Data, obj.blockSize, true);
 }
-Unit::Unit(Unit&& obj) noexcept : Data(std::exchange(obj.Data, nullptr)), blockSize(std::exchange(obj.blockSize, 0)) 
+BinaryUnit::BinaryUnit(BinaryUnit&& obj) noexcept : Data(std::exchange(obj.Data, nullptr)), blockSize(std::exchange(obj.blockSize, 0)) 
 {
     Allocate(obj.Data, obj.blockSize, false);
     obj.Data = nullptr;
     obj.blockSize = 0;
 }
-Unit::~Unit()
+BinaryUnit::~BinaryUnit()
 {
     Deallocate();
 }
 
-Unit Unit::FromSize(unsigned char size) noexcept
+BinaryUnit BinaryUnit::FromSize(unsigned char size) noexcept
 {
-    Unit result;
+    BinaryUnit result;
     if (size != 0)
     {
         result.Data = new char[size];
@@ -31,21 +31,21 @@ Unit Unit::FromSize(unsigned char size) noexcept
 
     return result;
 }
-Unit Unit::FromCharPtr(char* data, unsigned char size, bool copy) noexcept
+BinaryUnit BinaryUnit::FromCharPtr(char* data, unsigned char size, bool copy) noexcept
 {
-    Unit result;
+    BinaryUnit result;
     result.Allocate(data, size, copy);
 
     return result;
 }
 
-void Unit::Deallocate()
+void BinaryUnit::Deallocate()
 {
     delete[] Data;
     Data = nullptr;
     blockSize = 0;
 }
-void Unit::Allocate(char* data, unsigned char size, bool copy)
+void BinaryUnit::Allocate(char* data, unsigned char size, bool copy)
 {
     if (!size || !data)
         return;
@@ -60,7 +60,7 @@ void Unit::Allocate(char* data, unsigned char size, bool copy)
         this->Data = data;
 }
 
-Unit& Unit::operator=(const Unit& obj) noexcept
+BinaryUnit& BinaryUnit::operator=(const BinaryUnit& obj) noexcept
 {
     if (this == &obj)
         return *this;
@@ -71,7 +71,7 @@ Unit& Unit::operator=(const Unit& obj) noexcept
     Allocate(obj.Data, obj.blockSize, true);
     return *this;
 }
-Unit& Unit::operator=(Unit&& obj) noexcept
+BinaryUnit& BinaryUnit::operator=(BinaryUnit&& obj) noexcept
 {
     if (Data)
         Deallocate();
@@ -82,11 +82,11 @@ Unit& Unit::operator=(Unit&& obj) noexcept
     return *this;
 }
 
-const char* Unit::Expose() const noexcept
+const char* BinaryUnit::Expose() const noexcept
 {
     return this->Data;
 }
-unsigned char Unit::GetSize() const noexcept
+unsigned char BinaryUnit::GetSize() const noexcept
 {
     return this->blockSize;
 }

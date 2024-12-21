@@ -9,7 +9,7 @@ int main(int, char**)
 {
     std::cout << " Welcome to Jason " << '\n'
               << "------------------" << '\n'
-              << "   Version " << JASON_CURRENT_VERSION << "  " << '\n' << '\n';
+              << "   Version " << debug_print(JASON_CURRENT_VERSION) << "  " << '\n' << '\n';
 
     if (!logging.Open("run.log", LoggerLevel::LL_Debug))
     {

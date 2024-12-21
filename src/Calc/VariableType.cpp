@@ -12,7 +12,7 @@
 
 #include "../Core/Errors.h"
 
-std::unique_ptr<VariableType> VariableType::FromBinary(const std::vector<Unit>& data, VariableTypes targetType)
+std::unique_ptr<VariableType> VariableType::FromBinary(const std::vector<BinaryUnit>& data, VariableTypes targetType)
 {
     switch (targetType)
     {

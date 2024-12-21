@@ -61,22 +61,22 @@ Complex Complex::FromPolar(const std::pair<double, double>& polar) noexcept
     return Complex(x, y);
 }
 
-std::vector<Unit> Complex::ToBinary() const noexcept
+std::vector<BinaryUnit> Complex::ToBinary() const noexcept
 {
-    return { Unit::FromVar(this->a), Unit::FromVar(this->b) };
+    return { BinaryUnit::FromVar(this->a), BinaryUnit::FromVar(this->b) };
 }
-Complex Complex::FromBinary(const std::vector<Unit>& in)
+Complex Complex::FromBinary(const std::vector<BinaryUnit>& in)
 {
     if (in.size() < 2)
         throw ConversionError("from binary", "expected at least two units");
         
     Complex result;
-    in[0].Convert(result.a);
-    in[1].Convert(result.b);
+    in[0].ConvertTo(result.a);
+    in[1].ConvertTo(result.b);
     
     return result;
 }
-std::unique_ptr<Complex> Complex::FromBinaryPtr(const std::vector<Unit>& in)
+std::unique_ptr<Complex> Complex::FromBinaryPtr(const std::vector<BinaryUnit>& in)
 {
     return std::make_unique<Complex>(Complex::FromBinary(in));
 }

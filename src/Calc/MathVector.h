@@ -42,9 +42,9 @@ public:
     [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
     
     [[nodiscard]] size_t RequiredUnits() const noexcept override;
-    [[nodiscard]] std::vector<Unit> ToBinary() const noexcept override;
-    [[nodiscard]] static MathVector FromBinary(const std::vector<Unit>& in);
-    [[nodiscard]] static std::unique_ptr<MathVector> FromBinaryPtr(const std::vector<Unit>& in);
+    [[nodiscard]] std::vector<BinaryUnit> ToBinary() const noexcept override;
+    [[nodiscard]] static MathVector FromBinary(const std::vector<BinaryUnit>& in);
+    [[nodiscard]] static std::unique_ptr<MathVector> FromBinaryPtr(const std::vector<BinaryUnit>& in);
     
     [[nodiscard]] constexpr VariableTypes GetType() const noexcept override { return VariableTypes::VT_Vector; }
     void dsp_fmt(std::ostream& out) const noexcept override;

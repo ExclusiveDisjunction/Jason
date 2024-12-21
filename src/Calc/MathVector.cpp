@@ -90,22 +90,22 @@ size_t MathVector::RequiredUnits() const noexcept
 {
     return 1 + this->Data.size();
 }
-std::vector<Unit> MathVector::ToBinary() const noexcept
+std::vector<BinaryUnit> MathVector::ToBinary() const noexcept
 {
-    std::vector<Unit> result;
+    std::vector<BinaryUnit> result;
     result.resize(this->RequiredUnits());
-    result[0] = Unit::FromVar(this->Dim());
+    result[0] = BinaryUnit::FromVar(this->Dim());
 
     auto curr = result.begin() + 1;
     for (const auto& item : this->Data)
     {
-        *curr = Unit::FromVar(item);
+        *curr = BinaryUnit::FromVar(item);
         curr++;
     }
 
     return result;
 }
-MathVector MathVector::FromBinary(const std::vector<Unit>& in)
+MathVector MathVector::FromBinary(const std::vector<BinaryUnit>& in)
 {
     if (in.empty())
         throw std::logic_error("No data provided");
@@ -126,7 +126,7 @@ MathVector MathVector::FromBinary(const std::vector<Unit>& in)
 
     return result;
 }
-std::unique_ptr<MathVector> MathVector::FromBinaryPtr(const std::vector<Unit>& in) 
+std::unique_ptr<MathVector> MathVector::FromBinaryPtr(const std::vector<BinaryUnit>& in) 
 {
     return std::make_unique<MathVector>( MathVector::FromBinary(in) );
 }

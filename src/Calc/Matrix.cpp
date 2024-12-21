@@ -160,26 +160,26 @@ size_t Matrix::RequiredUnits() const noexcept
 {
     return 2 + rows * cols;
 }
-std::vector<Unit> Matrix::ToBinary() const noexcept
+std::vector<BinaryUnit> Matrix::ToBinary() const noexcept
 {
-    std::vector<Unit> result;
+    std::vector<BinaryUnit> result;
     result.resize(this->RequiredUnits());
-    result[0] = Unit::FromVar(this->rows);
-    result[1] = Unit::FromVar(this->cols);
+    result[0] = BinaryUnit::FromVar(this->rows);
+    result[1] = BinaryUnit::FromVar(this->cols);
 
     auto curr = result.begin() + 1;
     for (const auto& row : this->Data)
     {
         for (const auto& element : row)
         {
-            *curr = Unit::FromVar(element);
+            *curr = BinaryUnit::FromVar(element);
             curr++;
         }
     }
 
     return result;
 }
-Matrix Matrix::FromBinary(const std::vector<Unit>& in)
+Matrix Matrix::FromBinary(const std::vector<BinaryUnit>& in)
 {
     if (in.size() < 2)
         throw std::logic_error("No data provided");
@@ -201,7 +201,7 @@ Matrix Matrix::FromBinary(const std::vector<Unit>& in)
 
     return result;
 }
-std::unique_ptr<Matrix> Matrix::FromBinaryPtr(const std::vector<Unit>& in)
+std::unique_ptr<Matrix> Matrix::FromBinaryPtr(const std::vector<BinaryUnit>& in)
 {
     return std::make_unique<Matrix>( Matrix::FromBinary(in) );
 }

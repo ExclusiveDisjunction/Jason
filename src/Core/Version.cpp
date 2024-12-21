@@ -1,20 +1,42 @@
 #include "Version.h"
 
-std::ostream& operator<<(std::ostream& out, const Version& obj) noexcept
-{
-    out << obj.Major << '.' << obj.Minor << '.' << obj.Release;
-    return out;
-}
-std::istream& operator>>(std::istream& in, Version& obj)
-{
-    char p; //Placeholder for the '.'. This way, the istream will split up the reading between the three parts. 
-    in >> obj.Major >> p >> obj.Minor >> p >> obj.Release;
-    return in;
-}
+#include "Errors.h"
 
 void Version::dbg_fmt(std::ostream& out) const noexcept 
 {
-    out << *this;
+    out << this->Major << '.' << this->Minor << '.' << this->Release;
+}
+
+void Version::str_serialize(std::ostream &out) const noexcept
+{
+    out << this->Major << ' ' << this->Minor << ' ' << this->Release;
+}
+void Version::str_deserialize(std::istream &in)
+{
+    in >> this->Major >> this->Minor >> this->Release;
+}
+std::vector<BinaryUnit> Version::binary_serialize(unsigned char bytes_size) const noexcept
+{
+    return BinarySerializable::distribute_sizes(
+            bytes_size,
+            std::vector<BinaryUnit>(
+                {
+                    BinaryUnit::FromVar(this->Major),
+                    BinaryUnit::FromVar(this->Minor),
+                    BinaryUnit::FromVar(this->Release)
+                }
+            )
+    );
+}
+void Version::binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit> &data)
+{
+    auto transformed = BinarySerializable::binary_align(sizeof(unsigned), data);
+    if (transformed.size() < 3)
+        throw ConversionError("binary deserialize", "the input data does not contain at least three elements");
+    
+    transformed[0].ConvertTo(this->Major);
+    transformed[1].ConvertTo(this->Minor);
+    transformed[2].ConvertTo(this->Release);
 }
 
 std::strong_ordering Version::operator<=>(const Version& obj) const noexcept

@@ -19,7 +19,7 @@ bool NumericsTester()
     {
         Scalar a(1.1), b(3.2), c(0.00);
         
-        std::vector<Unit> a_bin = a.ToBinary();
+        std::vector<BinaryUnit> a_bin = a.ToBinary();
         Scalar a_conv = Scalar::FromBinary(a_bin);
         
         std::cout << "Scalars Conversion: Expect true: " << (a == a_conv) << '\n';
@@ -31,7 +31,7 @@ bool NumericsTester()
         (a / b == 1.1 / 3.2) << '\n' << std::endl;
         
         Complex ca(1.1, 3.3), cb(2.4, 1.6);
-        std::vector<Unit> ca_bin = ca.ToBinary();
+        std::vector<BinaryUnit> ca_bin = ca.ToBinary();
         Complex ca_conv = Complex::FromBinary(ca_bin);
         
         std::cout << "Complex Conversion: Expect true: " << (ca == ca_conv) << '\n';
@@ -45,7 +45,7 @@ bool NumericsTester()
         
         MathVector va = MathVector::FromList(1.1, 2.3), vb = MathVector::FromList(1, 2), vc = MathVector::FromList(3, 2, 1);
         
-        std::vector<Unit> va_bin = va.ToBinary();
+        std::vector<BinaryUnit> va_bin = va.ToBinary();
         MathVector va_conv = MathVector::FromBinary(va_bin);
         std::cout << "Vector Conversion: Expect true: " << (va == va_conv) << '\n';
         

@@ -10,10 +10,7 @@
 #include <memory.h>
 #include <stdexcept>
 
-template <typename T, typename U>
-concept is_different_v = !std::is_same_v<T, U>;
-
-class Unit
+class BinaryUnit
 {
 private:
     char* Data = nullptr;
@@ -31,59 +28,45 @@ private:
     /// @param obj The object to convert from
     template<typename T>
     void Allocate(const T& obj);
-    /// @brief Allocates based on a list of a specific type
-    /// @tparam T The type to convert from
-    /// @param obj The objects to convert from
-    template<typename T>
-    void AllocateList(const std::vector<T>& obj);
 
 public:
     /// @brief Constructs an empty unit with no data or block size.
-    Unit();
+    BinaryUnit();
     /// @brief Constructs a Unit from the data stored in the other Unit
     /// @param obj The object to copy
-    Unit(const Unit& obj) noexcept;
+    BinaryUnit(const BinaryUnit& obj) noexcept;
     /// @brief Constructs a Unit from the data stored in another unit
     /// @param obj The data to move
-    Unit(Unit&& obj) noexcept;
+    BinaryUnit(BinaryUnit&& obj) noexcept;
     /// @brief Cleans up internal data
-    ~Unit();
+    ~BinaryUnit();
 
     /// @brief Constructs a `Unit` from a specific variable data. NOTE: Do not use with types that include internal pointers, as pointers may be changed when the data is converted out of the `Unit`.
     /// @tparam T The type being inputted
     /// @param item The data being inputted
     /// @return A unit containing a copy of that object's memory map
     template<typename T>
-    static Unit FromVar(const T& item)
+    static BinaryUnit FromVar(const T& item)
     {
-        Unit result;
+        BinaryUnit result;
         result.Allocate(item);
-        return result;
-    }
-    /// @brief Constructs a `Unit` from a list of variable data. The block size will be the `sizeof(T)` * `item.length()`. NOTE: Do not use with types that include internal pointers, as pointers may be changed when the data is converted out of the `Unit`.
-    /// @tparam T The type being inputted
-    /// @param item The objects being inputted
-    /// @return A unit containing a copy of all elements memory map
-    template<typename T>
-    static Unit FromList(const std::vector<T>& item)
-    {
-        Unit result;
-        result.AllocateList(item);
         return result;
     }
     /// @brief Constructs a unit with a specific size, but no actual data contained (full of zeroes)
     /// @param size The size to construct
     /// @return A unit with a specific size
-    static Unit FromSize(unsigned char size) noexcept;
+    static BinaryUnit FromSize(unsigned char size) noexcept;
     /// @brief If copy is true, copies the data provided. Otherwise, it will assume ownership of the pointer & will handle its memory accordingly.
     /// @param data The data to copy or move
     /// @param size The size of the data
     /// @param copy If we are copying or not
     /// @return The unit with the data contained
-    static Unit FromCharPtr(char* data, unsigned char size, bool copy) noexcept;
+    static BinaryUnit FromCharPtr(char* data, unsigned char size, bool copy) noexcept;
+    
+    void Resize(unsigned char amount_to_add, bool packEnd = true);
 
-    Unit& operator=(const Unit& obj) noexcept;
-    Unit& operator=(Unit&& obj) noexcept;
+    BinaryUnit& operator=(const BinaryUnit& obj) noexcept;
+    BinaryUnit& operator=(BinaryUnit&& obj) noexcept;
 
     /// @brief Attempts to convert the unit into a specific output type. Throws `bad_cast` if the conversion is invalid (size mismatch)
     /// @tparam T The type to convert into
@@ -94,12 +77,7 @@ public:
     /// @tparam T The type to convert into
     /// @param result The output destination of the copied data.
     template<typename T>
-    void Convert(T& result) const;
-    /// @brief Converts the unit into a list of `T`. Throws `bad_cast` if `blockSize % sizeof(T) != 0`
-    /// @tparam T The target output type
-    /// @return A list containing the copied converted data
-    template<typename T>
-    [[nodiscard]] std::vector<T> ConvertMany() const;
+    void ConvertTo(T& result) const;
 
     /// @brief Gets the raw pointer contained
     /// @return The internal pointer

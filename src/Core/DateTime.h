@@ -25,7 +25,7 @@ enum class TimeStringFormat
 	ExtendedDuration, //## Hours, ## Minutes, ## Seconds, ## Miliseconds
 };
 
-class DateTime : public DebugPrint, public DisplayPrint, public UIDisplayPrint, public StringSerialize, public StringDeserialize, public BinarySerialize, public BinaryDeserialize
+class DateTime : public DebugPrint, public DisplayPrint, public UIDisplayPrint, public StringSerializable, public BinarySerializable
 {
 private:
 	std::chrono::duration<double> _Dur;
@@ -70,8 +70,8 @@ public:
     
     void str_serialize(std::ostream& out) const noexcept override;
     void str_deserialize(std::istream& in) override;
-    std::vector<Unit> binary_serialize(unsigned char bytes_size) const noexcept override;
-    void binary_deserialize(unsigned char bytes_size, const std::vector<Unit>& data) override;
+    std::vector<BinaryUnit> binary_serialize(unsigned char bytes_size) const noexcept override;
+    void binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit>& data) override;
 
     std::partial_ordering operator<=>(const DateTime& obj) const noexcept;
     bool operator==(const DateTime& Obj) const noexcept;

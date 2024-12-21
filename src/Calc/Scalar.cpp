@@ -6,20 +6,20 @@
 
 #include <iomanip>
 
-std::vector<Unit> Scalar::ToBinary() const noexcept
+std::vector<BinaryUnit> Scalar::ToBinary() const noexcept
 {
-    Unit data = Unit::FromVar(this->Data);
+    BinaryUnit data = BinaryUnit::FromVar(this->Data);
 
     return {data};
 }
-Scalar Scalar::FromBinary(const std::vector<Unit>& in)
+Scalar Scalar::FromBinary(const std::vector<BinaryUnit>& in)
 {
     if (in.empty())
         throw std::logic_error("No data was provided");
 
     return Scalar(in[0].Convert<double>());
 }
-std::unique_ptr<Scalar> Scalar::FromBinaryPtr(const std::vector<Unit>& in)
+std::unique_ptr<Scalar> Scalar::FromBinaryPtr(const std::vector<BinaryUnit>& in)
 {
     return std::make_unique<Scalar>( FromBinary(in) );
 }
