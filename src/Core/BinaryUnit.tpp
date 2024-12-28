@@ -1,5 +1,6 @@
 #include "BinaryUnit.h"
 
+/*
 template<typename T>
 void BinaryUnit::Allocate(const T& obj)
 {
@@ -27,3 +28,4 @@ void BinaryUnit::ConvertTo(T& result) const
 
     memcpy(&result, this->Data, blockSize);
 }
+*/

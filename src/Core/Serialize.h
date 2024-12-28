@@ -34,7 +34,7 @@ public:
 sst<const StringSerializable> StrSerialize(const StringSerializable& obj) noexcept;
 sst<StringSerializable> StrDeserialize(StringSerializable& obj) noexcept;
 
-// I think it would be more worth while to write the binary serializer that will handle this kind of stuff.
+/*
 class BinarySerializable
 {
 public:
@@ -45,5 +45,6 @@ public:
     virtual std::vector<BinaryUnit> binary_serialize(unsigned char bytes_size) const noexcept = 0;
     virtual void binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit>& data) = 0;
 };
+ */
 
 #endif

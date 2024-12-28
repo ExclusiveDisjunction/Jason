@@ -6,7 +6,7 @@
 #include "Printing.h"
 #include "Serialize.h"
 
-class Version : public DebugPrint, public DisplayPrint, public StringSerializable, public BinarySerializable
+class Version : public DebugPrint, public DisplayPrint, public StringSerializable
 {
 public:
     Version() : Version(0, 0, 0) {}
@@ -21,8 +21,6 @@ public:
     
     void str_serialize(std::ostream& out) const noexcept override;
     void str_deserialize(std::istream& in) override;
-    std::vector<BinaryUnit> binary_serialize(unsigned char bytes_size) const noexcept override;
-    void binary_deserialize(unsigned char bytes_size, const std::vector<BinaryUnit>& data) override;
 
     std::strong_ordering operator<=>(const Version& obj) const noexcept;
     bool operator==(const Version& obj) const noexcept { return this->operator<=>(obj) == 0; }

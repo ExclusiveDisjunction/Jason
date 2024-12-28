@@ -23,10 +23,8 @@ public:
     double Data = 0.00;
 
     [[nodiscard]] constexpr VariableTypes GetType() const noexcept override { return VT_Scalar; }
-    [[nodiscard]] constexpr size_t RequiredUnits() const noexcept override { return 1; }
-    [[nodiscard]] std::vector<BinaryUnit> ToBinary() const noexcept override;
-    [[nodiscard]] static Scalar FromBinary(const std::vector<BinaryUnit>& in);
-    [[nodiscard]] static std::unique_ptr<Scalar> FromBinaryPtr(const std::vector<BinaryUnit>& in);
+    void str_serialize(std::ostream& out) const noexcept override;
+    void str_deserialize(std::istream& in) override;
     void dsp_fmt(std::ostream& out) const noexcept override;
     void dbg_fmt(std::ostream& out) const noexcept override;
 

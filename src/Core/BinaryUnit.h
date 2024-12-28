@@ -10,6 +10,7 @@
 #include <memory.h>
 #include <stdexcept>
 
+/*
 class BinaryUnit
 {
 private:
@@ -86,6 +87,7 @@ public:
     /// @return The internal size
     [[nodiscard]] unsigned char GetSize() const noexcept;
 };
+ */
 
 #include "BinaryUnit.tpp"
 

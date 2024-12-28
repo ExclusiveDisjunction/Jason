@@ -156,56 +156,6 @@ VariableTypes Matrix::GetType() const noexcept
     return VariableTypes::VT_Matrix;
 }
 
-size_t Matrix::RequiredUnits() const noexcept
-{
-    return 2 + rows * cols;
-}
-std::vector<BinaryUnit> Matrix::ToBinary() const noexcept
-{
-    std::vector<BinaryUnit> result;
-    result.resize(this->RequiredUnits());
-    result[0] = BinaryUnit::FromVar(this->rows);
-    result[1] = BinaryUnit::FromVar(this->cols);
-
-    auto curr = result.begin() + 1;
-    for (const auto& row : this->Data)
-    {
-        for (const auto& element : row)
-        {
-            *curr = BinaryUnit::FromVar(element);
-            curr++;
-        }
-    }
-
-    return result;
-}
-Matrix Matrix::FromBinary(const std::vector<BinaryUnit>& in)
-{
-    if (in.size() < 2)
-        throw std::logic_error("No data provided");
-    
-    auto rows = in[0].Convert<unsigned int>(), cols = in[1].Convert<unsigned int>();
-    if (in.size() < rows * cols + 2)
-        throw std::logic_error("Not enough data provided.");
-
-    Matrix result(rows, cols);
-    auto curr = in.begin() + 1;
-    for (auto& row : result.Data)
-    {
-        for (auto& element : row) 
-        {
-            element = curr->Convert<double>();
-            curr++;
-        }
-    }
-
-    return result;
-}
-std::unique_ptr<Matrix> Matrix::FromBinaryPtr(const std::vector<BinaryUnit>& in)
-{
-    return std::make_unique<Matrix>( Matrix::FromBinary(in) );
-}
-
 Matrix Matrix::Extract(size_t StartI, size_t StartJ, size_t RowCount, size_t ColumnCount)
 {
     /*

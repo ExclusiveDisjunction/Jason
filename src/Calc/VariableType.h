@@ -24,15 +24,11 @@ enum VariableTypes
 std::ostream& operator<<(std::ostream& out, const VariableTypes& obj);
 std::istream& operator>>(std::istream& in, VariableTypes& obj);
 
-class VariableType : public DebugPrint, public DisplayPrint
+class VariableType : public DebugPrint, public DisplayPrint, public StringSerializable
 {
 public:
     [[nodiscard]] virtual VariableTypes GetType() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<VariableType> Clone() const noexcept = 0;
-
-    [[nodiscard]] virtual std::vector<BinaryUnit> ToBinary() const noexcept = 0;
-    [[nodiscard]] static std::unique_ptr<VariableType> FromBinary(const std::vector<BinaryUnit>& data, VariableTypes targetType);
-    [[nodiscard]] virtual size_t RequiredUnits() const noexcept = 0;
     [[nodiscard]] std::string GetTypeString() const noexcept;
     
     // [[nodiscard]] static std::unique_ptr<VariableType> ApplyOperation(const VariableType& One, const VariableType& Two, char oper);

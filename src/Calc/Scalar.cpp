@@ -6,23 +6,7 @@
 
 #include <iomanip>
 
-std::vector<BinaryUnit> Scalar::ToBinary() const noexcept
-{
-    BinaryUnit data = BinaryUnit::FromVar(this->Data);
 
-    return {data};
-}
-Scalar Scalar::FromBinary(const std::vector<BinaryUnit>& in)
-{
-    if (in.empty())
-        throw std::logic_error("No data was provided");
-
-    return Scalar(in[0].Convert<double>());
-}
-std::unique_ptr<Scalar> Scalar::FromBinaryPtr(const std::vector<BinaryUnit>& in)
-{
-    return std::make_unique<Scalar>( FromBinary(in) );
-}
 void Scalar::dbg_fmt(std::ostream& out) const noexcept
 {
     out <<  "(Scalar:" << this->Data << ')';
@@ -31,6 +15,20 @@ void Scalar::dbg_fmt(std::ostream& out) const noexcept
 std::unique_ptr<VariableType> Scalar::Clone() const noexcept
 {
     return std::make_unique<Scalar>(*this);
+}
+
+void Scalar::str_serialize(std::ostream& out) const noexcept
+{
+    out << VariableTypes::VT_Scalar << this->Data;
+}
+void Scalar::str_deserialize(std::istream& in)
+{
+    VariableTypes type;
+    in >> type;
+    if (type != VT_Scalar)
+        throw OperationError("deserialize", "type mismatch");
+    
+    in >> this->Data;
 }
 
 long long Scalar::ToLongNoRound() const

@@ -12,21 +12,6 @@
 
 #include "../Core/Errors.h"
 
-std::unique_ptr<VariableType> VariableType::FromBinary(const std::vector<BinaryUnit>& data, VariableTypes targetType)
-{
-    switch (targetType)
-    {
-    case VT_Scalar:
-        return Scalar::FromBinaryPtr(data);
-    case VT_Vector:
-        return MathVector::FromBinaryPtr(data);
-    case VT_Matrix:
-        return Matrix::FromBinaryPtr(data);
-    case VT_Complex:
-        return Complex::FromBinaryPtr(data);
-    }
-}
-
 std::string VariableType::GetTypeString() const noexcept
 {
     return static_cast<const DebugPrint&>(*this).dbg_fmt_string(); 

@@ -29,6 +29,7 @@ sst<StringSerializable> StrDeserialize(StringSerializable& obj) noexcept
     return sst<StringSerializable>(obj);
 }
 
+/*
 std::vector<BinaryUnit> BinarySerializable::distribute_sizes(unsigned char byte_sizes, const std::vector<BinaryUnit>& data) const noexcept
 {
     throw std::logic_error("not implemented");
@@ -41,3 +42,4 @@ std::vector<BinaryUnit> BinarySerializable::binary_align(const std::vector<unsig
 {
     throw std::logic_error("not implemented");
 }
+*/

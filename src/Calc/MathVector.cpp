@@ -86,50 +86,6 @@ double MathVector::Angle() const
     return atan(Magnitude());
 }
 
-size_t MathVector::RequiredUnits() const noexcept 
-{
-    return 1 + this->Data.size();
-}
-std::vector<BinaryUnit> MathVector::ToBinary() const noexcept
-{
-    std::vector<BinaryUnit> result;
-    result.resize(this->RequiredUnits());
-    result[0] = BinaryUnit::FromVar(this->Dim());
-
-    auto curr = result.begin() + 1;
-    for (const auto& item : this->Data)
-    {
-        *curr = BinaryUnit::FromVar(item);
-        curr++;
-    }
-
-    return result;
-}
-MathVector MathVector::FromBinary(const std::vector<BinaryUnit>& in)
-{
-    if (in.empty())
-        throw std::logic_error("No data provided");
-    
-    auto dim = in[0].Convert<size_t>();
-    if (in.size() < dim + 1)
-        throw std::logic_error("Not enough data provided.");
-
-    MathVector result(dim);
-    auto curr = in.begin() + 1, end = in.end();
-    unsigned i = 0;
-    while (curr != end)
-    {
-        result[i] = curr->Convert<double>();
-        i++;
-        curr++;
-    }
-
-    return result;
-}
-std::unique_ptr<MathVector> MathVector::FromBinaryPtr(const std::vector<BinaryUnit>& in) 
-{
-    return std::make_unique<MathVector>( MathVector::FromBinary(in) );
-}
 void MathVector::dbg_fmt(std::ostream& out) const noexcept
 {
     out << "(Vector:";

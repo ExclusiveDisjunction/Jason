@@ -54,13 +54,11 @@ public:
     [[nodiscard]] bool IsSquare() const { return IsValid() && rows == cols; }
 
     [[nodiscard]] std::unique_ptr<VariableType> Clone() const noexcept override;
-
-    [[nodiscard]] size_t RequiredUnits() const noexcept override;
-    [[nodiscard]] std::vector<BinaryUnit> ToBinary() const noexcept override;
-    [[nodiscard]] static Matrix FromBinary(const std::vector<BinaryUnit>& in);
-    [[nodiscard]] static std::unique_ptr<Matrix> FromBinaryPtr(const std::vector<BinaryUnit>& in);
-
     [[nodiscard]] VariableTypes GetType() const noexcept override;
+
+    void str_serialize(std::ostream& out) const noexcept override;
+    void str_deserialize(std::istream& in) override;
+
     void dbg_fmt(std::ostream& out) const noexcept override;
     void dsp_fmt(std::ostream& out) const noexcept override;
     void ui_dsp_fmt(std::ostream& out) const noexcept override;
