@@ -539,6 +539,43 @@ void Matrix::dsp_fmt(std::ostream& out) const noexcept
     }
 }
 
+void Matrix::str_serialize(std::ostream &out) const noexcept
+{
+    out << VariableTypes::VT_Matrix << ' ' << this->rows << ' ' << this->cols;
+    for (const auto& rows : this->Data)
+        for (const auto& item : rows)
+            out << ' ' << item;
+}
+void Matrix::str_deserialize(std::istream &in)
+{
+    VariableTypes type;
+    size_t rows, cols;
+    in >> type;
+    if (type != VT_Matrix)
+        throw FormatError("expected matrix type");
+    
+    in >> rows >> cols;
+    if (rows == 0 || cols == 0)
+    {
+        *this = Matrix();
+        return;
+    }
+    
+    this->Data.resize(rows, std::vector<double>(cols));
+    size_t count = 0;
+    for (auto& row : this->Data)
+    {
+        for (auto& element : row)
+        {
+            in >> element;
+            count++;
+        }
+    }
+    
+    if (count != rows * cols)
+        throw FormatError("not enough elements provided");
+}
+
 Matrix Matrix::operator|(const Matrix& Two) const
 {
     if (!IsValid() || !Two.IsValid())

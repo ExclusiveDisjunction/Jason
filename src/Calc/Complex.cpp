@@ -78,6 +78,19 @@ void Complex::dsp_fmt(std::ostream& out) const noexcept
         out << "i";
     }
 }
+void Complex::str_serialize(std::ostream& out) const noexcept
+{
+    out << VariableTypes::VT_Complex << ' ' << this->a << ' ' << this->b;
+}
+void Complex::str_deserialize(std::istream& in)
+{
+    VariableTypes type;
+    in >> type;
+    if (type != VT_Complex)
+        throw FormatError("expected complex type");
+    
+    in >> this->a >> this->b;
+}
 
 std::unique_ptr<VariableType> Complex::Clone() const noexcept
 {
@@ -137,12 +150,15 @@ Complex& Complex::operator-=(const Complex& b) noexcept
     
     return *this;
 }
-Complex& Complex::operator*=(const Complex& b) noexcept
+Complex& Complex::operator*=(const Complex& obj) noexcept
 {
     // (a+bi)(c+di) = (ac + adi + bci - bd) = (ac - bd) + (ad + bc)i
+    const double& a = this->a, &b = this->b, &c = obj.a, &d = obj.b;
+    // (a+bi)(c+di) = (ac + adi + bci - bd)
+    //              = ( (ac - bd) + (ad + bc)i
     
-    this->a = this->a * b.a - this->b * b.b;
-    this->b = this->a * b.b + this->b * b.a;
+    this->a = a * c - b * d;
+    this->b = a * d + b * c;
     
     return *this;
 }

@@ -19,9 +19,8 @@ class MathVector : public VariableType
 private:
     std::vector<double> Data;
 
-    MathVector();
-
 public:
+    MathVector();
     explicit MathVector(size_t Dim, double Val = 0.0);
     MathVector(const MathVector &Obj) noexcept;
     MathVector(MathVector &&Obj) noexcept;

@@ -19,7 +19,7 @@ std::unique_ptr<VariableType> Scalar::Clone() const noexcept
 
 void Scalar::str_serialize(std::ostream& out) const noexcept
 {
-    out << VariableTypes::VT_Scalar << this->Data;
+    out << VariableTypes::VT_Scalar << ' ' << this->Data;
 }
 void Scalar::str_deserialize(std::istream& in)
 {

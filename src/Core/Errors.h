@@ -34,6 +34,7 @@ public:
 class FormatError : public ErrorBase {
 public:
     FormatError(const std::string& target, const std::string& reason);
+    FormatError(const std::string& reason);
 };
 
 class RangeError : public ErrorBase {

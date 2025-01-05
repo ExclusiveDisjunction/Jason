@@ -17,6 +17,10 @@ FormatError::FormatError(const std::string& target, const std::string& reason) :
 {
     
 }
+FormatError::FormatError(const std::string& reason) : ErrorBase("the input was invalid because of '" + reason + "'")
+{
+    
+}
 
 NullError::NullError(const std::string& name) : ErrorBase(name + " was null")
 {

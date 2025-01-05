@@ -19,8 +19,11 @@ bool NumericsTester()
     {
         Scalar a(1.1), b(3.2), c(0.00);
         
-        std::vector<BinaryUnit> a_bin = a.ToBinary();
-        Scalar a_conv = Scalar::FromBinary(a_bin);
+        std::stringstream ss;
+        a.str_serialize(ss);
+        Scalar a_conv;
+        ss.seekg(0, std::ios::beg);
+        a_conv.str_deserialize(ss);
         
         std::cout << "Scalars Conversion: Expect true: " << (a == a_conv) << '\n';
         
@@ -31,8 +34,12 @@ bool NumericsTester()
         (a / b == 1.1 / 3.2) << '\n' << std::endl;
         
         Complex ca(1.1, 3.3), cb(2.4, 1.6);
-        std::vector<BinaryUnit> ca_bin = ca.ToBinary();
-        Complex ca_conv = Complex::FromBinary(ca_bin);
+        
+        ss = {};
+        ca.str_serialize(ss);
+        Complex ca_conv;
+        ss.seekg(0, std::ios::beg);
+        ca_conv.str_deserialize(ss);
         
         std::cout << "Complex Conversion: Expect true: " << (ca == ca_conv) << '\n';
         
@@ -45,8 +52,11 @@ bool NumericsTester()
         
         MathVector va = MathVector::FromList(1.1, 2.3), vb = MathVector::FromList(1, 2), vc = MathVector::FromList(3, 2, 1);
         
-        std::vector<BinaryUnit> va_bin = va.ToBinary();
-        MathVector va_conv = MathVector::FromBinary(va_bin);
+        ss = {};
+        va.str_serialize(ss);
+        MathVector va_conv;
+        ss.seekg(0, std::ios::beg);
+        va_conv.str_deserialize(ss);
         std::cout << "Vector Conversion: Expect true: " << (va == va_conv) << '\n';
         
         std::cout << "Vector Operations: \n" <<

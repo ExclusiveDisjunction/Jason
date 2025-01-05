@@ -204,8 +204,8 @@ std::ostream& operator<<(std::ostream& out, const VariableTypes& obj)
 }
 std::istream& operator>>(std::istream& in, VariableTypes& obj)
 {
-    char r_str[3];
-    std::string str; 
+    char r_str[4] = {0};
+    std::string str;
     in.read(r_str, 3);
     
     str = r_str;

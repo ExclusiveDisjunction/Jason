@@ -103,6 +103,31 @@ void MathVector::dsp_fmt(std::ostream& out) const noexcept
         out << this->Data[i] << (i == d - 1 ? " " : ", ");
     out << '}';
 }
+void MathVector::str_serialize(std::ostream &out) const noexcept
+{
+    out << VariableTypes::VT_Vector << ' ' << this->Data.size();
+    for (const auto& item : this->Data)
+        out << ' ' << item;
+}
+void MathVector::str_deserialize(std::istream &in)
+{
+    VariableTypes type;
+    size_t dim;
+    in >> type;
+    if (type != VT_Vector)
+        throw FormatError("expected vector type");
+    
+    in >> dim;
+    this->Data.resize(dim);
+    
+    size_t i;
+    auto iter = this->Data.begin(), end = this->Data.end();
+    for (i = 0; i < dim && in && iter != end; i++, iter++)
+        in >> *iter;
+    
+    if (i != dim)
+        throw FormatError("not enough arguments");
+}
 
 MathVector MathVector::CrossProduct(const MathVector& One, const MathVector& Two)
 {
