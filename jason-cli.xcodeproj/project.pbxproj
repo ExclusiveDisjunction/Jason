@@ -6,12 +6,8 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		DD9CB5B72D1288AC00C4E631 /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = DD9CB5852D1288AC00C4E631 /* Makefile */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXCopyFilesBuildPhase section */
-		DD9CB5772D12884500C4E631 /* CopyFiles */ = {
+		DD906B092D3A34660041550D /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -23,21 +19,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		DD9CB5792D12884500C4E631 /* jason-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "jason-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
-		DD9CB5832D1288AC00C4E631 /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
-		DD9CB5852D1288AC00C4E631 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		DD906B0B2D3A34660041550D /* jason-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "jason-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		DD9CB5AA2D1288AC00C4E631 /* src */ = {
+		DD906B0D2D3A34660041550D /* jason-cli */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = src;
+			path = "jason-cli";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		DD9CB5762D12884500C4E631 /* Frameworks */ = {
+		DD906B082D3A34660041550D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -47,20 +41,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		DD9CB5702D12884500C4E631 = {
+		DD906B022D3A34660041550D = {
 			isa = PBXGroup;
 			children = (
-				DD9CB5832D1288AC00C4E631 /* CMakeLists.txt */,
-				DD9CB5852D1288AC00C4E631 /* Makefile */,
-				DD9CB5AA2D1288AC00C4E631 /* src */,
-				DD9CB57A2D12884500C4E631 /* Products */,
+				DD906B0D2D3A34660041550D /* jason-cli */,
+				DD906B0C2D3A34660041550D /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		DD9CB57A2D12884500C4E631 /* Products */ = {
+		DD906B0C2D3A34660041550D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				DD9CB5792D12884500C4E631 /* jason-cli */,
+				DD906B0B2D3A34660041550D /* jason-cli */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,74 +60,74 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		DD9CB5782D12884500C4E631 /* jason-cli */ = {
+		DD906B0A2D3A34660041550D /* jason-cli */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = DD9CB5802D12884500C4E631 /* Build configuration list for PBXNativeTarget "jason-cli" */;
+			buildConfigurationList = DD906B122D3A34660041550D /* Build configuration list for PBXNativeTarget "jason-cli" */;
 			buildPhases = (
-				DD9CB5752D12884500C4E631 /* Sources */,
-				DD9CB5762D12884500C4E631 /* Frameworks */,
-				DD9CB5772D12884500C4E631 /* CopyFiles */,
+				DD906B072D3A34660041550D /* Sources */,
+				DD906B082D3A34660041550D /* Frameworks */,
+				DD906B092D3A34660041550D /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				DD9CB5AA2D1288AC00C4E631 /* src */,
+				DD906B0D2D3A34660041550D /* jason-cli */,
 			);
 			name = "jason-cli";
 			packageProductDependencies = (
 			);
 			productName = "jason-cli";
-			productReference = DD9CB5792D12884500C4E631 /* jason-cli */;
+			productReference = DD906B0B2D3A34660041550D /* jason-cli */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		DD9CB5712D12884500C4E631 /* Project object */ = {
+		DD906B032D3A34660041550D /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					DD9CB5782D12884500C4E631 = {
+					DD906B0A2D3A34660041550D = {
 						CreatedOnToolsVersion = 16.2;
 					};
 				};
 			};
-			buildConfigurationList = DD9CB5742D12884500C4E631 /* Build configuration list for PBXProject "jason-cli" */;
+			buildConfigurationList = DD906B062D3A34660041550D /* Build configuration list for PBXProject "jason-cli" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = DD9CB5702D12884500C4E631;
+			mainGroup = DD906B022D3A34660041550D;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = DD9CB57A2D12884500C4E631 /* Products */;
+			productRefGroup = DD906B0C2D3A34660041550D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				DD9CB5782D12884500C4E631 /* jason-cli */,
+				DD906B0A2D3A34660041550D /* jason-cli */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		DD9CB5752D12884500C4E631 /* Sources */ = {
+		DD906B072D3A34660041550D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD9CB5B72D1288AC00C4E631 /* Makefile in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		DD9CB57E2D12884500C4E631 /* Debug */ = {
+		DD906B102D3A34660041550D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -188,15 +180,17 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
 		};
-		DD9CB57F2D12884500C4E631 /* Release */ = {
+		DD906B112D3A34660041550D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -243,55 +237,58 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
 		};
-		DD9CB5812D12884500C4E631 /* Debug */ = {
+		DD906B132D3A34660041550D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8QF4NKZP3V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		DD9CB5822D12884500C4E631 /* Release */ = {
+		DD906B142D3A34660041550D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8QF4NKZP3V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		DD9CB5742D12884500C4E631 /* Build configuration list for PBXProject "jason-cli" */ = {
+		DD906B062D3A34660041550D /* Build configuration list for PBXProject "jason-cli" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DD9CB57E2D12884500C4E631 /* Debug */,
-				DD9CB57F2D12884500C4E631 /* Release */,
+				DD906B102D3A34660041550D /* Debug */,
+				DD906B112D3A34660041550D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		DD9CB5802D12884500C4E631 /* Build configuration list for PBXNativeTarget "jason-cli" */ = {
+		DD906B122D3A34660041550D /* Build configuration list for PBXNativeTarget "jason-cli" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DD9CB5812D12884500C4E631 /* Debug */,
-				DD9CB5822D12884500C4E631 /* Release */,
+				DD906B132D3A34660041550D /* Debug */,
+				DD906B142D3A34660041550D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = DD9CB5712D12884500C4E631 /* Project object */;
+	rootObject = DD906B032D3A34660041550D /* Project object */;
 }
