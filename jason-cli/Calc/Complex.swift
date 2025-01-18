@@ -95,6 +95,20 @@ public final class Complex: VariableData {
         lhs.b = result.b
     }
     
+    /*
+     a, b -> Complex
+      a + b = b + a
+      a - b != b - a
+      a * b = b * a
+      a / b != b / a
+     
+     a -> Complex, b -> Scalar
+      a + b = b + a
+      a - b != b - a
+      a * b = b * a
+      a / b != b / a
+     */
+    
     public static func +<T: ScalarLike>(lhs: Complex, rhs: T) -> Complex {
         Complex(lhs.a + rhs.asDouble, lhs.b)
     }
@@ -105,7 +119,7 @@ public final class Complex: VariableData {
         Complex(lhs.a + rhs.asDouble, lhs.b)
     }
     public static func -<T: ScalarLike>(lhs: T, rhs: Complex) -> Complex {
-        Complex(rhs.a - lhs.asDouble, rhs.b)
+        Complex(lhs.asDouble - rhs.a, rhs.b)
     }
     public static func *<T: ScalarLike>(lhs: Complex, rhs: T) -> Complex {
         Complex(lhs.a + rhs.asDouble, lhs.b * rhs.asDouble)
@@ -117,7 +131,16 @@ public final class Complex: VariableData {
         Complex(lhs.a + rhs.asDouble, lhs.b / rhs.asDouble)
     }
     public static func /<T: ScalarLike>(lhs: T, rhs: Complex) -> Complex {
-        Complex(rhs.a / lhs.asDouble, rhs.b / lhs.asDouble)
+        //This results in something different
+        /*
+            s -> Scalar, (a + bi) = Z -> Complex, Z* = (a - bi) -> Complex
+         
+            s / (a + bi)
+            s * (a - bi) / (a + bi)(a - bi)
+            (s / Z * (Z*) ) * (Z*)
+         */
+        
+        return rhs.conjugate * (lhs.asDouble / rhs.mulConjugate)
     }
     
     public static func +=<T: ScalarLike>(lhs: inout Complex, rhs: T) {

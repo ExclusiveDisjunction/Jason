@@ -46,14 +46,26 @@ public final class Scalar : VariableData, ScalarLike, Comparable {
     public static func +<T: ScalarLike>(lhs: Scalar, rhs: T) -> Scalar {
         Scalar(lhs.a + rhs.asDouble)
     }
+    public static func +<T: ScalarLike>(lhs: T, rhs: Scalar) -> Scalar {
+        Scalar(rhs.a + lhs.asDouble)
+    }
     public static func -<T: ScalarLike>(lhs: Scalar, rhs: T) -> Scalar {
         Scalar(lhs.a - rhs.asDouble)
+    }
+    public static func -<T: ScalarLike>(lhs: T, rhs: Scalar) -> Scalar {
+        Scalar(rhs.a - lhs.asDouble)
     }
     public static func *<T: ScalarLike>(lhs: Scalar, rhs: T) -> Scalar {
         Scalar(lhs.a * rhs.asDouble)
     }
+    public static func *<T: ScalarLike>(lhs: T, rhs: Scalar) -> Scalar {
+        Scalar(rhs.a * lhs.asDouble)
+    }
     public static func /<T: ScalarLike>(lhs: Scalar, rhs: T) -> Scalar {
         Scalar(lhs.a / rhs.asDouble)
+    }
+    public static func /<T: ScalarLike>(lhs: T, rhs: Scalar) -> Scalar {
+        Scalar(rhs.a / lhs.asDouble)
     }
     
     public static func +=<T: ScalarLike>(lhs: inout Scalar, rhs: T) {
