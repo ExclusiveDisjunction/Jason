@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DD51CAC62D3CB263000DA0A5 /* XMLParsing in Frameworks */ = {isa = PBXBuildFile; productRef = DD51CAC52D3CB263000DA0A5 /* XMLParsing */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		DD906B092D3A34660041550D /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -35,6 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD51CAC62D3CB263000DA0A5 /* XMLParsing in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +82,7 @@
 			);
 			name = "jason-cli";
 			packageProductDependencies = (
+				DD51CAC52D3CB263000DA0A5 /* XMLParsing */,
 			);
 			productName = "jason-cli";
 			productReference = DD906B0B2D3A34660041550D /* jason-cli */;
@@ -106,6 +112,9 @@
 			);
 			mainGroup = DD906B022D3A34660041550D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DD51CAC42D3CB263000DA0A5 /* XCRemoteSwiftPackageReference "XMLParsing" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DD906B0C2D3A34660041550D /* Products */;
 			projectDirPath = "";
@@ -289,6 +298,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DD51CAC42D3CB263000DA0A5 /* XCRemoteSwiftPackageReference "XMLParsing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ShawnMoore/XMLParsing.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DD51CAC52D3CB263000DA0A5 /* XMLParsing */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD51CAC42D3CB263000DA0A5 /* XCRemoteSwiftPackageReference "XMLParsing" */;
+			productName = XMLParsing;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DD906B032D3A34660041550D /* Project object */;
 }

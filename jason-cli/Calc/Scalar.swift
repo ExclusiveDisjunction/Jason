@@ -29,7 +29,7 @@ extension ScalarLike {
         if round {
             return Int(val);
         } else {
-            let variance = val - Double(Int(val));
+            let variance = val - val.rounded(.toNearestOrAwayFromZero);
             if abs(variance) >= roundingThreshold {
                 return nil
             }

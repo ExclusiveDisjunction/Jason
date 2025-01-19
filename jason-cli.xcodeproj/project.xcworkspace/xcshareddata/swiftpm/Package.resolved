@@ -1,0 +1,15 @@
+{
+  "originHash" : "6772e256d7bd572080af54e67892e38744be14b5ec83a2fad705045ddeaf8828",
+  "pins" : [
+    {
+      "identity" : "xmlparsing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ShawnMoore/XMLParsing.git",
+      "state" : {
+        "revision" : "2b77a8078d9695aac1a0e5806768e819025174c3",
+        "version" : "0.0.3"
+      }
+    }
+  ],
+  "version" : 3
+}

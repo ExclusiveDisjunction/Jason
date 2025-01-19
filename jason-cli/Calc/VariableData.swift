@@ -7,11 +7,11 @@
 
 import Foundation
 
-public enum VariableType : Codable, Equatable {
-    case scalar
-    case complex
-    case vector
-    case matrix
+public enum VariableType : String, Codable, Equatable {
+    case scalar = "SCA"
+    case complex = "CMP"
+    case vector = "VEC"
+    case matrix = "MAT"
     
     public var displayString: String {
         switch self {
