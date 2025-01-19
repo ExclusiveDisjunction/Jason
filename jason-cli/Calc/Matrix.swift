@@ -7,31 +7,73 @@
 
 import Foundation
 
-public final class MatrixRow {
+public struct MatrixRow {
     internal init(target: Matrix, offset: Int) {
         self.target = target
-        self._offset = offset
+        self.offset = offset
     }
     
-    private var target: Matrix
-    private var _offset: Int
+    private let target: Matrix
+    private let offset: Int
     
     public var isValidRow: Bool {
-        _offset >= 0 && _offset < target.rows;
-    }
-    public var offset: Int {
-        self._offset
+        offset >= 0 && offset < target.rows;
     }
     
     public subscript(_ index: Int) -> Double {
         get {
-            return target.getAtIndex(_offset, index)
+            return target[offset, index]
         }
         set(v) {
-            target.setAtIndex(_offset, index, val: v)
+            target[offset, index] = v
         }
     }
 }
+
+public struct MatrixExtraction<T: Collection> where T.Element == Matrix.IndexType {
+    internal init(target: Matrix, rows: T, cols: T) {
+        self.target = target
+        self.rows = rows
+        self.cols = cols
+    }
+    
+    private let target: Matrix;
+    public let rows: T;
+    public let cols: T;
+    
+    public subscript(_ row: T.Index) -> MatrixRow {
+        get {
+            let offset = rows[row]
+            return target[offset];
+        }
+    }
+    public subscript(_ row: T.Index, _ col: T.Index) -> Double {
+        get {
+            let row_offset = rows[row];
+            let col_offset = cols[col];
+            
+            return target[row_offset, col_offset];
+        }
+        set(v) {
+            let row_offset = rows[row];
+            let col_offset = cols[col];
+            
+            target[row_offset, col_offset] = v;
+        }
+    }
+    
+    public subscript(_ rows: [T.Index], _ cols: [T.Index]) -> MinorMatrixExtraction {
+        get {
+            let extracted_rows = rows.map { self.rows[$0] }
+            let extracted_cols = cols.map { self.cols[$0] }
+            
+            return MatrixExtraction<[Int]>(target: self.target, rows: extracted_rows, cols: extracted_cols)
+        }
+    }
+}
+
+public typealias ContinuousMatrixExtraction = MatrixExtraction<Range<Int>>;
+public typealias MinorMatrixExtraction = MatrixExtraction<[Int]>;
 
 public final class Matrix : VariableData {
     public init() {
@@ -72,8 +114,10 @@ public final class Matrix : VariableData {
         self.data = inner
     }
     
+    public typealias IndexType = [[Double]].Index;
+    
     public static func Identity(dim: Int) -> Matrix {
-        var result = Matrix(rows: dim, cols: dim);
+        let result = Matrix(rows: dim, cols: dim);
         for i in 0..<dim {
             result.data[i][i] = 1;
         }
@@ -86,10 +130,10 @@ public final class Matrix : VariableData {
     }
     
     private func getColSchematic() -> [(Bool, Int)] {
-        
+        return [];
     }
     private func getRowString(schema: [(Bool, Int)], row: Int, open: Character, close: Character) -> String? {
-        
+        return nil;
     }
     
     public static var type: VariableType { .matrix }
@@ -108,17 +152,46 @@ public final class Matrix : VariableData {
             return MatrixRow(target: self, offset: row)
         }
     }
-    public func getAtIndex(_ row: Int, _ col: Int) -> Double {
-        precondition(row >= 0 && row < self.rows, "invalid row index")
-        precondition(col >= 0 && col < self.columns, "invalid column index")
-        
-        return data[row][col];
+    public subscript(_ row: Int, _ col: Int) -> Double {
+        get {
+            precondition(row >= 0 && row < self.rows, "invalid row index")
+            precondition(col >= 0 && col < self.columns, "invalid column index")
+            
+            return data[row][col];
+        }
+        set(v) {
+            precondition(row >= 0 && row < self.rows, "invalid row index")
+            precondition(col >= 0 && col < self.columns, "invalid column index")
+            
+            data[row][col] = v;
+        }
     }
-    public func setAtIndex(_ row: Int, _ col: Int, val: Double) {
-        precondition(row >= 0 && row < self.rows, "invalid row index")
-        precondition(col >= 0 && col < self.columns, "invalid column index")
+    
+    public func extract(rows: Range<Int>, cols: Range<Int>) -> ContinuousMatrixExtraction {
+        return ContinuousMatrixExtraction(target: self, rows: rows, cols: cols)
+    }
+    public func extract(rows: [Int], cols: [Int]) -> MinorMatrixExtraction {
+        return MinorMatrixExtraction(target: self, rows: rows, cols: cols)
+    }
+    
+    public func determinant() -> Double? {
         
-        data[row][col] = val;
+    }
+    public func invert() -> Matrix? {
+        
+    }
+    public func transpose() -> Matrix {
+        
+    }
+    public func transposeInplace() {
+        
+    }
+    
+    public func rowEchelonForm() -> Matrix {
+        
+    }
+    public func reducedRowEchelonForm() -> Matrix {
+        
     }
     
     public var rows: Int {
@@ -136,5 +209,53 @@ public final class Matrix : VariableData {
     
     public static func == (lhs: Matrix, rhs: Matrix) -> Bool {
         lhs.rows == rhs.rows && lhs.columns == rhs.columns && lhs.data == rhs.data
+    }
+    
+    public static func |(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
+        
+    }
+    
+    public static func +(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
+        
+    }
+    public static func -(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
+        
+    }
+    public static func *(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
+        
+    }
+    
+    public static prefix func -(lhs: Matrix) -> Matrix {
+        
+    }
+    
+    public static func +=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        
+    }
+    public static func -=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        
+    }
+    public static func *=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        
+    }
+    
+    public static func *<T: ScalarLike>(lhs: Matrix, rhs: T) -> Matrix {
+        
+    }
+    public static func *<T: ScalarLike>(lhs: T, rhs: Matrix) -> Matrix {
+        return rhs * lhs;
+    }
+    public static func /<T: ScalarLike>(lhs: Matrix, rhs: T) -> Matrix {
+        
+    }
+    public static func /<T: ScalarLike>(lhs: T, rhs: Matrix) -> Matrix {
+        return rhs / lhs
+    }
+    
+    public static func *(lhs: Vector, rhs: Matrix) throws(OperationError) -> Matrix {
+        
+    }
+    public static func *(lhs: Matrix, rhs: Vector) throws(OperationError) -> Matrix {
+        try rhs * lhs;
     }
 }

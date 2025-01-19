@@ -165,6 +165,11 @@ public final class Vector : VariableData {
         return Vector(list: lhs.data.map { $0 / b })
     }
     
+    public static prefix func -(lhs: Vector) -> Vector {
+        let arr = lhs.data.map { -$0 };
+        return Vector(list: arr);
+    }
+    
     public static func +=(lhs: inout Vector, rhs: Vector) throws {
         guard lhs.dim >= rhs.dim else { throw OperationError(operation: "+=", a: lhs.displayString, b: rhs.displayString, reason: "cannot add in place if lhs dim is less than rhs dim") }
         

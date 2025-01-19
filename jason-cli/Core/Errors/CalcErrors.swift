@@ -17,14 +17,14 @@ extension Int: DimensionKind {
     }
 }
 
-public final class DimensionError<T: DimensionKind> : Error {
+public final class DimensionError<T> : Error where T: Sendable, T: DimensionKind {
     init(dimA: T, dimB: T) {
         self.a = dimA
         self.b = dimB
     }
     
-    var a: T
-    var b: T
+    let a: T
+    let b: T
     
     var localizedDescription: String {
         "Dimension mismatch between \(a.stringDescription) and \(b.stringDescription)"
@@ -38,9 +38,9 @@ public final class OperationError : Error {
         self.reason = reason
     }
     
-    public var operation: String;
-    public var on: (String, String);
-    public var reason: String;
+    public let operation: String;
+    public let on: (String, String);
+    public let reason: String;
     
     public var localizedDescription: String {
         "Cannot apply \(operation) on \(on.0) & \(on.1) because of '\(reason)'"
