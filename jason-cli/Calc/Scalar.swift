@@ -27,7 +27,8 @@ extension ScalarLike {
     public func toInt(round: Bool = true, roundingThreshold: Double = 0.05) -> Int? {
         let val = self.asDouble;
         if round {
-            return Int(val);
+            let round = val.rounded(.toNearestOrAwayFromZero)
+            return Int(round);
         } else {
             let variance = val - val.rounded(.toNearestOrAwayFromZero);
             if abs(variance) >= roundingThreshold {

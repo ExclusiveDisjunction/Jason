@@ -17,6 +17,18 @@ extension Int: DimensionKind {
     }
 }
 
+public final class IndexOutOfRangeError<T> : Error where T: Sendable, T: DimensionKind {
+    public init(index: T) {
+        self.index = index
+    }
+    
+    public let index: T;
+    
+    var localizedDescription: String {
+        "The index \(index) is out of range"
+    }
+}
+
 public final class DimensionError<T> : Error where T: Sendable, T: DimensionKind {
     init(dimA: T, dimB: T) {
         self.a = dimA
