@@ -266,19 +266,87 @@ public final class Matrix : VariableData {
     
     // Outputting
     private func getColSchematic() -> [(Bool, Int)] {
-        return [];
+        //Optimization: Iterate through the matrix row by row instead of column by column, as this is faster. The result is required to be pre-initalized.
+        var result = [(Bool, Int)](repeating: (false, 0), count: self.columns);
+        
+        for row in self.data {
+            for (i, element) in row.enumerated() {
+                result[i].0 = element < 0;
+                result[i].1 = max(
+                    result[i].1, //Previous result
+                    String(element).count - (element < 0 ? 1 : 0) //The longest string is defined to be the count, but if the string is negative, we omit that by subtracting one.
+                )
+            }
+        }
+        
+        return result;
     }
     private func getRowString(schema: [(Bool, Int)], row: Int, open: Character, close: Character) -> String? {
-        return nil;
+        guard row >= 0 && row < self.rows else { return nil }
+        
+        var result = "\(open)";
+        let host = self.data[row];
+        for i in 0..<self.columns {
+            let (has_negative, width) = schema[i];
+            let curr: Double = host[i];
+            
+            if curr >= 0 && has_negative {
+                result += " ";
+            }
+            let curr_str = "\(curr)";
+            result += curr_str;
+            
+            if ((has_negative && curr_str.count < width + 1) || curr_str.count < width) {
+                let diff = width - (curr_str.count) + (curr < 0 ? 1 : 0);
+                var space_str = "";
+                for t in 0..<diff {
+                    space_str += " ";
+                }
+                
+                result += space_str;
+            }
+        }
+        
+        result += "\(close)"
+        
+        return result;
     }
     public var singleLinePrint: String {
         get {
-            
+            return "[ " + data.map { $0.map { String($0) }.joined(separator: ", " ) }.joined(separator: "; ") + " ]";
         }
     }
     public var multiLinePrint: String {
         get {
+            guard isValid else { return "[ ]" }
             
+            let schema = self.getColSchematic();
+            
+            if rows == 1 {
+                guard let row = self.getRowString(schema: schema, row: 0, open: "[", close: "]") else { return "[ ERR ]" }
+                return row;
+            }
+            else {
+                // ⌊ ⌋ ⌈ ⌉ |
+                
+                var result: String = "";
+                for i in 0..<rows {
+                    let open: Character, close: Character;
+                    if i == 0 || i == rows - 1 {
+                        open = "⌈";
+                        close = "⌉";
+                    }
+                    else {
+                        open = "|";
+                        close = "|";
+                    }
+                    
+                    guard let row = self.getRowString(schema: schema, row: i, open: open, close: close) else { return "[ ERR ]" }
+                    result += row + "\n";
+                }
+                
+                return result;
+            }
         }
     }
     
@@ -419,13 +487,101 @@ public final class Matrix : VariableData {
         }
     }
     public func rowEchelonForm() {
+        guard self.isValid else { return }
         
+        var currentRow: Int = 0;
+        for currentCol in 0..<self.columns {
+            var pivotRow: Int = currentCol;
+            while pivotRow < self.rows && self.data[pivotRow][currentCol] == 0 {
+                pivotRow += 1;
+            }
+            
+            if pivotRow < rows {
+                try! rowSwap(orig: currentRow, dest: pivotRow) //We already know that the rows are in bounds, so we can use try!.
+                
+                let pivotValue = data[currentRow][currentCol];
+                for col in currentCol..<self.columns {
+                    data[currentRow][col] /= pivotValue;
+                }
+                
+                for row in currentRow+1..<self.rows {
+                    let mul = data[row][currentCol];
+                    for col in currentCol..<self.columns {
+                        data[row][col] -= mul * data[currentRow][col];
+                    }
+                }
+                
+                currentRow += 1;
+            }
+        }
     }
     public func reducedRowEchelonForm() {
+        rowEchelonForm()
         
+        var lead: Int = 0;
+        for r in 0..<self.rows {
+            if lead >= columns { break }
+            
+            var i = r;
+            while data[i][lead] == 0 {
+                i += 1;
+                if i == self.rows {
+                    i = r;
+                    lead += 1;
+                    if lead == columns { break }
+                }
+            }
+            
+            if lead < columns {
+                try! rowSwap(orig: i, dest: r);
+                let divisor = data[r][lead];
+                if divisor != 0 {
+                    for j in 0..<self.columns {
+                        data[r][j] /= divisor;
+                    }
+                }
+                
+                for k in 0..<self.rows {
+                    if k != r {
+                        let factor = data[k][lead];
+                        for j in 0..<self.columns {
+                            data[k][j] = factor * data[r][j];
+                        }
+                    }
+                }
+            }
+            
+            lead += 1;
+        }
+        
+        lead = 0;
+        for r in 0..<self.rows {
+            if self.columns < lead { return }
+            
+            var i = r;
+            while data[i][lead] != 0 {
+                i += 1;
+                lead += 1;
+                if columns == lead { return }
+            }
+            
+            if i != r {
+                try! rowSwap(orig: i, dest: r)
+            }
+            
+            for j in 0..<self.columns {
+                data[r][j] /= data[r][lead];
+            }
+            
+            for j in 0..<self.rows {
+                if j != r {
+                    try! rowAdd(orig: r, fac: data[j][lead], dest: j);
+                }
+            }
+            
+            lead += 1;
+        }
     }
-    
-    
     
     public static func == (lhs: Matrix, rhs: Matrix) -> Bool {
         lhs.rows == rhs.rows && lhs.columns == rhs.columns && lhs.data == rhs.data
@@ -460,7 +616,7 @@ public final class Matrix : VariableData {
     }
     
     public static func +(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
-        guard lhs.dims == rhs.dims else { throw OperationError(operation: "", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
+        guard lhs.dims == rhs.dims else { throw OperationError(operation: "+", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
         
         let result = Matrix(dims: lhs.dims)
         for i in 0..<result.rows {
@@ -472,7 +628,7 @@ public final class Matrix : VariableData {
         return result;
     }
     public static func -(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
-        guard lhs.dims == rhs.dims else { throw OperationError(operation: "", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
+        guard lhs.dims == rhs.dims else { throw OperationError(operation: "-", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
         
         let result = Matrix(dims: lhs.dims)
         for i in 0..<result.rows {
@@ -484,7 +640,23 @@ public final class Matrix : VariableData {
         return result;
     }
     public static func *(lhs: Matrix, rhs: Matrix) throws(OperationError) -> Matrix {
+        guard lhs.columns == rhs.rows else { throw OperationError(operation: "*", a: lhs.displayString, b: rhs.displayString, reason: "dimension mismatch") }
         
+        let r = lhs.rows, c = rhs.columns;
+        let result = Matrix(rows: r, cols: c)
+        
+        for i in 0..<r {
+            for j in 0..<c {
+                var calc: Double = 0;
+                for k in 0..<rhs.rows {
+                    calc += lhs.data[i][k] * rhs.data[k][j];
+                }
+                
+                result.data[i][j] = calc;
+            }
+        }
+        
+        return result;
     }
     
     public static prefix func -(lhs: Matrix) -> Matrix {
@@ -500,13 +672,38 @@ public final class Matrix : VariableData {
     }
     
     public static func +=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        guard lhs.dims == rhs.dims else { throw OperationError(operation: "+=", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
         
+        for i in 0..<lhs.rows {
+            for j in 0..<lhs.columns {
+                lhs.data[i][j] += rhs.data[i][j];
+            }
+        }
     }
     public static func -=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        guard lhs.dims == rhs.dims else { throw OperationError(operation: "-=", a: lhs.displayString, b: rhs.displayString, reason: "dimensions for this operation require the same dimensions")}
         
+        for i in 0..<lhs.rows {
+            for j in 0..<lhs.columns {
+                lhs.data[i][j] -= rhs.data[i][j];
+            }
+        }
     }
     public static func *=(lhs: inout Matrix, rhs: Matrix) throws(OperationError) {
+        guard lhs.columns == rhs.rows else { throw OperationError(operation: "*=", a: lhs.displayString, b: rhs.displayString, reason: "dimension mismatch") }
         
+        let r = lhs.rows, c = rhs.columns
+        
+        for i in 0..<r {
+            for j in 0..<c {
+                var calc: Double = 0;
+                for k in 0..<rhs.rows {
+                    calc += lhs.data[i][k] * rhs.data[k][j];
+                }
+                
+                lhs.data[i][j] = calc;
+            }
+        }
     }
     
     public static func *<T: ScalarLike>(lhs: Matrix, rhs: T) -> Matrix {
@@ -535,9 +732,6 @@ public final class Matrix : VariableData {
         }
         
         return result;
-    }
-    public static func /<T: ScalarLike>(lhs: T, rhs: Matrix) -> Matrix {
-        return rhs / lhs
     }
     
     public static func *(lhs: Vector, rhs: Matrix) throws(OperationError) -> Vector {
