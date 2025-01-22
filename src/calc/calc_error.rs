@@ -1,12 +1,13 @@
 use std::fmt::{Display, Debug, Formatter};
 
-pub trait DimensionKind : Display + Debug  {}
+pub trait DimensionKind : Display + Debug + Clone + Copy + PartialEq {}
 impl DimensionKind for usize { }
 impl DimensionKind for i32 {}
 impl DimensionKind for i64 {}
 impl DimensionKind for u32 {}
 impl DimensionKind for u64 {}
 
+#[derive(Debug)]
 pub enum CalcError<T> where T: DimensionKind {
     index(IndexOutOfRangeError<T>),
     dimension(DimensionError<T>),

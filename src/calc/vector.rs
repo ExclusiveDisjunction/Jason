@@ -1,7 +1,7 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
 use super::calc_error::{DimensionError, OperationError, CalcError, CalcResult};
-use std::ops::{Add, Sub, Mul, Div, Index, IndexMut};
+use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use std::iter::zip;
 use serde::{Deserialize, Serialize};
@@ -23,12 +23,21 @@ impl Debug for MathVector {
     }
 }
 
-impl MathVector {
-    pub fn from<T>(data: &[T]) -> Self where T: ScalarLike {
+impl<T> From<&[T]> for MathVector where T: ScalarLike {
+    fn from(value: &[T]) -> Self {
         Self {
-            data: data.iter().map(|x| x.as_scalar()).collect()
+            data: value.iter().map(|x| x.as_scalar()).collect()
         }
     }
+}
+impl<T> From<Vec<T>> for MathVector where T: ScalarLike {
+    fn from(value: Vec<T>) -> Self {
+        Self {
+            data: value.into_iter().map(|x| x.as_scalar()).collect()
+        }
+    }
+}
+impl MathVector {
     pub fn with_capacity(size: usize) -> Self {
         Self {
             data: vec![0.0; size]
@@ -47,7 +56,7 @@ impl MathVector {
     }
     pub fn angle(&self) -> Option<f64> {
         if self.dim() == 2 {
-            Some( self.data[0].atan2(self.data[1]) )
+            Some( self.data[1].atan2(self.data[0]) )
         }
         else {
             None
@@ -88,11 +97,19 @@ impl MathVector {
             }
         }
 
+        /*
+             i   j   k 
+            a.0 a.1 a.2 
+            b.0 b.1 b.2
+
+            i(a.1 * b.2 - a.2 * b.1) - j(a.0 * b.2 - a.2 * b.0) + k(a.0 * b.1 - a.1 * b.0)
+         */
+
         Ok(
             MathVector::from(
-                &[
+                vec![
                     a.1 * b.2 - a.2 * b.1,
-                    a.2 * b.0 - a.0 * b.2,
+                    a.0 * b.2 - a.2 * b.0,
                     a.0 * b.1 - a.1 * b.0
                 ]
             )
@@ -115,6 +132,14 @@ impl IndexMut<usize> for MathVector {
 impl VariableData for MathVector {
     fn get_type() -> VariableType {
         VariableType::Vector
+    }
+}
+
+impl Neg for MathVector {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        let contents: Vec<f64> = self.data.into_iter().map(|x| -x).collect();
+        Self::from(contents)
     }
 }
 
@@ -143,23 +168,8 @@ impl Add for MathVector {
 impl Sub for MathVector {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        let mut a: MathVector;
-        let b: MathVector;
-
-        if self.dim() < rhs.dim() {
-            a = rhs;
-            b = self;
-        }
-        else {
-            a = self;
-            b = rhs;
-        }
-
-        for (i, elem) in b.data.into_iter().enumerate() {
-            a.data[i] -= elem;
-        }
-
-        return a;
+        //Note that a - b != b - a, dispite widining. an equivalent result is a + (-b). 
+        self + (-rhs)
     }
 }
 impl<T> Mul<T> for MathVector where T: ScalarLike {
@@ -168,7 +178,7 @@ impl<T> Mul<T> for MathVector where T: ScalarLike {
     fn mul(self, rhs: T) -> Self::Output {
         let b = rhs.as_scalar();
         let result: Vec<f64> = self.data.into_iter().map(|x| x * b).collect();
-        MathVector::from(&result)
+        MathVector::from(result)
     }
 }
 impl Mul<MathVector> for Scalar {
@@ -182,11 +192,46 @@ impl<T> Div<T> for MathVector where T: ScalarLike {
     fn div(self, rhs: T) -> Self::Output {
         let b = rhs.as_scalar();
         let result: Vec<f64> = self.data.into_iter().map(|x| x / b).collect();
-        MathVector::from(&result)
+        MathVector::from(result)
     }
 }
 
 #[test]
 fn test_vector() {
+    let a = MathVector::from(vec![1, 2, 3]);
+    let b = MathVector::from(vec![2, 3]);
+    let c = Scalar::new(4.0);
 
+    //Negation
+    assert_eq!(-a.clone(), MathVector::from(vec![-1, -2, -3]));
+
+    //Index
+    assert_eq!(a[0], 1.0);
+
+    //Other operations
+    assert!(a.dot_product(&b).is_err());
+    assert_eq!(a.dot_product(&a).unwrap(), (1 * 1 + 2 * 2 + 3 * 3) as f64);
+    assert_eq!(a.cross_product(&MathVector::from(vec![3, 2, 1])).unwrap(), MathVector::from(vec![-4, -8, -4]));
+    assert_eq!(b.cross_product(&MathVector::from(vec![3, 2])).unwrap(), MathVector::from(vec![0, 0, -5]));
+
+    //Properties
+    assert_eq!(a.magnitude(), ((1 * 1 + 2 * 2 + 3 * 3) as f64).sqrt());
+    assert!(a.angle().is_none());
+    //Due to floating point error, this may fail. 
+    assert_eq!(b.angle().unwrap(), 3f64.atan2(2.0));
+
+    // a + b == b + a
+    assert_eq!(a.clone() + b.clone(), MathVector::from(vec![3, 5, 3]));
+    assert_eq!(b.clone() + a.clone(), a.clone() + b.clone());
+
+    // a - b != b - a
+    assert_eq!(a.clone() - b.clone(), MathVector::from(vec![-1, -1, 3]));
+    assert_eq!(b.clone() - a.clone(), MathVector::from(vec![1, 1, -3]));
+
+    // a * b == b * a
+    assert_eq!(a.clone() * c, MathVector::from(vec![4, 8, 12]));
+    assert_eq!(c * a.clone(), a.clone() * c);
+
+    // b / a DNE
+    assert_eq!(a.clone() / c, MathVector::from(vec![1.0/4.0, 2.0/4.0, 3.0/4.0]));
 }
