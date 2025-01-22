@@ -288,7 +288,6 @@ fn test_logger_write() {
     if let Err(e) = logging.open("tmp.log", LoggerLevel::Debug) {
         panic!("unable to open log because '{:?}'", e);
     }
-    format!("hello");
 
     logger_write!(LoggerLevel::Debug, "hello");
     logger_write!(LoggerLevel::Info, "hello");

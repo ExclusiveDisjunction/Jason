@@ -145,10 +145,10 @@ impl Complex {
         }
     }
     pub fn conjugate(&self) -> Complex {
-        return Complex::new_with(self.a, -self.b)
+        Complex::new_with(self.a, -self.b)
     }
     pub fn mul_conjugate(&self) -> Scalar {
-        return Scalar::new(self.a.powi(2) + self.b.powi(2));
+        Scalar::new(self.a.powi(2) + self.b.powi(2))
     }
 }
 
@@ -157,7 +157,7 @@ fn complex_test() {
     let a = Complex::new_with(1.0, 0.0);
     let b = Complex::new_with(3.0, 1.4);
     let c = Scalar::new(3.0);
-    let d = Complex::new_with(2.4, 3.1);
+    //let d = Complex::new_with(2.4, 3.1);
 
     assert_eq!(a.clone() + b.clone(), Complex::new_with(4.0, 1.4));
     assert_eq!(a.clone() - b.clone(), Complex::new_with(-2.0, -1.4));
