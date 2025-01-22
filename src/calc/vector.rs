@@ -1,9 +1,9 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
 use super::calc_error::{DimensionError, OperationError, CalcError, CalcResult};
-use std::ops::{Add, Sub, Mul, Div};
-use std::ops::{Index, IndexMut};
+use std::ops::{Add, Sub, Mul, Div, Index, IndexMut};
 use std::fmt::{Display, Debug, Formatter};
+use std::iter::zip;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,17 +43,60 @@ impl MathVector {
     }
 
     pub fn magnitude(&self) -> f64 {
-
+        self.dot_product(self).unwrap().sqrt() //note that the dot product returns error if the dims do not match, and when dot product with self, the dims cannot mismatch
     }
     pub fn angle(&self) -> Option<f64> {
-
+        if self.dim() == 2 {
+            Some( self.data[0].atan2(self.data[1]) )
+        }
+        else {
+            None
+        }
     }
 
-    pub fn dotProduct(&self, rhs: &Self) -> Result<f64, DimensionError<usize>> {
+    pub fn dot_product(&self, rhs: &Self) -> Result<f64, DimensionError<usize>> {
+        if self.dim() != rhs.dim() {
+            return Err(DimensionError::new(self.dim(), rhs.dim()));
+        }
 
+        let mut result: f64 = 0.0;
+        for (a, b) in zip(self.data.iter(), rhs.data.iter()) {
+            result += a * b;
+        }
+
+        Ok(result)
     }
     pub fn cross_product(&self, rhs: &Self) -> CalcResult<Self, usize> {
+        if self.dim() != rhs.dim() {
+            return Err(CalcError::dimension(DimensionError::new(self.dim(), rhs.dim())))
+        }
 
+        let a: (f64, f64, f64);
+        let b: (f64, f64, f64);
+
+        match self.dim() {
+            2 => {
+                a = (self.data[0], self.data[1], 0.0);
+                b = (rhs.data[0], rhs.data[1], 0.0);
+            }
+            3 => {
+                a = (self.data[0], self.data[1], self.data[2]);
+                b = (rhs.data[0], rhs.data[1], rhs.data[2]);
+            }
+            _ => {
+                return Err(CalcError::operation(OperationError::new_fmt("X", self, rhs, Some("dimension must be either 2 or 3 for cross product"))));
+            }
+        }
+
+        Ok(
+            MathVector::from(
+                &[
+                    a.1 * b.2 - a.2 * b.1,
+                    a.2 * b.0 - a.0 * b.2,
+                    a.0 * b.1 - a.1 * b.0
+                ]
+            )
+        )
     }
 }
 
@@ -123,7 +166,9 @@ impl<T> Mul<T> for MathVector where T: ScalarLike {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
-
+        let b = rhs.as_scalar();
+        let result: Vec<f64> = self.data.into_iter().map(|x| x * b).collect();
+        MathVector::from(&result)
     }
 }
 impl Mul<MathVector> for Scalar {
@@ -135,6 +180,13 @@ impl Mul<MathVector> for Scalar {
 impl<T> Div<T> for MathVector where T: ScalarLike {
     type Output = Self;
     fn div(self, rhs: T) -> Self::Output {
-
+        let b = rhs.as_scalar();
+        let result: Vec<f64> = self.data.into_iter().map(|x| x / b).collect();
+        MathVector::from(&result)
     }
+}
+
+#[test]
+fn test_vector() {
+
 }

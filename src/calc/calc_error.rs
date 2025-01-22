@@ -13,7 +13,7 @@ pub enum CalcError<T> where T: DimensionKind {
     operation(OperationError)
 }
 
-pub type CalcResult<T, U> where U: DimensionKind = Result<T, CalcError<U>>;
+pub type CalcResult<T, U> = Result<T, CalcError<U>>;
 
 pub struct IndexOutOfRangeError<T> where T: DimensionKind {
     index: T
@@ -65,11 +65,26 @@ pub struct OperationError {
     reason: Option<String>
 }
 impl OperationError {
-    pub fn new(operation: String, a: String, b: String, reason: Option<String>) -> Self {
+    pub fn new(operation: &str, a: String, b: String, reason: Option<&str>) -> Self {
         Self {
-            operation,
+            operation: operation.to_string(),
             on: (a, b),
-            reason
+            reason: if let Some(r) = reason {
+                Some(r.to_string())
+            } else {
+                None
+            }  
+        }
+    }
+    pub fn new_fmt<T1, T2>(operation: &str, a: &T1, b: &T2, reason: Option<&str>) -> Self where T1: Debug, T2: Debug {
+        Self {
+            operation: operation.to_string(),
+            on: (format!("{:?}", a), format!("{:?}", b)),
+            reason: if let Some(r) = reason {
+                Some(r.to_string())
+            } else {
+                None
+            }  
         }
     }
 }
