@@ -5,9 +5,8 @@ pub enum Error {
     NullError(String), //name
     FormatError(String, String), //string, reason
     RangeError(String, String, Option<String>, Option<String>), //variable, value, range min, range max
-    NotFoundError(String), //identifyer
+    NotFoundError(String), //identifier
     PermissionError,
-    OperatorError(String, String, Option<String>), //operator, operand1, [operand2] (for math)
     UnexpectedError(String), //Reason
     OperationError(String, String), //Action, Reason (for activities)
     ConversionError(String), //Reason
@@ -27,13 +26,7 @@ impl Debug for Error {
             },
             Self::NotFoundError(value) => write!(f, "the value '{}' was not found", value),
             Self::PermissionError => write!(f, "invalid permissions"),
-            Self::OperatorError(operator, operand1, operand2 ) => {
-                match operand2 {
-                    None => write!(f, "operator '{operator}' cannot be applied to '{operand1}'"),
-                    Some(s) => write!(f, "operator '{operator}' cannot be applied to '{operand1}' and '{s}'")
-                }
-            },
-            Self::ConversionError(s) => write!(f, "converson failed because of '{s}'"),
+            Self::ConversionError(s) => write!(f, "conversion failed because of '{s}'"),
             Self::UnexpectedError(s) => write!(f, "unexpected error: '{s}'"),
             Self::OperationError(action, reason) => write!(f, "operation '{action}' is not permitted because of '{reason}'"),
             Self::IOError(e) => (e as &dyn Debug).fmt(f)
@@ -104,9 +97,9 @@ macro_rules! range_error {
 }
 #[macro_export]
 macro_rules! not_found_error {
-    ($identifyer: expr) => {
+    ($identifier: expr) => {
         {
-            $crate::core::errors::Error::NotFoundError($identifyer.to_string())
+            $crate::core::errors::Error::NotFoundError($identifier.to_string())
         }
     }
 }
@@ -115,19 +108,6 @@ macro_rules! permission_error {
     () => {
         {
             $crate::core::errors::Error::PermissionError()
-        }
-    }
-}
-#[macro_export]
-macro_rules! operator_error{
-    ($operator: expr, $operand1: expr) => {
-        {
-            $crate::core::errors::Error::OperatorError($operator.to_string(), format!("{:?}", &$operand1), None)
-        }
-    };
-    ($operator: expr, $operand1: expr, $operand2: expr) => {
-        {
-            $crate::core::errors::Error::OperatorError($operator.to_string(), format!("{:?}", &$operand1), Some( format!("{:?}", &$operand2) ))
         }
     }
 }
