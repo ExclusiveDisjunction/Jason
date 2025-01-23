@@ -1,9 +1,10 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
-use super::calc_error::{DimensionError, OperationError, CalcError, CalcResult, DimensionKind};
+use super::calc_error::{CalcError, CalcResult, DimensionError, DimensionKind, IndexOutOfRangeError, OperationError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg, Range};
 use std::fmt::{Display, Debug, Formatter};
 use std::iter::zip;
+use std::os::unix::thread::JoinHandleExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -29,32 +30,38 @@ impl<T, U> PartialEq<(U, U)> for MatrixDimension<T> where T: DimensionKind, U: D
     }
 }
 
-
-pub struct MatrixExtraction<'a, T> {
+pub struct MatrixExtraction<'a> {
     target: &'a Matrix,
-    rows: T,
-    cols: T
+    rows: Vec<usize>,
+    cols: Vec<usize>
 }
-impl<'a, T> MatrixExtraction<'a, T> {
-    fn new(target: &'a Matrix, rows: T, cols: T) -> Self {
+impl<'a> MatrixExtraction<'a> {
+    fn new(target: &'a Matrix, rows: Vec<usize>, cols: Vec<usize>) -> Self {
         Self {
             target,
             rows,
             cols
         }
     }
+    fn new_range(target: &'a Matrix, rows: Range<usize>, cols: Range<usize>) -> Self {
+        Self {
+            target,
+            rows: rows.collect(),
+            cols: cols.collect()
+        }
+    }
 }
-impl<'a, T> Into<Matrix> for MatrixExtraction<'a, T> where T: Iterator<Item = usize> + Clone {
+impl<'a> Into<Matrix> for MatrixExtraction<'a> {
     fn into(self) -> Matrix {
-        let mut result = Matrix::with_capacity(self.rows.clone().count(), self.cols.clone().count(), 0);
+        let mut result = Matrix::with_capacity(self.rows.len(), self.cols.len(), 0);
 
         let mut ourI: usize = 0;
         let mut ourJ: usize;
 
-        for i in self.rows {
+        for i in &self.rows {
             ourJ = 0;
-            for j in self.cols.clone() {
-                result[(ourI, ourJ)] = self.target[(i, j)];
+            for j in &self.cols {
+                result[(ourI, ourJ)] = self.target[(*i, *j)];
                 ourJ += 1;
             }
             ourI += 1;
@@ -63,9 +70,9 @@ impl<'a, T> Into<Matrix> for MatrixExtraction<'a, T> where T: Iterator<Item = us
         result
     }
 }
-impl<'a, T> MatrixExtraction<'a, T> where T: Iterator<Item = usize> + Clone {
+impl<'a> MatrixExtraction<'a> {
     pub fn dim(&self) -> MatrixDimension<usize> {
-        MatrixDimension::new(self.rows.clone().count(), self.cols.clone().count())
+        MatrixDimension::new(self.rows.len(), self.cols.len())
     }
     
     pub fn determinant(&self) -> Option<f64> {
@@ -74,8 +81,54 @@ impl<'a, T> MatrixExtraction<'a, T> where T: Iterator<Item = usize> + Clone {
         }
 
         if self.dim() == (2, 2) {
-            
+            Some(
+                self[(0, 0)] * self[(1, 1)] - self[(0, 1)] * self[(1, 0)]
+            )
         }
+        else {
+            let mut result: f64 = 0.0;
+            let first_rows_removed: Vec<usize> = self.rows.clone().into_iter().skip(1).collect();
+            for i in self.cols.clone() {
+                let our_cols: Vec<usize> = self.cols.clone().into_iter().filter(|x| *x != i).collect();
+
+                let minor: MatrixExtraction<'a> = MatrixExtraction::new(
+                    &self.target,
+                    first_rows_removed.clone(),
+                    our_cols
+                );
+                let minors_det = minor.determinant()?;
+
+                let fac: f64 = if i % 2 == 0 {
+                    -1.0
+                } else {
+                    1.0
+                };
+
+                result += fac * self[(0, i)] * minors_det;
+            }
+
+            Some(result)
+        }
+    }
+
+    pub fn extract<U>(rows: U, cols: U) -> MatrixExtraction<'a> where U: Iterator<Item = usize> {
+        todo!()
+    }
+}
+impl<'a, 'b> PartialEq for MatrixExtraction<'a> {
+    fn eq(&self, other: &MatrixExtraction<'a>) -> bool {
+        todo!()
+    }
+}
+impl<'a> PartialEq<Matrix> for MatrixExtraction<'a> {
+    fn eq(&self, other: &Matrix) -> bool {
+        todo!()
+    }
+}
+impl<'a> Index<(usize, usize)> for MatrixExtraction<'a> {
+    type Output = f64;
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        todo!()
     }
 }
 
@@ -166,9 +219,34 @@ impl Matrix {
         tmp
     }
 
+    pub fn identity(dim: usize) -> Matrix {
+        let mut result = Matrix::with_capacity(dim, dim, 0);
+        for i in 0..dim {
+            result[(i, i)] = 1.0;
+        }
+
+        result
+    }
+
     fn allocate<T>(&mut self, rows: usize, cols: usize, val: T) where T: ScalarLike {
         let f = val.as_scalar();
+        let currs = (self.rows(), self.columns());
 
+        if currs == (rows, cols) {
+            for row in &mut self.data {
+                for item in row {
+                    *item = f;
+                }
+            }
+        }
+        else {
+            if rows == 0 || cols == 0 {
+                self.data = vec![];
+            } 
+            else {
+                self.data = vec![vec![f; cols]; rows];
+            }
+        }
 
     }
     
@@ -183,8 +261,118 @@ impl Matrix {
             self.data[0].len()
         }
     }
+    pub fn dims(&self) -> MatrixDimension<usize> {
+        MatrixDimension::new(self.rows(), self.columns())
+    }
+    pub fn is_square(&self) -> bool {
+        self.dims().is_square()
+    }
+    pub fn is_valid(&self) -> bool {
+        self.rows() != 0 && self.columns() != 0
+    }
 
-    pub fn extract<'a>(&'a self, rows: Range<usize>, cols: Range<usize>) -> MatrixExtraction<'a, Range<usize>> {
+    pub fn extract<'a>(&'a self, rows: Range<usize>, cols: Range<usize>) -> MatrixExtraction<'a> {
+        MatrixExtraction::new_range(self, rows, cols)
+    }
+    pub fn extract_specific<'a>(&'a self, rows: Vec<usize>, cols: Vec<usize>) -> MatrixExtraction<'a> {
         MatrixExtraction::new(self, rows, cols)
+    }
+    pub fn as_extraction<'a>(&'a self) -> MatrixExtraction<'a> {
+        MatrixExtraction::new_range(self, 0..self.rows(), 0..self.columns())
+    }
+
+    pub fn determinant(&self) -> Option<f64> {
+        self.as_extraction().determinant()
+    }
+    pub fn inverse(&self) -> Option<Matrix> {
+        todo!()
+    }
+    pub fn transpose(&self) -> Matrix {
+        let mut result = Matrix::with_capacity(self.columns(), self.rows(), 0);
+
+        for i in 0..self.rows() {
+            for j in 0..self.columns() {
+                result.data[j][i] = self.data[i][j];
+            }
+        }
+
+        result
+    }
+
+    pub fn row_swap(&mut self, orig: usize, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> {
+        if orig >= self.rows() {
+            return Err(IndexOutOfRangeError::new(orig))
+        }
+        else if dest >= self.rows() {
+            return Err(IndexOutOfRangeError::new(dest))
+        }
+
+        if orig != dest {
+            self.data.swap(orig, dest);
+        }
+
+        Ok(())
+    }
+    pub fn row_add<T>(&mut self, orig: usize, fac: T, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> where T: ScalarLike{
+        if orig >= self.rows() {
+            return Err(IndexOutOfRangeError::new(orig))
+        }
+        else if dest >= self.rows() {
+            return Err(IndexOutOfRangeError::new(dest))
+        }
+
+        let fac = fac.as_scalar();
+        for j in 0..self.columns() {
+            self.data[dest][j] += fac * self.data[orig][j];
+        }
+
+        Ok(())
+    }
+    pub fn row_echelon_form() {
+        todo!()
+    }
+    pub fn reduced_row_echelon_form() {
+        todo!()
+    }
+
+    pub fn augment(lhs: &Self, rhs: &Self) -> Self {
+        todo!()
+    }
+}
+
+impl Add for Matrix {
+    type Output = CalcResult<Matrix>;
+    fn add(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+impl Sub for Matrix {
+    type Output = CalcResult<Matrix>;
+    fn sub(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+impl Mul for Matrix {
+    type Output = CalcError<Matrix>;
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+impl<T> Mul<T> for Matrix where T: ScalarLike {
+    type Output = Matrix;
+    fn mul(self, rhs: T) -> Self::Output {
+        todo!()
+    }
+}
+impl Mul<Matrix> for Scalar {
+    type Output = Matrix;
+    fn mul(self, rhs: Matrix) -> Self::Output {
+        rhs * self
+    }
+}
+impl<T> Div<T> for Matrix where T: ScalarLike {
+    type Output = Matrix;
+    fn div(self, rhs: T) -> Self::Output {
+        todo!()
     }
 }
