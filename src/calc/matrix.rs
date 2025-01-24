@@ -1,19 +1,18 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
+use super::vector::MathVector;
 use super::calc_error::{CalcError, CalcResult, DimensionError, DimensionKind, IndexOutOfRangeError, OperationError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg, Range};
 use std::fmt::{Display, Debug, Formatter};
-use std::iter::zip;
-use std::os::unix::thread::JoinHandleExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct MatrixDimension<T> where T: DimensionKind {
-    rows: T,
-    cols: T
+pub struct MatrixDimension {
+    rows: usize,
+    cols: usize
 }
-impl<T> MatrixDimension<T> where T: DimensionKind {
-    pub fn new(a: T, b: T) -> Self {
+impl MatrixDimension {
+    pub fn new(a: usize, b: usize) -> Self {
         Self {
             rows: a,
             cols: b
@@ -23,12 +22,26 @@ impl<T> MatrixDimension<T> where T: DimensionKind {
     pub fn is_square(&self) -> bool {
         self.rows == self.cols
     }
+    pub fn is_empty(&self) -> bool {
+        self.rows == 0 || self.cols == 0
+    }
 }
-impl<T, U> PartialEq<(U, U)> for MatrixDimension<T> where T: DimensionKind, U: DimensionKind, T: PartialEq<U> {
-    fn eq(&self, other: &(U, U)) -> bool {
+impl PartialEq<(usize, usize)> for MatrixDimension {
+    fn eq(&self, other: &(usize, usize)) -> bool {
         self.rows == other.0 && self.cols == other.1
     }
 }
+impl Debug for MatrixDimension {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}x{}", self.rows, self.cols)
+    }
+}
+impl Display for MatrixDimension {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Debug).fmt(f)
+    }
+}
+impl DimensionKind for MatrixDimension { }
 
 pub struct MatrixExtraction<'a> {
     target: &'a Matrix,
@@ -261,7 +274,7 @@ impl Matrix {
             self.data[0].len()
         }
     }
-    pub fn dims(&self) -> MatrixDimension<usize> {
+    pub fn dims(&self) -> MatrixDimension {
         MatrixDimension::new(self.rows(), self.columns())
     }
     pub fn is_square(&self) -> bool {
@@ -298,6 +311,20 @@ impl Matrix {
 
         result
     }
+    pub fn transpose_inplace(&mut self) {
+        let rows = self.rows();
+        let cols = self.columns();
+
+        let mut old_data: Vec<Vec<f64>> = vec![vec![]; rows];
+        self.data.swap_with_slice(&mut old_data);
+        self.allocate(cols, rows, 0);
+
+        for i in 0..rows {
+            for j in 0..cols {
+                self.data[j][i] = old_data[i][j];
+            }
+        }
+    }
 
     pub fn row_swap(&mut self, orig: usize, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> {
         if orig >= self.rows() {
@@ -328,32 +355,84 @@ impl Matrix {
 
         Ok(())
     }
-    pub fn row_echelon_form() {
-        todo!()
+    pub fn row_echelon_form(&mut self) {
+        if !self.is_valid() {
+            return;
+        }
+
+        let mut current_row: usize = 0;
+        for current_col in 0..self.columns() {
+            let mut piviot_row: usize = current_col;
+            while piviot_row < self.rows() && self.data[piviot_row][current_row] == 0 {
+                piviot_row += 1;
+            }
+
+            if piviot_row < self.rows() {
+                self.row_swap(current_row, piviot_row).unwrap(); //we know this cannot through, we checked the bounds ourself.
+
+                let piviot_value = self.data[current_row][current_col];
+                for col in current_col..self.columns() {
+                    self.data[current_row][col] /= piviot_value;
+                }
+
+                for row in current_row+1..self.rows() {
+                    let mul = self.data[row][current_col];
+                    for col in current_col..self.columns() {
+                        self.data[row][col] -= mul * self.data[current_row][col];
+                    }
+                }
+            }
+
+            current_row += 1;
+        }
     }
-    pub fn reduced_row_echelon_form() {
+    pub fn reduced_row_echelon_form(&mut self) {
         todo!()
     }
 
-    pub fn augment(lhs: &Self, rhs: &Self) -> Self {
-        todo!()
+    pub fn augment(lhs: &Self, rhs: &Self) -> Result<Self, DimensionError<usize>> {
+        if lhs.rows() != rhs.rows() {
+            return Err(DimensionError::new(lhs.rows(), rhs.rows()))
+        }
+
+        let one_rows = lhs.rows();
+        let one_cols = lhs.columns();
+        let two_cols = rhs.columns();
+
+        let mut result = Matrix::with_capacity(one_rows, one_cols + two_cols, 0);
+        assert!(result.is_valid());
+
+        for i in 0..one_rows {
+            let mut j: usize = 0;
+            for sources_col in &lhs.data[i] {
+                result.data[i][j] = *sources_col;
+                j += 1;
+            }
+
+            for sources_col in &rhs.data[i] {
+                result.data[i][j] = *sources_col;
+                j += 1;
+            }
+        }
+        
+        Ok(result)
     }
 }
 
 impl Add for Matrix {
-    type Output = CalcResult<Matrix>;
+    type Output = CalcResult<Matrix, usize>;
     fn add(self, rhs: Self) -> Self::Output {
         todo!()
     }
 }
 impl Sub for Matrix {
-    type Output = CalcResult<Matrix>;
+    type Output = CalcResult<Matrix, usize>;
     fn sub(self, rhs: Self) -> Self::Output {
         todo!()
     }
 }
 impl Mul for Matrix {
-    type Output = CalcError<Matrix>;
+    type Output = CalcResult<Matrix, usize>;
     fn mul(self, rhs: Self) -> Self::Output {
         todo!()
     }
@@ -370,9 +449,22 @@ impl Mul<Matrix> for Scalar {
         rhs * self
     }
 }
+impl Mul<Matrix> for MathVector {
+    type Output = CalcResult<MathVector, usize>;
+    fn mul(self, rhs: Matrix) -> Self::Output {
+        
+    }
+}
 impl<T> Div<T> for Matrix where T: ScalarLike {
     type Output = Matrix;
     fn div(self, rhs: T) -> Self::Output {
         todo!()
+    }
+}
+
+impl Neg for Matrix {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        
     }
 }
