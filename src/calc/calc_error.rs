@@ -110,22 +110,14 @@ impl OperationError {
         Self {
             operation: operation.to_string(),
             on: (a, b),
-            reason: if let Some(r) = reason {
-                Some(r.to_string())
-            } else {
-                None
-            }  
+            reason: reason.map(|r| r.to_string())
         }
     }
     pub fn new_fmt<T1, T2>(operation: &str, a: &T1, b: &T2, reason: Option<&str>) -> Self where T1: Debug, T2: Debug {
         Self {
             operation: operation.to_string(),
             on: (format!("{:?}", a), format!("{:?}", b)),
-            reason: if let Some(r) = reason {
-                Some(r.to_string())
-            } else {
-                None
-            }  
+            reason: reason.map(|r| r.to_string())
         }
     }
 }

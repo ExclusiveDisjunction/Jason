@@ -162,7 +162,7 @@ impl Add for MathVector {
             a.data[i] += elem;
         }
 
-        return a;
+        a
     }
 }
 impl Sub for MathVector {

@@ -1,7 +1,7 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
 use super::vector::MathVector;
-use super::calc_error::{CalcError, CalcResult, DimensionError, DimensionKind, IndexOutOfRangeError, OperationError};
+use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg, Range};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
@@ -85,7 +85,7 @@ impl<'a> MatrixExtraction<'a> {
                 let our_cols: Vec<usize> = self.cols.clone().into_iter().filter(|x| *x != i).collect();
 
                 let minor: MatrixExtraction<'a> = MatrixExtraction::new(
-                    &self.target,
+                    self.target,
                     first_rows_removed.clone(),
                     our_cols
                 );
@@ -108,30 +108,11 @@ impl<'a> MatrixExtraction<'a> {
         let extracted_rows: Vec<usize> = rows.map( |x| self.rows[x] ).collect();
         let extracted_cols: Vec<usize> = cols.map( |x| self.rows[x] ).collect();
 
-        return MatrixExtraction::new(&self.target, extracted_rows, extracted_cols);
+        MatrixExtraction::new(self.target, extracted_rows, extracted_cols)
     }
 }
-impl<'a> Into<Matrix> for MatrixExtraction<'a> {
-    fn into(self) -> Matrix {
-        let mut result = Matrix::with_capacity(self.rows.len(), self.cols.len(), 0);
-
-        let mut ourI: usize = 0;
-        let mut ourJ: usize;
-
-        for i in &self.rows {
-            ourJ = 0;
-            for j in &self.cols {
-                result[(ourI, ourJ)] = self.target[(*i, *j)];
-                ourJ += 1;
-            }
-            ourI += 1;
-        }
-
-        result
-    }
-}
-impl<'a, 'b> PartialEq for MatrixExtraction<'a> {
-    fn eq(&self, other: &MatrixExtraction<'a>) -> bool {
+impl PartialEq for MatrixExtraction<'_> {
+    fn eq(&self, other: &MatrixExtraction<'_>) -> bool {
         if self.dim() != other.dim() { return false; }
 
         for i in 0..self.rows.len() {
@@ -145,7 +126,7 @@ impl<'a, 'b> PartialEq for MatrixExtraction<'a> {
         true
     }
 }
-impl<'a> PartialEq<Matrix> for MatrixExtraction<'a> {
+impl PartialEq<Matrix> for MatrixExtraction<'_> {
     fn eq(&self, other: &Matrix) -> bool {
         if self.dim() != other.dims() { return false; }
 
@@ -160,12 +141,12 @@ impl<'a> PartialEq<Matrix> for MatrixExtraction<'a> {
         true
     }
 }
-impl<'a> PartialEq<MatrixExtraction<'a>> for Matrix {
-    fn eq(&self, other: &MatrixExtraction<'a>) -> bool {
+impl PartialEq<MatrixExtraction<'_>> for Matrix {
+    fn eq(&self, other: &MatrixExtraction<'_>) -> bool {
         other == self
     }
 }
-impl<'a> Index<(usize, usize)> for MatrixExtraction<'a> {
+impl Index<(usize, usize)> for MatrixExtraction<'_> {
     type Output = f64;
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         let row_offset = self.rows[index.0];
@@ -254,6 +235,20 @@ impl TryFrom<Vec<Vec<f64>>> for Matrix {
         }
     }
 }
+impl From<MatrixExtraction<'_>> for Matrix {
+    fn from(value: MatrixExtraction<'_>) -> Self {
+        let mut result = Matrix::with_capacity(value.rows.len(), value.cols.len(), 0);
+
+        for (our_i, i) in value.rows.iter().enumerate() {
+            for (our_j, j) in value.cols.iter().enumerate() {
+                result[(our_i, our_j)] = value.target[(*i, *j)];
+            }
+        }
+
+        result
+    }
+}
+
 impl Matrix {
     pub fn with_capacity<T>(rows: usize, cols: usize, val: T) -> Self where T: ScalarLike {
         let mut tmp = Self { data: vec![] };
@@ -282,13 +277,11 @@ impl Matrix {
                 }
             }
         }
+        else if rows == 0 || cols == 0 {
+            self.data = vec![];
+        } 
         else {
-            if rows == 0 || cols == 0 {
-                self.data = vec![];
-            } 
-            else {
-                self.data = vec![vec![f; cols]; rows];
-            }
+            self.data = vec![vec![f; cols]; rows];
         }
 
     }
@@ -314,13 +307,13 @@ impl Matrix {
         self.rows() != 0 && self.columns() != 0
     }
 
-    pub fn extract<'a>(&'a self, rows: Range<usize>, cols: Range<usize>) -> MatrixExtraction<'a> {
+    pub fn extract(&self, rows: Range<usize>, cols: Range<usize>) -> MatrixExtraction<'_> {
         MatrixExtraction::new_range(self, rows, cols)
     }
-    pub fn extract_specific<'a>(&'a self, rows: Vec<usize>, cols: Vec<usize>) -> MatrixExtraction<'a> {
+    pub fn extract_specific(&self, rows: Vec<usize>, cols: Vec<usize>) -> MatrixExtraction<'_> {
         MatrixExtraction::new(self, rows, cols)
     }
-    pub fn as_extraction<'a>(&'a self) -> MatrixExtraction<'a> {
+    pub fn as_extraction(&self) -> MatrixExtraction<'_> {
         MatrixExtraction::new_range(self, 0..self.rows(), 0..self.columns())
     }
 
@@ -349,7 +342,7 @@ impl Matrix {
         }
         else {
             let as_mat: Matrix = left.into();
-            return Some(as_mat);
+            Some(as_mat)
         }
     }
     pub fn transpose(&self) -> Matrix {
@@ -371,9 +364,9 @@ impl Matrix {
         self.data.swap_with_slice(&mut old_data);
         self.allocate(cols, rows, 0);
 
-        for i in 0..rows {
-            for j in 0..cols {
-                self.data[j][i] = old_data[i][j];
+        for (i, row) in old_data.into_iter().enumerate(){
+            for (j, element) in row.into_iter().enumerate() {
+                self.data[j][i] = element;
             }
         }
     }
@@ -412,10 +405,9 @@ impl Matrix {
             return Ok(());
         }
 
-        let mut current_row: usize = 0;
         let rows = self.rows();
         let columns = self.columns();
-        for current_col in 0..columns {
+        for (current_row, current_col) in (0..columns).enumerate() {
             let mut pivot_row = current_col;
             while pivot_row < rows && self.data[pivot_row][current_col] == 0.0 {
                 pivot_row += 1;
@@ -434,8 +426,6 @@ impl Matrix {
                     self.row_add(row, -mul, current_row)?;
                 }
             }
-
-            current_row += 1;
         }
 
         Ok(())
