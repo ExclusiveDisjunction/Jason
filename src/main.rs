@@ -1,5 +1,5 @@
 pub mod core;
-mod calc;
+pub mod calc;
 
 fn main() {
     println!("Hello, world!");

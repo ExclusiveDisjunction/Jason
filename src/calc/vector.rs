@@ -77,7 +77,7 @@ impl MathVector {
     }
     pub fn cross_product(&self, rhs: &Self) -> CalcResult<Self, usize> {
         if self.dim() != rhs.dim() {
-            return Err(CalcError::dimension(DimensionError::new(self.dim(), rhs.dim())))
+            return Err(CalcError::Dim(DimensionError::new(self.dim(), rhs.dim())))
         }
 
         let a: (f64, f64, f64);
@@ -93,7 +93,7 @@ impl MathVector {
                 b = (rhs.data[0], rhs.data[1], rhs.data[2]);
             }
             _ => {
-                return Err(CalcError::operation(OperationError::new_fmt("X", self, rhs, Some("dimension must be either 2 or 3 for cross product"))));
+                return Err(CalcError::Oper(OperationError::new_fmt("X", self, rhs, Some("dimension must be either 2 or 3 for cross product"))));
             }
         }
 

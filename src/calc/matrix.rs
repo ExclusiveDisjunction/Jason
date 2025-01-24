@@ -63,28 +63,8 @@ impl<'a> MatrixExtraction<'a> {
             cols: cols.collect()
         }
     }
-}
-impl<'a> Into<Matrix> for MatrixExtraction<'a> {
-    fn into(self) -> Matrix {
-        let mut result = Matrix::with_capacity(self.rows.len(), self.cols.len(), 0);
 
-        let mut ourI: usize = 0;
-        let mut ourJ: usize;
-
-        for i in &self.rows {
-            ourJ = 0;
-            for j in &self.cols {
-                result[(ourI, ourJ)] = self.target[(*i, *j)];
-                ourJ += 1;
-            }
-            ourI += 1;
-        }
-
-        result
-    }
-}
-impl<'a> MatrixExtraction<'a> {
-    pub fn dim(&self) -> MatrixDimension<usize> {
+    pub fn dim(&self) -> MatrixDimension {
         MatrixDimension::new(self.rows.len(), self.cols.len())
     }
     
@@ -126,6 +106,25 @@ impl<'a> MatrixExtraction<'a> {
 
     pub fn extract<U>(rows: U, cols: U) -> MatrixExtraction<'a> where U: Iterator<Item = usize> {
         todo!()
+    }
+}
+impl<'a> Into<Matrix> for MatrixExtraction<'a> {
+    fn into(self) -> Matrix {
+        let mut result = Matrix::with_capacity(self.rows.len(), self.cols.len(), 0);
+
+        let mut ourI: usize = 0;
+        let mut ourJ: usize;
+
+        for i in &self.rows {
+            ourJ = 0;
+            for j in &self.cols {
+                result[(ourI, ourJ)] = self.target[(*i, *j)];
+                ourJ += 1;
+            }
+            ourI += 1;
+        }
+
+        result
     }
 }
 impl<'a, 'b> PartialEq for MatrixExtraction<'a> {
@@ -355,39 +354,78 @@ impl Matrix {
 
         Ok(())
     }
-    pub fn row_echelon_form(&mut self) {
+    pub fn row_echelon_form(&mut self) -> Result<(), IndexOutOfRangeError<usize>> {
         if !self.is_valid() {
-            return;
+            return Ok(());
         }
 
         let mut current_row: usize = 0;
-        for current_col in 0..self.columns() {
-            let mut piviot_row: usize = current_col;
-            while piviot_row < self.rows() && self.data[piviot_row][current_row] == 0 {
-                piviot_row += 1;
+        let rows = self.rows();
+        let columns = self.columns();
+        for current_col in 0..columns {
+            let mut pivot_row = current_col;
+            while pivot_row < rows && self.data[pivot_row][current_col] == 0.0 {
+                pivot_row += 1;
             }
 
-            if piviot_row < self.rows() {
-                self.row_swap(current_row, piviot_row).unwrap(); //we know this cannot through, we checked the bounds ourself.
+            if pivot_row < rows {
+                self.row_swap(current_row, pivot_row)?;
 
-                let piviot_value = self.data[current_row][current_col];
-                for col in current_col..self.columns() {
-                    self.data[current_row][col] /= piviot_value;
+                let pivot_value = self.data[current_row][current_col];
+                for col in current_col..columns {
+                    self.data[current_row][col] /= pivot_value;
                 }
 
-                for row in current_row+1..self.rows() {
+                for row in current_row+1..rows {
                     let mul = self.data[row][current_col];
-                    for col in current_col..self.columns() {
-                        self.data[row][col] -= mul * self.data[current_row][col];
-                    }
+                    self.row_add(row, -mul, current_row)?;
                 }
             }
 
             current_row += 1;
         }
+
+        Ok(())
     }
-    pub fn reduced_row_echelon_form(&mut self) {
-        todo!()
+    pub fn reduced_row_echelon_form(&mut self) -> Result<(), IndexOutOfRangeError<usize>>{
+        if !self.is_valid() {
+            return Ok(());
+        }
+
+        self.row_echelon_form()?;
+
+        let rows = self.rows();
+        let cols = self.columns();
+
+        for i in (0..rows).rev() {
+            let mut pivot_col = None;
+            for j in 0..cols {
+                if self.data[i][j] != 0.0 {
+                    pivot_col = Some(j);
+                    break;
+                }
+            }
+
+            if let Some(col) = pivot_col {
+                let pivot_value = self.data[i][col];
+                if pivot_value != 1.0 {
+                    let scale_factor = 1.0 / pivot_value;
+                    for j in 0..cols {
+                        self.data[i][j] /= scale_factor;
+                    }
+                }
+
+                //Elminate the pivot column above the current row
+                for k in 0..i {
+                    let factor = self.data[k][col];
+                    if factor != 0.0 {
+                        self.row_add(k, -factor, i)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn augment(lhs: &Self, rhs: &Self) -> Result<Self, DimensionError<usize>> {
@@ -452,7 +490,7 @@ impl Mul<Matrix> for Scalar {
 impl Mul<Matrix> for MathVector {
     type Output = CalcResult<MathVector, usize>;
     fn mul(self, rhs: Matrix) -> Self::Output {
-        
+        todo!()
     }
 }
 impl<T> Div<T> for Matrix where T: ScalarLike {
@@ -465,6 +503,6 @@ impl<T> Div<T> for Matrix where T: ScalarLike {
 impl Neg for Matrix {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        
+        todo!()
     }
 }
