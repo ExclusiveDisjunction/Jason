@@ -93,7 +93,7 @@ impl<T> Display for DimensionError<T> where T: DimensionKind + Display {
         write!(f, "dimension mismatch between {} and {} (they must be equal)", self.a, self.b)
     }
 }
-impl<T> Debug for DimensionError<T> where T: DimensionKind + Debug{
+impl<T> Debug for DimensionError<T> where T: DimensionKind + Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "dimension mismatch between {:?} and {:?} (they must be equal)", self.a, self.b)
     }

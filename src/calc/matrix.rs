@@ -43,6 +43,7 @@ impl Display for MatrixDimension {
 }
 impl DimensionKind for MatrixDimension { }
 
+#[derive(Clone)]
 pub struct MatrixExtraction<'a> {
     target: &'a Matrix,
     rows: Vec<usize>,
@@ -56,7 +57,7 @@ impl<'a> MatrixExtraction<'a> {
             cols
         }
     }
-    fn new_range(target: &'a Matrix, rows: Range<usize>, cols: Range<usize>) -> Self {
+    fn new_iter<T1, T2>(target: &'a Matrix, rows: T1, cols: T2) -> Self where T1: Iterator<Item = usize>, T2: Iterator<Item = usize> {
         Self {
             target,
             rows: rows.collect(),
@@ -91,7 +92,7 @@ impl<'a> MatrixExtraction<'a> {
                 );
                 let minors_det = minor.determinant()?;
 
-                let fac: f64 = if i % 2 == 0 {
+                let fac: f64 = if (i + 1) % 2 == 0 {
                     -1.0
                 } else {
                     1.0
@@ -109,6 +110,26 @@ impl<'a> MatrixExtraction<'a> {
         let extracted_cols: Vec<usize> = cols.map( |x| self.rows[x] ).collect();
 
         MatrixExtraction::new(self.target, extracted_rows, extracted_cols)
+    }
+}
+impl Debug for MatrixExtraction<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let rows_str: Vec<String> = self.target.data.iter().map(
+            |x| {
+                x.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", ")
+            }
+        ).collect();
+
+        write!(
+            f, 
+            "[ {} ]", 
+            rows_str.join("; ")
+        )
+    }
+}
+impl Display for MatrixExtraction<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Debug).fmt(f)
     }
 }
 impl PartialEq for MatrixExtraction<'_> {
@@ -184,22 +205,12 @@ impl IndexMut<(usize, usize)> for Matrix {
 
 impl Debug for Matrix {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let rows_str: Vec<String> = self.data.iter().map(
-            |x| {
-                x.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", ")
-            }
-        ).collect();
-
-        write!(
-            f, 
-            "[ {} ]", 
-            rows_str.join("; ")
-        )
+        (&self.as_extraction() as &dyn Debug).fmt(f)
     }
 }
 impl Display for Matrix {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Debug).fmt(f)
+        (&self.as_extraction() as &dyn Display).fmt(f)
     }
 }
 
@@ -209,9 +220,9 @@ impl VariableData for Matrix {
     }
 }
 
-impl TryFrom<Vec<Vec<f64>>> for Matrix {
+impl<T> TryFrom<Vec<Vec<T>>> for Matrix where T: ScalarLike {
     type Error = DimensionError<usize>;
-    fn try_from(value: Vec<Vec<f64>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<Vec<T>>) -> Result<Self, Self::Error> {
         if value.is_empty() {
             Ok(
                 Self {
@@ -229,7 +240,7 @@ impl TryFrom<Vec<Vec<f64>>> for Matrix {
 
             Ok(
                 Self {
-                    data: value
+                    data: value.into_iter().map(|x| x.into_iter().map(|x| x.as_scalar()).collect() ).collect()
                 }
             )
         }
@@ -308,13 +319,13 @@ impl Matrix {
     }
 
     pub fn extract(&self, rows: Range<usize>, cols: Range<usize>) -> MatrixExtraction<'_> {
-        MatrixExtraction::new_range(self, rows, cols)
+        MatrixExtraction::new_iter(self, rows, cols)
     }
     pub fn extract_specific(&self, rows: Vec<usize>, cols: Vec<usize>) -> MatrixExtraction<'_> {
         MatrixExtraction::new(self, rows, cols)
     }
     pub fn as_extraction(&self) -> MatrixExtraction<'_> {
-        MatrixExtraction::new_range(self, 0..self.rows(), 0..self.columns())
+        MatrixExtraction::new_iter(self, 0..self.rows(), 0..self.columns())
     }
 
     pub fn determinant(&self) -> Option<f64> {
@@ -577,10 +588,28 @@ impl Mul<Matrix> for MathVector {
             return Err(DimensionError::new(self.dim(), rhs.columns()));
         }
 
+        /*
+              [ 1 ]   [ 4 -1 2 ]
+            = [ 2 ] * [ 1  3 0 ] 
+              [ 3 ]   [ 0 -1 4 ] 
+
+                  [ 4 ]       [ -1 ]       [ 2 ]
+            = 1 * [ 1 ] + 2 * [  3 ] + 3 * [ 0 ]
+                  [ 0 ]       [ -1 ]       [ 4 ]
+
+              [ 4 - 2 + 6  ]   
+            = [ 1 + 3 + 0  ]
+              [ 0 - 2 + 12 ]
+            
+              [ 8  ]
+            = [ 4  ]
+              [ 10 ]
+         */
+
         let mut result = MathVector::with_capacity(rhs.rows());
         for i in 0..rhs.rows() {
             for j in 0..rhs.columns() {
-                result[i] += self[i] * rhs.data[i][j];
+                result[i] += self[j] * rhs.data[i][j];
             }
         }
 
@@ -617,4 +646,62 @@ impl Neg for Matrix {
 
         result
     }
+}
+
+#[test]
+fn matrix_dimension_tester() {
+    let a = MatrixDimension::new(1, 4);
+    let b = MatrixDimension::new(3, 1);
+    assert_ne!(a, b);
+    assert_eq!(format!("{}", a), String::from("1x4"));
+    assert_eq!(b, (3, 1));
+    assert!(!a.is_empty());
+    assert!(!a.is_square());
+    assert!(MatrixDimension::new(1, 1).is_square());
+}
+
+#[test]
+fn matrix_extraction_tester() {
+    let mat = Matrix::identity(3);
+    let extr = mat.as_extraction();
+    assert_eq!(extr[(0, 0)], mat[(0, 0)]);
+    assert_eq!(extr, mat);
+
+    let sub_extr = extr.extract(0..1, 0..1);
+    assert_eq!(sub_extr, mat.extract(0..1, 0..1));
+
+    let sub_mat: Matrix = sub_extr.clone().into();
+    assert_eq!(sub_mat, sub_extr);
+    assert_ne!(sub_extr, extr);
+
+    let det = extr.determinant();
+    assert_eq!(det, Some(1.0));
+}
+
+#[test]
+fn matrix_tester() {
+    let a = Matrix::try_from(vec![vec![1, 3, 6], vec![-1, 4, 1], vec![6, 2, 4]]).unwrap();
+    let b = Matrix::try_from(vec![vec![0, 4, 6], vec![-1, -2, -1], vec![1, -3, 6]]).unwrap();
+    let c = Matrix::identity(2);
+    let d = Matrix::try_from(vec![vec![1, 3], vec![-4, 1], vec![7, 6]]).unwrap();
+    let e = Matrix::try_from(vec![vec![4, 1, 9], vec![7, -2, 1]]).unwrap();
+    let f = Matrix::try_from(vec![vec![2, 6], vec![1, 4]]).unwrap();
+    let v = MathVector::from(vec![1, 2, 3]);
+    let s = Scalar::new(4);
+
+    assert!(a.is_square() && a.is_valid());
+    assert!(!Matrix::default().is_valid());
+
+    assert_eq!(a.determinant(), Some(-112.0));
+    assert_eq!(b.determinant(), Some(50.0));
+    assert_eq!(c.determinant(), Some(1.0));
+    assert_eq!(d.determinant(), None);
+
+    assert_eq!((a.clone() + b).ok(), Matrix::try_from(vec![vec![1, 7, 12], vec![-2, 2, 0], vec![7, -1, 10]]).ok());
+
+    assert_eq!(d * e, Matrix::try_from(vec![vec![25, -5, 12], vec![-9, -6, -35], vec![70, -5, 69]]));
+    assert_eq!(c.clone() * f.clone(), Ok(f));
+    assert_eq!(v * a, Ok(MathVector::from(vec![25, 10, 22])));
+    assert_eq!(c.clone() * s, s * c.clone());
+    assert_eq!(c * s, Matrix::try_from(vec![vec![4, 0], vec![0, 4]]).unwrap());
 }
