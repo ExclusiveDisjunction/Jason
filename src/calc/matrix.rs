@@ -104,8 +104,11 @@ impl<'a> MatrixExtraction<'a> {
         }
     }
 
-    pub fn extract<U>(rows: U, cols: U) -> MatrixExtraction<'a> where U: Iterator<Item = usize> {
-        todo!()
+    pub fn extract<U>(&self, rows: U, cols: U) -> MatrixExtraction<'a> where U: Iterator<Item = usize> {
+        let extracted_rows: Vec<usize> = rows.map( |x| self.rows[x] ).collect();
+        let extracted_cols: Vec<usize> = cols.map( |x| self.rows[x] ).collect();
+
+        return MatrixExtraction::new(&self.target, extracted_rows, extracted_cols);
     }
 }
 impl<'a> Into<Matrix> for MatrixExtraction<'a> {
@@ -129,18 +132,46 @@ impl<'a> Into<Matrix> for MatrixExtraction<'a> {
 }
 impl<'a, 'b> PartialEq for MatrixExtraction<'a> {
     fn eq(&self, other: &MatrixExtraction<'a>) -> bool {
-        todo!()
+        if self.dim() != other.dim() { return false; }
+
+        for i in 0..self.rows.len() {
+            for j in 0..self.cols.len() {
+                if self[(i, j)] != other[(i, j)] {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 }
 impl<'a> PartialEq<Matrix> for MatrixExtraction<'a> {
     fn eq(&self, other: &Matrix) -> bool {
-        todo!()
+        if self.dim() != other.dims() { return false; }
+
+        for i in 0..self.rows.len() {
+            for j in 0..self.cols.len() {
+                if self[(i, j)] != other[(i, j)] {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+impl<'a> PartialEq<MatrixExtraction<'a>> for Matrix {
+    fn eq(&self, other: &MatrixExtraction<'a>) -> bool {
+        other == self
     }
 }
 impl<'a> Index<(usize, usize)> for MatrixExtraction<'a> {
     type Output = f64;
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        todo!()
+        let row_offset = self.rows[index.0];
+        let col_offset = self.cols[index.1];
+
+        self.target.index((row_offset, col_offset))
     }
 }
 
@@ -297,7 +328,29 @@ impl Matrix {
         self.as_extraction().determinant()
     }
     pub fn inverse(&self) -> Option<Matrix> {
-        todo!()
+        if !self.is_square() { return None; }
+        if !self.is_valid() { return Some(Matrix::default()); }
+
+        let identity = Matrix::identity(self.rows());
+        let augmented = match Matrix::augment(&identity, self) {
+            Ok(m) => m,
+            Err(_) => return None
+        };
+
+        let cols_index = 0..self.rows();
+        let left_index = 0..self.rows();
+        let right_index = self.rows()..(2 * self.rows());
+
+        let left = augmented.extract(left_index, cols_index.clone());
+        let right = augmented.extract(right_index, cols_index);
+
+        if right != identity {
+            None
+        }
+        else {
+            let as_mat: Matrix = left.into();
+            return Some(as_mat);
+        }
     }
     pub fn transpose(&self) -> Matrix {
         let mut result = Matrix::with_capacity(self.columns(), self.rows(), 0);
@@ -458,27 +511,67 @@ impl Matrix {
 }
 
 impl Add for Matrix {
-    type Output = CalcResult<Matrix, usize>;
+    type Output = Result<Matrix, DimensionError<MatrixDimension>>;
     fn add(self, rhs: Self) -> Self::Output {
-        todo!()
+        if self.dims() != rhs.dims() { return Err(DimensionError::new(self.dims(), rhs.dims())); } 
+
+        let mut result = Matrix::with_capacity(self.rows(), self.columns(), 0.0);
+        for i in 0..self.rows() {
+            for j in 0..self.columns() {
+                result.data[i][j] = self.data[i][j] + rhs.data[i][j];
+            }
+        }
+        
+        Ok(result)
     }
 }
 impl Sub for Matrix {
-    type Output = CalcResult<Matrix, usize>;
+    type Output = Result<Matrix, DimensionError<MatrixDimension>>;
     fn sub(self, rhs: Self) -> Self::Output {
-        todo!()
+        if self.dims() != rhs.dims() { return Err(DimensionError::new(self.dims(), rhs.dims())); } 
+
+        let mut result = Matrix::with_capacity(self.rows(), self.columns(), 0.0);
+        for i in 0..self.rows() {
+            for j in 0..self.columns() {
+                result.data[i][j] = self.data[i][j] - rhs.data[i][j];
+            }
+        }
+        
+        Ok(result)
     }
 }
 impl Mul for Matrix {
-    type Output = CalcResult<Matrix, usize>;
+    type Output = Result<Matrix, DimensionError<usize>>;
     fn mul(self, rhs: Self) -> Self::Output {
-        todo!()
+        if self.columns() != rhs.rows() { 
+            return Err(DimensionError::new(self.columns(), rhs.rows()));
+        }
+
+        let r = self.rows();
+        let c = rhs.columns();
+        let mut result = Matrix::with_capacity(r, c, 0.0);
+
+        for i in 0..r {
+            for j in 0..c {
+                let calc = &mut result.data[i][j]; //Note that we dont have to set to zero, because the matrix is filled out to zero.
+                for k in 0..rhs.rows() {
+                    *calc += self.data[i][k] * rhs.data[k][j];
+                }
+            }
+        }
+
+        Ok(result)
     }
 }
 impl<T> Mul<T> for Matrix where T: ScalarLike {
     type Output = Matrix;
     fn mul(self, rhs: T) -> Self::Output {
-        todo!()
+        let rhs = rhs.as_scalar();
+        let result: Vec<Vec<f64>> = self.data.clone().into_iter().map(|x| 
+            x.into_iter().map(|x| x * rhs).collect()
+        ).collect();
+
+        Matrix::try_from(result).unwrap() //We made this list, and we know it is "perfect", so we can safely unwrap. 
     }
 }
 impl Mul<Matrix> for Scalar {
@@ -488,21 +581,50 @@ impl Mul<Matrix> for Scalar {
     }
 }
 impl Mul<Matrix> for MathVector {
-    type Output = CalcResult<MathVector, usize>;
+    type Output = Result<MathVector, DimensionError<usize>>;
     fn mul(self, rhs: Matrix) -> Self::Output {
-        todo!()
+        if self.dim() != rhs.columns() { 
+            return Err(DimensionError::new(self.dim(), rhs.columns()));
+        }
+
+        let mut result = MathVector::with_capacity(rhs.rows());
+        for i in 0..rhs.rows() {
+            for j in 0..rhs.columns() {
+                result[i] += self[i] * rhs.data[i][j];
+            }
+        }
+
+        Ok(result)
+    }
+}
+impl Mul<MathVector> for Matrix {
+    type Output = Result<MathVector, DimensionError<usize>>;
+    fn mul(self, rhs: MathVector) -> Self::Output {
+        rhs * self
     }
 }
 impl<T> Div<T> for Matrix where T: ScalarLike {
     type Output = Matrix;
     fn div(self, rhs: T) -> Self::Output {
-        todo!()
+        let rhs = rhs.as_scalar();
+        let result: Vec<Vec<f64>> = self.data.clone().into_iter().map(|x| 
+            x.into_iter().map(|x| x / rhs).collect()
+        ).collect();
+
+        Matrix::try_from(result).unwrap() //We made this list, and we know it is "perfect", so we can safely unwrap. 
     }
 }
 
 impl Neg for Matrix {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        todo!()
+        let mut result = self.clone();
+        for row in &mut result.data {
+            for element in row {
+                *element *= -1.0;
+            }
+        }
+
+        result
     }
 }
