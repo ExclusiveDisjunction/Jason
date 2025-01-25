@@ -168,7 +168,7 @@ impl Add for MathVector {
 impl Sub for MathVector {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        //Note that a - b != b - a, dispite widining. an equivalent result is a + (-b). 
+        //Note that a - b != b - a, despite widening. an equivalent result is a + (-b).
         self + (-rhs)
     }
 }

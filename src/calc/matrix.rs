@@ -267,7 +267,6 @@ impl Matrix {
 
         tmp
     }
-
     pub fn identity(dim: usize) -> Matrix {
         let mut result = Matrix::with_capacity(dim, dim, 0);
         for i in 0..dim {
@@ -382,13 +381,18 @@ impl Matrix {
         }
     }
 
+    fn rows_oob(&self, a: usize, b: usize) -> Result<(), IndexOutOfRangeError<usize>> {
+        if a >= self.rows() {
+            return Err(IndexOutOfRangeError::new(a))
+        }
+        else if b >= self.rows() {
+            return Err(IndexOutOfRangeError::new(b))
+        }
+
+        Ok(())
+    }
     pub fn row_swap(&mut self, orig: usize, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> {
-        if orig >= self.rows() {
-            return Err(IndexOutOfRangeError::new(orig))
-        }
-        else if dest >= self.rows() {
-            return Err(IndexOutOfRangeError::new(dest))
-        }
+        self.rows_oob(orig, dest)?;
 
         if orig != dest {
             self.data.swap(orig, dest);
@@ -397,12 +401,7 @@ impl Matrix {
         Ok(())
     }
     pub fn row_add<T>(&mut self, orig: usize, fac: T, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> where T: ScalarLike{
-        if orig >= self.rows() {
-            return Err(IndexOutOfRangeError::new(orig))
-        }
-        else if dest >= self.rows() {
-            return Err(IndexOutOfRangeError::new(dest))
-        }
+        self.rows_oob(orig, dest)?;
 
         let fac = fac.as_scalar();
         for j in 0..self.columns() {
@@ -417,27 +416,70 @@ impl Matrix {
         }
 
         let rows = self.rows();
-        let columns = self.columns();
-        for (current_row, current_col) in (0..columns).enumerate() {
-            let mut pivot_row = current_col;
-            while pivot_row < rows && self.data[pivot_row][current_col] == 0.0 {
-                pivot_row += 1;
+        let cols = self.columns();
+
+        for i in 0..rows {
+            let mut pivot_col = None;
+            for col in 0..cols {
+                if self.data[i][col] != 0.0 {
+                    pivot_col = Some(col);
+                    break;
+                }
             }
 
-            if pivot_row < rows {
-                self.row_swap(current_row, pivot_row)?;
-
-                let pivot_value = self.data[current_row][current_col];
-                for col in current_col..columns {
-                    self.data[current_row][col] /= pivot_value;
+            if let Some(p) = pivot_col {
+                if self.data[i][p] != 1.0 {
+                    let fac = self.data[i][p]; //We need to reduce the pivot to one.
+                    for k in 0..cols {
+                        self.data[i][k] /= fac;
+                    }
                 }
 
-                for row in current_row+1..rows {
-                    let mul = self.data[row][current_col];
-                    self.row_add(row, -mul, current_row)?;
+                for below_row in (i+1)..rows { //Every row under our row needs to have the 'p' value eliminated.
+                    let fac = -self.data[below_row][p];
+                    if fac == 0.0 || fac == -0.0 {
+                        continue;
+                    }
+
+                    self.row_add(p, fac, below_row)?;
+                }
+            }
+            else {
+                continue;
+            }
+        }
+
+        /*
+        for col in 0..cols {
+            let mut max_row = pivot_row;
+            for row in 0..rows {
+                if self.data[row][col].abs() > self.data[max_row][col].abs() {
+                    max_row = row;
+                }
+            }
+
+            if self.data[max_row][col] == 0.0 {
+                continue;
+            }
+
+            if max_row != pivot_row {
+                self.row_swap(pivot_row, max_row)?;
+            }
+
+            let pivot_value = self.data[pivot_row][col];
+            let scale_factor = 1.0 / pivot_value;
+            if pivot_value != 0.0 && pivot_value != 1.0 {
+                self.row_add(pivot_row, scale_factor, max_row)?;
+            }
+
+            for row in (pivot_row + 1)..rows {
+                let factor = self.data[row][col];
+                if factor != 0.0 {
+                    self.row_add(row, -factor, pivot_row)?;
                 }
             }
         }
+         */
 
         Ok(())
     }
@@ -469,7 +511,7 @@ impl Matrix {
                     }
                 }
 
-                //Elminate the pivot column above the current row
+                //Eliminate the pivot column above the current row
                 for k in 0..i {
                     let factor = self.data[k][col];
                     if factor != 0.0 {
@@ -477,6 +519,12 @@ impl Matrix {
                     }
                 }
             }
+        }
+
+        //Now we have to ensure that the rows are in proper order
+        for i in 0..rows {
+            //Implement this algorithm.
+            todo!()
         }
 
         Ok(())
@@ -704,4 +752,17 @@ fn matrix_tester() {
     assert_eq!(v * a, Ok(MathVector::from(vec![25, 10, 22])));
     assert_eq!(c.clone() * s, s * c.clone());
     assert_eq!(c * s, Matrix::try_from(vec![vec![4, 0], vec![0, 4]]).unwrap());
+
+    let mut l = Matrix::try_from(vec![vec![1, 4, 9], vec![-2, 1, 0], vec![0, -3, -6]]).unwrap();
+    let _ = l.row_echelon_form().unwrap();
+    let as_ref =Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 1.0, 2.0], vec![0.0, 0.0, 0.0]]).unwrap();
+    assert_eq!(l, as_ref);
+
+    let mut m = Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 0.0, 0.0], vec![0.0, 1.0, 2.0]]).unwrap();
+    let _ = m.row_echelon_form().unwrap();
+    assert_eq!(m, as_ref);
+
+    //let _ = l.reduced_row_echelon_form().unwrap();
+    //let rref = Matrix::try_from(vec![vec![1, 0, 0], vec![0, 1, 2], vec![0, 0, 0]]).unwrap();
+    //assert_eq!(l, rref);
 }

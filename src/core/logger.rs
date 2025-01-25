@@ -202,42 +202,41 @@ lazy_static! {
 macro_rules! logger_write {
     ($level: expr, $($arg:tt)*) => {
         {
-            if !logging.is_open() { //Do nothing, so that standard error is not flooded with 'not open' errors.
-                return;
-            }
+            if logging.is_open() { //Do nothing, so that standard error is not flooded with 'not open' errors.
+                #[allow(unreachable_patterns)]
+                let true_level: LoggerLevel = match $level {
+                    LoggerLevel::None => panic!("cannot record information about a None log"),
+                    LoggerLevel::Debug => LoggerLevel::Debug,
+                    LoggerLevel::Info => LoggerLevel::Info,
+                    LoggerLevel::Warning => LoggerLevel::Warning,
+                    LoggerLevel::Error => LoggerLevel::Error,
+                    LoggerLevel::Critical => LoggerLevel::Critical,
+                    _ => panic!("the type {:?} cannot be interpreted as a valid `LoggerLevel` instance", $level)
+                };
+                if true_level >= logging.open_level() {
+                    let contents: String = format!($($arg)*);
 
-            #[allow(unreachable_patterns)]
-            let true_level: LoggerLevel = match $level {
-                LoggerLevel::None => panic!("cannot record information about a None log"),
-                LoggerLevel::Debug => LoggerLevel::Debug,
-                LoggerLevel::Info => LoggerLevel::Info,
-                LoggerLevel::Warning => LoggerLevel::Warning,
-                LoggerLevel::Error => LoggerLevel::Error,
-                LoggerLevel::Critical => LoggerLevel::Critical,
-                _ => panic!("the type {:?} cannot be interpreted as a valid `LoggerLevel` instance", $level)
-            };
-            if true_level < logging.open_level() {
-                return; //Nothing to do, optimization
-            }
-
-            let contents: String = format!($($arg)*);
-
-            if let Err(e) = logging.start_log(true_level) {
-                eprintln!("log error: '{:?}'. closing log", e);
-                logging.close();
-                return;
-            }
-
-            if let Err(e) = logging.write(&contents) {
-                eprintln!("log error: '{:?}'. closing log", e);
-                logging.close();
-                return;
-            }
-
-            if let Err(e) = logging.end_log() {
-                eprintln!("log error: '{:?}'. closing log", e);
-                logging.close();
-                return;
+                    match logging.start_log(true_level) {
+                        Ok(_) => {
+                            match logging.write(&contents) {
+                                Ok(_) => {
+                                    if let Err(e) = logging.end_log() {
+                                        eprintln!("log error: '{:?}'. closing log", e);
+                                        logging.close();
+                                    }
+                                },
+                                Err(e) => {
+                                    eprintln!("log error: '{:?}'. closing log", e);
+                                    logging.close();
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("log error: '{:?}'. closing log", e);
+                            logging.close();
+                        }
+                    }
+                }
             }
         }
     };
