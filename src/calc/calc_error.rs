@@ -1,5 +1,7 @@
 use std::fmt::{Display, Debug, Formatter};
 
+use super::matrix::MatrixDimension;
+
 pub trait DimensionKind : Clone + Copy {}
 impl DimensionKind for usize { }
 impl DimensionKind for i32 {}
@@ -7,34 +9,38 @@ impl DimensionKind for i64 {}
 impl DimensionKind for u32 {}
 impl DimensionKind for u64 {}
 
-pub enum CalcError<T> where T: DimensionKind {
-    Index(IndexOutOfRangeError<T>),
-    Dim(DimensionError<T>),
+pub enum CalcError {
+    Index(IndexOutOfRangeError<usize>),
+    MatDim(DimensionError<MatrixDimension>),
+    Dim(DimensionError<usize>),
     Oper(OperationError)
 }
-impl<T> Debug for CalcError<T> where T: DimensionKind + Debug {
+impl Debug for CalcError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Index(a) => (a as &dyn Debug).fmt(f),
             Self::Dim(a) => (a as &dyn Debug).fmt(f),
+            Self::MatDim(b) => (b as &dyn Debug).fmt(f),
             Self::Oper(a) => (a as &dyn Debug).fmt(f)
         }
     }
 }
-impl<T> Display for CalcError<T> where T: DimensionKind + Display {
+impl Display for CalcError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Index(a) => (a as &dyn Display).fmt(f),
             Self::Dim(a) => (a as &dyn Display).fmt(f),
+            Self::MatDim(a) => (a as &dyn Display).fmt(f),
             Self::Oper(a) => (a as &dyn Display).fmt(f)
         }
     }
 }
-impl<T> PartialEq for CalcError<T> where T: DimensionKind + PartialEq {
+impl PartialEq for CalcError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Index(a), Self::Index(b)) => a == b,
             (Self::Dim(a), Self::Dim(b)) => a == b,
+            (Self::MatDim(a), Self::MatDim(b)) => a == b,
             (Self::Oper(a), Self::Oper(b)) => a == b,
             (_, _) => false
         }
@@ -42,7 +48,7 @@ impl<T> PartialEq for CalcError<T> where T: DimensionKind + PartialEq {
 }
 
 
-pub type CalcResult<T, U> = Result<T, CalcError<U>>;
+pub type CalcResult<T> = Result<T, CalcError>;
 
 #[derive(Clone)]
 pub struct IndexOutOfRangeError<T> where T: DimensionKind {

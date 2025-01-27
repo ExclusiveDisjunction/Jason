@@ -24,7 +24,7 @@ impl Debug for Complex {
     }
 }
 impl VariableData for Complex {
-    fn get_type() -> VariableType {
+    fn get_type(&self) -> VariableType {
         VariableType::Complex
     }
 }

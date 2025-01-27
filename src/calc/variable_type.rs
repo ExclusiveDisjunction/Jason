@@ -11,5 +11,5 @@ pub enum VariableType {
 
 
 pub trait VariableData: Display + Debug + Clone + Serialize + for<'a> Deserialize<'a> + Default {
-    fn get_type() -> VariableType;
+    fn get_type(&self) -> VariableType;
 }

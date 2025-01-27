@@ -75,7 +75,7 @@ impl MathVector {
 
         Ok(result)
     }
-    pub fn cross_product(&self, rhs: &Self) -> CalcResult<Self, usize> {
+    pub fn cross_product(&self, rhs: &Self) -> CalcResult<Self> {
         if self.dim() != rhs.dim() {
             return Err(CalcError::Dim(DimensionError::new(self.dim(), rhs.dim())))
         }
@@ -130,7 +130,7 @@ impl IndexMut<usize> for MathVector {
 }
 
 impl VariableData for MathVector {
-    fn get_type() -> VariableType {
+    fn get_type(&self) -> VariableType {
         VariableType::Vector
     }
 }

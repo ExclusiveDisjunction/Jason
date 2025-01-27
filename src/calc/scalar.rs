@@ -47,7 +47,7 @@ impl Debug for Scalar {
     }
 }
 impl VariableData for Scalar {
-    fn get_type() -> VariableType {
+    fn get_type(&self) -> VariableType {
         VariableType::Scalar
     }
 }

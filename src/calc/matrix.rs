@@ -215,7 +215,7 @@ impl Display for Matrix {
 }
 
 impl VariableData for Matrix {
-    fn get_type() -> VariableType {
+    fn get_type(&self) -> VariableType {
         VariableType::Matrix
     }
 }
