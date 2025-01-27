@@ -444,8 +444,31 @@ impl Matrix {
                     self.row_add(p, fac, below_row)?;
                 }
             }
+        }
+
+        let mut cols: usize = cols; //We will decrement this so that the same row will not be checked over and over.
+        let mut zeroes_rows: usize = 0;
+
+        for i in 0..cols {
+            let mut pivot: Option<usize> = None;
+            for j in 0..cols { //Pivot is constrainted to be inside 0-cols
+                if self.data[i][j] != 0.0 {
+                    pivot = Some(j);
+                    break;
+                }
+            }
+
+            if let Some(p) = pivot {
+                if p > i {
+                    self.row_swap(p, i)?;
+                }
+            }
             else {
-                continue;
+                let with = cols - (zeroes_rows + 1);
+                if with != i {
+                    self.row_swap(with, i)?;
+                    zeroes_rows += 1;
+                }
             }
         }
 
@@ -519,12 +542,6 @@ impl Matrix {
                     }
                 }
             }
-        }
-
-        //Now we have to ensure that the rows are in proper order
-        for i in 0..rows {
-            //Implement this algorithm.
-            todo!()
         }
 
         Ok(())
@@ -752,14 +769,17 @@ fn matrix_tester() {
     assert_eq!(v * a, Ok(MathVector::from(vec![25, 10, 22])));
     assert_eq!(c.clone() * s, s * c.clone());
     assert_eq!(c * s, Matrix::try_from(vec![vec![4, 0], vec![0, 4]]).unwrap());
+}
 
+#[test]
+fn matrix_rref_tester() {
     let mut l = Matrix::try_from(vec![vec![1, 4, 9], vec![-2, 1, 0], vec![0, -3, -6]]).unwrap();
-    let _ = l.row_echelon_form().unwrap();
+    l.row_echelon_form().unwrap();
     let as_ref =Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 1.0, 2.0], vec![0.0, 0.0, 0.0]]).unwrap();
     assert_eq!(l, as_ref);
 
     let mut m = Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 0.0, 0.0], vec![0.0, 1.0, 2.0]]).unwrap();
-    let _ = m.row_echelon_form().unwrap();
+    m.row_echelon_form().unwrap();
     assert_eq!(m, as_ref);
 
     //let _ = l.reduced_row_echelon_form().unwrap();
