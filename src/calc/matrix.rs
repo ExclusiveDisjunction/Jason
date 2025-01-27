@@ -446,63 +446,54 @@ impl Matrix {
             }
         }
 
-        let mut cols: usize = cols; //We will decrement this so that the same row will not be checked over and over.
-        let mut zeroes_rows: usize = 0;
+        let mut rows: usize = rows;
 
-        for i in 0..cols {
-            let mut pivot: Option<usize> = None;
-            for j in 0..cols { //Pivot is constrainted to be inside 0-cols
+        let mut i: usize = 0;
+        loop {
+            if i >= rows || i >= cols {
+                break;
+            }
+
+            let mut pivot = None;
+            for j in 0..cols {
                 if self.data[i][j] != 0.0 {
                     pivot = Some(j);
                     break;
                 }
             }
 
+            let switch_with_last: bool;
+
             if let Some(p) = pivot {
-                if p > i {
+                if p < rows && p > i {
                     self.row_swap(p, i)?;
+                    i += 1;
+                    switch_with_last = false;
                 }
+                else if p >= rows && p < cols {
+                    switch_with_last = true;
+                }
+                else {
+                    switch_with_last = false;
+                    i += 1;
+                }
+                
             }
             else {
-                let with = cols - (zeroes_rows + 1);
-                if with != i {
+                switch_with_last = true;
+            }
+
+            if switch_with_last {
+                let with = rows - 1;
+                if with != i && with < rows {
                     self.row_swap(with, i)?;
-                    zeroes_rows += 1;
+                    rows -= 1; //This shrinks the rows, so that we dont double count that row.
+                }
+                else {
+                    i += 1; //We increment when we dont swap with a zero row. 
                 }
             }
         }
-
-        /*
-        for col in 0..cols {
-            let mut max_row = pivot_row;
-            for row in 0..rows {
-                if self.data[row][col].abs() > self.data[max_row][col].abs() {
-                    max_row = row;
-                }
-            }
-
-            if self.data[max_row][col] == 0.0 {
-                continue;
-            }
-
-            if max_row != pivot_row {
-                self.row_swap(pivot_row, max_row)?;
-            }
-
-            let pivot_value = self.data[pivot_row][col];
-            let scale_factor = 1.0 / pivot_value;
-            if pivot_value != 0.0 && pivot_value != 1.0 {
-                self.row_add(pivot_row, scale_factor, max_row)?;
-            }
-
-            for row in (pivot_row + 1)..rows {
-                let factor = self.data[row][col];
-                if factor != 0.0 {
-                    self.row_add(row, -factor, pivot_row)?;
-                }
-            }
-        }
-         */
 
         Ok(())
     }
@@ -513,33 +504,36 @@ impl Matrix {
 
         self.row_echelon_form()?;
 
+        /*
+
+            The row echelon form provides the following functionalities:
+                1. All pivots are one.
+                2. All values under a pivot are zero.
+                3. All zeroes rows are at the bottom.
+                4. All pivots are in decending order. 
+
+            Therefore, to convert this into reduced row echelon form:
+                1. All values above a pivot must be zero.
+         */
+
         let rows = self.rows();
         let cols = self.columns();
 
-        for i in (0..rows).rev() {
-            let mut pivot_col = None;
+        for i in 0..rows {
+            //Pivot is a column position
+            let mut pivot = None;
             for j in 0..cols {
                 if self.data[i][j] != 0.0 {
-                    pivot_col = Some(j);
+                    pivot = Some(j);
                     break;
                 }
             }
 
-            if let Some(col) = pivot_col {
-                let pivot_value = self.data[i][col];
-                if pivot_value != 1.0 {
-                    let scale_factor = 1.0 / pivot_value;
-                    for j in 0..cols {
-                        self.data[i][j] /= scale_factor;
-                    }
-                }
-
-                //Eliminate the pivot column above the current row
-                for k in 0..i {
-                    let factor = self.data[k][col];
-                    if factor != 0.0 {
-                        self.row_add(k, -factor, i)?;
-                    }
+            if let Some(p) = pivot {
+                //We need to go above this pivot
+                for row in 0..p {
+                    let fac = -self.data[row][p];
+                    self.row_add(i, fac, row)?;
                 }
             }
         }
@@ -782,7 +776,15 @@ fn matrix_rref_tester() {
     m.row_echelon_form().unwrap();
     assert_eq!(m, as_ref);
 
-    //let _ = l.reduced_row_echelon_form().unwrap();
-    //let rref = Matrix::try_from(vec![vec![1, 0, 0], vec![0, 1, 2], vec![0, 0, 0]]).unwrap();
-    //assert_eq!(l, rref);
+    let mut r = Matrix::try_from(vec![vec![0, 0, 0], vec![4, 8, 16], vec![0, 0, 0]]).unwrap();
+    r.row_echelon_form().unwrap();
+    assert_eq!(r, Matrix::try_from(vec![vec![1, 2, 4], vec![0, 0, 0], vec![0, 0, 0]]).unwrap());
+
+    let mut t = Matrix::try_from(vec![vec![1, 0, 0, 0, 0], vec![0, 0, 0, 0, 1], vec![0, 1, 0, 0, 0]]).unwrap();
+    t.row_echelon_form().unwrap();
+    assert_eq!(t, Matrix::try_from(vec![vec![1, 0, 0, 0, 0], vec![0, 1, 0, 0, 0], vec![0, 0, 0, 0, 1]]).unwrap());
+
+    l.reduced_row_echelon_form().unwrap();
+    let rref = Matrix::try_from(vec![vec![1, 0, 1], vec![0, 1, 2], vec![0, 0, 0]]).unwrap();
+    assert_eq!(l, rref);
 }
