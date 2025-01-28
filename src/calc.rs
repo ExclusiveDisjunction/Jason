@@ -5,7 +5,7 @@ pub mod matrix;
 pub mod variable_type;
 pub mod calc_error;
 
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug};
 
 use serde::{Serialize, Deserialize};
@@ -15,7 +15,7 @@ pub use scalar::Scalar;
 pub use complex::Complex;
 pub use vector::MathVector;
 pub use matrix::Matrix;
-pub use calc_error::CalcResult;
+pub use calc_error::{CalcResult, OperationError, CalcError};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum VariableUnion {
@@ -27,6 +27,18 @@ pub enum VariableUnion {
 impl Default for VariableUnion {
     fn default() -> Self {
         Self::Sca(Scalar::default())
+    }
+}
+
+impl Neg for VariableUnion {
+    type Output = VariableUnion;
+    fn neg(self) -> Self::Output {
+        match self {
+            VariableUnion::Sca(sc) => VariableUnion::Sca(-sc),
+            VariableUnion::Cmp(c) => VariableUnion::Cmp(-c),
+            VariableUnion::Vec(v) => VariableUnion::Vec(-v),
+            VariableUnion::Mat(m) => VariableUnion::Mat(-m)
+        }
     }
 }
 impl Add for VariableUnion {
@@ -89,10 +101,10 @@ impl Debug for VariableUnion {
 impl VariableData for VariableUnion {
     fn get_type(&self) -> VariableType {
         match self {
-            Self::Sca(ref a) => a.get_type(),
-            Self::Cmp(ref a) => a.get_type(),
-            Self::Vec(ref a) => a.get_type(),
-            Self::Mat(ref a) => a.get_type()
+            Self::Sca(a) => a.get_type(),
+            Self::Cmp(a) => a.get_type(),
+            Self::Vec(a) => a.get_type(),
+            Self::Mat(a) => a.get_type()
         }
     }
 }
@@ -100,25 +112,24 @@ impl VariableData for VariableUnion {
 impl VariableUnion {
     pub fn get_ref(&self) -> VariableUnionRef<'_> {
         match self {
-            Self::Sca(ref s) => VariableUnionRef::Sca(s),
-            Self::Cmp(ref s) => VariableUnionRef::Cmp(s),
-            Self::Vec(ref s) => VariableUnionRef::Vec(s),
-            Self::Mat(ref s) => VariableUnionRef::Mat(s)
+            Self::Sca(s) => VariableUnionRef::Sca(*s),
+            Self::Cmp(s) => VariableUnionRef::Cmp(s),
+            Self::Vec(s) => VariableUnionRef::Vec(s),
+            Self::Mat(s) => VariableUnionRef::Mat(s)
         }
     }
     pub fn get_ref_mut(&mut self) -> VariableUnionRefMut<'_> {
         match self {
-            Self::Sca(ref mut s) => VariableUnionRefMut::Sca(s),
-            Self::Cmp(ref mut s) => VariableUnionRefMut::Cmp(s),
-            Self::Vec(ref mut s) => VariableUnionRefMut::Vec(s),
-            Self::Mat(ref mut s) => VariableUnionRefMut::Mat(s)
+            Self::Sca(s) => VariableUnionRefMut::Sca(s),
+            Self::Cmp(s) => VariableUnionRefMut::Cmp(s),
+            Self::Vec(s) => VariableUnionRefMut::Vec(s),
+            Self::Mat(s) => VariableUnionRefMut::Mat(s)
         }
     }
 }
 
-
 pub enum VariableUnionRef<'a> {
-    Sca(&'a Scalar),
+    Sca(Scalar),
     Cmp(&'a Complex),
     Vec(&'a MathVector),
     Mat(&'a Matrix)
@@ -145,28 +156,136 @@ impl Display for VariableUnionRef<'_> {
     }
 }
 
+impl Neg for VariableUnionRef<'_> {
+    type Output = VariableUnion;
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::Sca(s) => VariableUnion::Sca(-s),
+            Self::Cmp(s) => VariableUnion::Cmp(-s),
+            Self::Vec(s) => VariableUnion::Vec(-s),
+            Self::Mat(s) => VariableUnion::Mat(-s),
+        }
+    }
+}
 impl Add for VariableUnionRef<'_> {
     type Output = CalcResult<VariableUnion>;
-    fn add(self, rhs: Self) -> Self::Output {
-        todo!()
+    fn add(self, rhs: Self) -> CalcResult<VariableUnion> {
+        /* Add is defined for all types upon themselves, and the following ones:
+            Sca + Sca
+            (Sca as Cmp) + Cmp
+            Cmp + (Sca as Cmp)
+            Cmp + Cmp
+            Vec + Vec
+            Mat + Mat
+         */
+
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a + b)),
+            (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
+                let a: Complex = a.into();
+                Ok(VariableUnion::Cmp(&a + b))
+            },
+            (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a + b)),
+            (Self::Vec(a), Self::Vec(b)) => Ok(VariableUnion::Vec(a + b)),
+            (Self::Mat(a), Self::Mat(b)) => {
+                match a + b {
+                    Ok(m) => Ok(VariableUnion::Mat(m)),
+                    Err(e) => Err(CalcError::MatDim(e))
+                }
+            },
+            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("+", &a, &b, Some("operator not defined"))))
+        }
     }
 }
 impl Sub for VariableUnionRef<'_> {
     type Output = CalcResult<VariableUnion>;
     fn sub(self, rhs: Self) -> Self::Output {
-        todo!()
+        /* Sub is defined for all types upon themselves, and the following ones:
+            Sca - Sca
+            (Sca as Cmp) - Cmp
+            Cmp - (Sca as Cmp)
+            Cmp + Cmp
+            Vec + Vec
+            Mat + Mat
+         */
+
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a - b)),
+            (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
+                let a: Complex = a.into();
+                Ok(VariableUnion::Cmp(&a - b))
+            },
+            (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a - b)),
+            (Self::Vec(a), Self::Vec(b)) => Ok(VariableUnion::Vec(a - b)),
+            (Self::Mat(a), Self::Mat(b)) => {
+                match a - b {
+                    Ok(m) => Ok(VariableUnion::Mat(m)),
+                    Err(e) => Err(CalcError::MatDim(e))
+                }
+            },
+            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("-", &a, &b, Some("operator not defined"))))
+        }
     }
 }
 impl Mul for VariableUnionRef<'_> {
     type Output = CalcResult<VariableUnion>;
     fn mul(self, rhs: Self) -> Self::Output {
-        todo!()   
+        /*
+            Mul is the biggest one out here. It is defined over
+
+            Sca * Sca
+            Sca * Cmp, Cmp * Sca
+            Sca * Vec, Vec * Sca
+            Sca * Mat, Mat * Sca
+            Cmp * Cmp,
+            Mat * Mat
+         */
+
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a * b)),
+            (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a * b)),
+            (Self::Mat(a), Self::Mat(b)) => {
+                match a * b {
+                    Ok(m) => Ok(VariableUnion::Mat(m)),
+                    Err(e) => Err(CalcError::Dim(e))
+                }
+            },
+
+            (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
+                let a: Complex = a.into();
+                Ok(VariableUnion::Cmp(&a * b))
+            },
+            (Self::Sca(a), Self::Vec(b)) | (Self::Vec(b), Self::Sca(a)) => Ok(VariableUnion::Vec(a * b)),
+            (Self::Sca(a), Self::Mat(b)) | (Self::Mat(b), Self::Sca(a)) => Ok(VariableUnion::Mat(a * b)),
+
+            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("*", &a, &b, Some("operator not defined"))))
+        }
     }
 }
 impl Div for VariableUnionRef<'_> {
     type Output = CalcResult<VariableUnion>;
     fn div(self, rhs: Self) -> Self::Output {
-        todo!()
+        /*
+            Div is simple
+
+            Sca / Sca
+            Cmp / Cmp
+            Cmp / Sca, Sca / Cmp
+            Vec / Sca
+            Mat / Sca
+         */
+
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a / b)),
+            (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a / b)),
+            (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
+                let a: Complex = a.into();
+                Ok(VariableUnion::Cmp(&a / b))
+            },
+            (Self::Vec(a), Self::Sca(b)) => Ok(VariableUnion::Vec(a / b)),
+            (Self::Mat(a), Self::Vec(b)) => Ok(VariableUnion::Mat(a / b)),
+            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("/", &a, &b, Some("operator not defined"))))
+        }
     }
 }
 
@@ -175,4 +294,14 @@ pub enum VariableUnionRefMut<'a> {
     Cmp(&'a mut Complex),
     Vec(&'a mut MathVector),
     Mat(&'a mut Matrix)
+}
+
+#[test]
+fn test_variable_union() {
+
+}
+
+#[test]
+fn test_variable_union_ref() {
+
 }

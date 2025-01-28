@@ -601,17 +601,16 @@ impl Neg for Matrix {
 }
 impl Add for Matrix {
     type Output = Result<Matrix, DimensionError<MatrixDimension>>;
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(mut self, rhs: Self) -> Self::Output {
         if self.dimension() != rhs.dimension() { return Err(DimensionError::new(self.dimension(), rhs.dimension())); }
 
-        let mut result = Matrix::with_capacity(self.rows(), self.columns(), 0.0);
-        for i in 0..self.rows() {
-            for j in 0..self.columns() {
-                result.data[i][j] = self.data[i][j] + rhs.data[i][j];
+        for (i, row) in self.data.iter_mut().enumerate() {
+            for (j, element) in row.iter_mut().enumerate() {
+                *element *= rhs.data[i][j]
             }
         }
-        
-        Ok(result)
+
+        Ok(self)
     }
 }
 impl Sub for Matrix {
@@ -622,8 +621,53 @@ impl Sub for Matrix {
 }
 impl Mul for Matrix {
     type Output = Result<Matrix, DimensionError<usize>>;
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.columns() != rhs.rows() { 
+    fn mul(self, rhs: Self) -> Result<Matrix, DimensionError<usize>> {
+        (&self).mul(&rhs)
+    }
+}
+
+// REFERENCE
+impl<'a> Neg for &'a Matrix {
+    type Output = Matrix;
+    fn neg(self) -> Self::Output {
+        self.clone().neg()
+    }
+}
+impl<'a, 'b> Add<&'a Matrix> for &'b Matrix {
+    type Output = Result<Matrix, DimensionError<MatrixDimension>>;
+    fn add(self, rhs: &'a Matrix) -> Self::Output {
+        if self.dimension() != rhs.dimension() { return Err(DimensionError::new(self.dimension(), rhs.dimension())); }
+
+        let mut result = Matrix::with_capacity(self.rows(), self.columns(), 0.0);
+        for i in 0..self.rows() {
+            for j in 0..self.columns() {
+                result.data[i][j] = self.data[i][j] + rhs.data[i][j];
+            }
+        }
+
+        Ok(result)
+    }
+}
+impl<'a, 'b> Sub<&'a Matrix> for &'b Matrix {
+    type Output = Result<Matrix, DimensionError<MatrixDimension>>;
+    fn sub(self, rhs: &'a Matrix) -> Self::Output {
+        if self.dimension() != rhs.dimension() { return Err(DimensionError::new(self.dimension(), rhs.dimension())); }
+
+        let mut result = Matrix::with_capacity(self.rows(), self.columns(), 0.0);
+        for i in 0..self.rows() {
+            for j in 0..self.columns() {
+                result.data[i][j] = self.data[i][j] - rhs.data[i][j];
+            }
+        }
+
+        Ok(result)
+    }
+}
+impl<'a, 'b> Mul<&'a Matrix> for &'b Matrix {
+    type Output = Result<Matrix, DimensionError<usize>>;
+
+    fn mul(self, rhs: &'a Matrix) -> Self::Output {
+        if self.columns() != rhs.rows() {
             return Err(DimensionError::new(self.columns(), rhs.rows()));
         }
 
