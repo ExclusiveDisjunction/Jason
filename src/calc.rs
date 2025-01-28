@@ -78,8 +78,8 @@ impl Mul for VariableUnion {
     fn mul(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
         match (self, rhs) {
-            (Self::Sca(a), Self::Vec(b)) | (Self::Vec(b), Self::Sca(a)) => Ok(Self::Vec(a * b)),
-            (Self::Sca(a), Self::Mat(b)) | (Self::Mat(b), Self::Sca(a)) => Ok(Self::Mat(a * b)),
+            (Self::Vec(a), Self::Sca(b)) | (Self::Sca(b), Self::Vec(a)) => Ok(Self::Vec(a * b)),
+            (Self::Mat(a), Self::Sca(b)) | (Self::Sca(b), Self::Mat(a)) => Ok(Self::Mat(a * b)),
             (a, b) => a.get_ref().add(b.get_ref())
         }
     }
@@ -280,8 +280,8 @@ impl Mul for VariableUnionRef<'_> {
                 let a: Complex = a.into();
                 Ok(VariableUnion::Cmp(&a * b))
             },
-            (Self::Sca(a), Self::Vec(b)) | (Self::Vec(b), Self::Sca(a)) => Ok(VariableUnion::Vec(a * b)),
-            (Self::Sca(a), Self::Mat(b)) | (Self::Mat(b), Self::Sca(a)) => Ok(VariableUnion::Mat(a * b)),
+            (Self::Vec(a), Self::Sca(b)) | (Self::Sca(b), Self::Vec(a)) => Ok(VariableUnion::Vec(a * b)),
+            (Self::Mat(a), Self::Sca(b)) | (Self::Sca(b), Self::Mat(a)) => Ok(VariableUnion::Mat(a * b)),
 
             (a, b) => Err(CalcError::Oper(OperationError::new_fmt("*", &a, &b, Some("operator not defined"))))
         }

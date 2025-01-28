@@ -1,5 +1,5 @@
 use super::variable_type::*;
-use super::scalar::{Scalar, ScalarLike};
+use super::scalar::ScalarLike;
 use super::calc_error::{DimensionError, OperationError, CalcError, CalcResult};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
 use std::fmt::{Display, Debug, Formatter};
@@ -239,14 +239,6 @@ impl<T> Div<T> for MathVector where T: ScalarLike {
     }
 }
 
-// B A
-impl Mul<MathVector> for Scalar {
-    type Output = MathVector;
-    fn mul(self, rhs: MathVector) -> Self::Output {
-        rhs * self
-    }
-}
-
 // REFERENCE
 // A B
 impl<'a, T> Mul<T> for &'a MathVector where T: ScalarLike {
@@ -266,19 +258,11 @@ impl<'a, T> Div<T> for &'a MathVector where T: ScalarLike {
     }
 }
 
-// B A
-impl<'a> Mul<&'a MathVector> for Scalar {
-    type Output = MathVector;
-    fn mul(self, rhs: &'a MathVector) -> Self::Output {
-        rhs * self
-    }
-}
-
 #[test]
 fn test_vector() {
     let a = MathVector::from(vec![1, 2, 3]);
     let b = MathVector::from(vec![2, 3]);
-    let c = Scalar::new(4.0);
+    let c = 4.0;
 
     //Negation
     assert_eq!(-a.clone(), MathVector::from(vec![-1, -2, -3]));
@@ -308,7 +292,6 @@ fn test_vector() {
 
     // a * b == b * a
     assert_eq!(a.clone() * c, MathVector::from(vec![4, 8, 12]));
-    assert_eq!(c * a.clone(), a.clone() * c);
 
     // b / a DNE
     assert_eq!(a.clone() / c, MathVector::from(vec![1.0/4.0, 2.0/4.0, 3.0/4.0]));
@@ -318,6 +301,5 @@ fn test_vector() {
     assert_eq!(&a + &b, &b + &a);
     assert_eq!(&a - &b, a.clone() - b.clone());
     assert_eq!(&a * c, a.clone() * c);
-    assert_eq!(&a * c, c * &a);
     assert_eq!(&a / c, a.clone() / c);
 }

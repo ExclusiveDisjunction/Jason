@@ -1,5 +1,5 @@
 use super::variable_type::*;
-use super::scalar::{Scalar, ScalarLike};
+use super::scalar::ScalarLike;
 use super::vector::MathVector;
 use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
@@ -606,7 +606,7 @@ impl Add for Matrix {
 
         for (i, row) in self.data.iter_mut().enumerate() {
             for (j, element) in row.iter_mut().enumerate() {
-                *element *= rhs.data[i][j]
+                *element += rhs.data[i][j]
             }
         }
 
@@ -703,12 +703,6 @@ impl<T> Mul<T> for Matrix where T: ScalarLike {
         self
     }
 }
-impl Mul<Matrix> for Scalar {
-    type Output = Matrix;
-    fn mul(self, rhs: Matrix) -> Self::Output {
-        rhs * self
-    }
-}
 impl<T> Div<T> for Matrix where T: ScalarLike {
     type Output = Matrix;
     fn div(mut self, rhs: T) -> Self::Output {
@@ -731,13 +725,6 @@ impl<'a, T> Mul<T> for &'a Matrix where T: ScalarLike {
         result * rhs
     }
 }
-impl<'a> Mul<&'a Matrix> for Scalar {
-    type Output = Matrix;
-    fn mul(self, rhs: &'a Matrix) -> Self::Output {
-        let result = rhs.clone();
-        result * self
-    }
-}
 impl<'a, T> Div<T> for &'a Matrix where T: ScalarLike {
     type Output = Matrix;
     fn div(self, rhs: T) -> Self::Output {
@@ -747,25 +734,10 @@ impl<'a, T> Div<T> for &'a Matrix where T: ScalarLike {
 }
 
 // MATRIX - MATH VECTOR OPERATIONS
-// PURE
-impl Mul<Matrix> for MathVector {
-    type Output = Result<MathVector, DimensionError<usize>>;
-    fn mul(self, rhs: Matrix) -> Self::Output {
-        (&rhs).mul(&self)
-    }
-}
 impl Mul<MathVector> for Matrix {
     type Output = Result<MathVector, DimensionError<usize>>;
     fn mul(self, rhs: MathVector) -> Self::Output {
         (&self).mul(&rhs)
-    }
-}
-
-// REFERENCE
-impl<'a, 'b> Mul<&'a Matrix> for &'b MathVector {
-    type Output = Result<MathVector, DimensionError<usize>>;
-    fn mul(self, rhs: &'a Matrix) -> Self::Output {
-        (&rhs).mul(self)
     }
 }
 impl<'a, 'b> Mul<&'a MathVector> for &'b Matrix {
@@ -825,7 +797,7 @@ fn matrix_tester() {
     let e = Matrix::try_from(vec![vec![4, 1, 9], vec![7, -2, 1]]).unwrap();
     let f = Matrix::try_from(vec![vec![2, 6], vec![1, 4]]).unwrap();
     let v = MathVector::from(vec![1, 2, 3]);
-    let s = Scalar::new(4);
+    let s = 4.0;
 
     assert!(a.is_square() && a.is_valid());
     assert!(!Matrix::default().is_valid());
@@ -835,12 +807,14 @@ fn matrix_tester() {
     assert_eq!(c.determinant(), Some(1.0));
     assert_eq!(d.determinant(), None);
 
-    assert_eq!((a.clone() + b).ok(), Matrix::try_from(vec![vec![1, 7, 12], vec![-2, 2, 0], vec![7, -1, 10]]).ok());
+    match (a.clone() + b, Matrix::try_from(vec![vec![1, 7, 12], vec![-2, 2, 0], vec![7, -1, 10]])) {
+        (Ok(m1), Ok(m2)) => assert_eq!(m1, m2),
+        (a, b) => panic!("Expected (ok, ok), got ({:?}, {:?})", a, b)
+    }
 
     assert_eq!(d * e, Matrix::try_from(vec![vec![25, -5, 12], vec![-9, -6, -35], vec![70, -5, 69]]));
     assert_eq!(c.clone() * f.clone(), Ok(f));
-    assert_eq!(v * a, Ok(MathVector::from(vec![25, 10, 22])));
-    assert_eq!(c.clone() * s, s * c.clone());
+    assert_eq!(a * v, Ok(MathVector::from(vec![25, 10, 22])));
     assert_eq!(c * s, Matrix::try_from(vec![vec![4, 0], vec![0, 4]]).unwrap());
 }
 
