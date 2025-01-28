@@ -153,11 +153,38 @@ impl VariableUnion {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum VariableUnionRef<'a> {
     Sca(Scalar),
     Cmp(&'a Complex),
     Vec(&'a MathVector),
     Mat(&'a Matrix)
+}
+
+impl From<Scalar> for VariableUnionRef<'_> {
+    fn from(value: Scalar) -> Self {
+        Self::Sca(value)
+    }
+}
+impl<'a> From<&'a Scalar> for VariableUnionRef<'a> {
+    fn from(value: &'a Scalar) -> Self {
+        Self::Sca(*value)
+    }
+}
+impl<'a> From<&'a Complex> for VariableUnionRef<'a> {
+    fn from(value: &'a Complex) -> Self {
+        Self::Cmp(value)
+    }
+}
+impl<'a> From<&'a MathVector> for VariableUnionRef<'a> {
+    fn from(value: &'a MathVector) -> Self {
+        Self::Vec(value)
+    }
+}
+impl<'a> From<&'a Matrix> for VariableUnionRef<'a> {
+    fn from(value: &'a Matrix) -> Self {
+        Self::Mat(value)
+    }
 }
 
 impl Debug for VariableUnionRef<'_> {
@@ -396,5 +423,68 @@ fn test_variable_union() {
 
 #[test]
 fn test_variable_union_ref() {
+    //We are primarily testing the operators.
+    let ar = Scalar::new(4.0);
+    let br = Complex::new(1.0, 2.5);
+    let cr = MathVector::from(vec![1, 4, 3]);
+    let dr = Matrix::identity(2);
+    
+    // Conversion
+    let a = VariableUnionRef::from(&ar);
+    let b = VariableUnionRef::from(&br);
+    let c = VariableUnionRef::from(&cr);
+    let d = VariableUnionRef::from(&dr);
 
+    //Printing
+    assert_eq!(format!("{:?}", &a), format!("{:?}", &ar));
+    assert_eq!(format!("{:?}", &b), format!("{:?}", &br));
+    assert_eq!(format!("{:?}", &c), format!("{:?}", &cr));
+    assert_eq!(format!("{:?}", &d), format!("{:?}", &dr));
+
+    assert_eq!(format!("{}", &a), format!("{}", &ar));
+    assert_eq!(format!("{}", &b), format!("{}", &br));
+    assert_eq!(format!("{}", &c), format!("{}", &cr));
+    assert_eq!(format!("{}", &d), format!("{}", &dr));
+
+    // Negation
+    assert_eq!(-a, VariableUnion::Sca(-ar));
+    assert_eq!(-b, VariableUnion::Cmp(-br.clone()));
+    assert_eq!(-c, VariableUnion::Vec(-cr.clone()));
+    assert_eq!(-d, VariableUnion::Mat(-dr.clone()));
+
+
+    let er = Scalar::new(1.0);
+    let fr = Complex::new(2.1, 4.0);
+    let gr = MathVector::from(vec![2, 1, -4]);
+    let hr = Matrix::try_from(vec![vec![1, 4], vec![5,2]]).unwrap();
+
+    //Addition
+    assert_eq!(a + VariableUnionRef::from(&er), Ok( VariableUnion::from( ar + er) ));
+    assert_eq!(b + VariableUnionRef::from(&fr), Ok( VariableUnion::from( &br + &fr ) ));
+    assert_eq!(c + VariableUnionRef::from(&gr), Ok( VariableUnion::from( &cr + &gr ) ));
+    assert_eq!(d + VariableUnionRef::from(&hr), Ok( VariableUnion::from( (&dr + &hr).unwrap() ) ));
+
+    //Subtraction
+    assert_eq!(a - VariableUnionRef::from(&er), Ok( VariableUnion::from( ar - er) ));
+    assert_eq!(b - VariableUnionRef::from(&fr), Ok( VariableUnion::from( &br - &fr ) ));
+    assert_eq!(c - VariableUnionRef::from(&gr), Ok( VariableUnion::from( &cr - &gr ) ));
+    assert_eq!(d - VariableUnionRef::from(&hr), Ok( VariableUnion::from( (&dr - &hr).unwrap() ) ));
+
+    //Multiplication
+    assert_eq!(a * VariableUnionRef::from(&er), Ok( VariableUnion::from( ar * er) ));
+    assert_eq!(b * VariableUnionRef::from(&fr), Ok( VariableUnion::from( &br * &fr ) ));
+    assert_eq!(b * VariableUnionRef::Cmp(&ar.into()), Ok( VariableUnion::from( &br * &ar.into() ) ));
+    assert_eq!(c * VariableUnionRef::from(&ar), Ok( VariableUnion::from( &cr * ar ) ));
+    assert!( (c * VariableUnionRef::from(&gr)).is_err() );
+    assert_eq!(d * VariableUnionRef::from(&hr), Ok( VariableUnion::from( (&dr * &hr).unwrap() ) ));
+    assert_eq!(d * VariableUnionRef::from(&ar), Ok( VariableUnion::from( &dr * ar ) ));
+
+    //Division
+    assert_eq!(a / VariableUnionRef::from(&er), Ok( VariableUnion::from( ar / er) ));
+    assert_eq!(b / VariableUnionRef::from(&fr), Ok( VariableUnion::from( &br / &fr ) ));
+    assert_eq!(b / VariableUnionRef::Cmp(&ar.into()), Ok( VariableUnion::from( &br / &ar.into() ) ));
+    assert!( (c / VariableUnionRef::from(&gr)).is_err() );
+    assert_eq!(c / VariableUnionRef::from(&ar), Ok( VariableUnion::from( &cr / ar ) ));
+    assert!( (d / VariableUnionRef::from(&hr)).is_err() );
+    assert_eq!(d / VariableUnionRef::from(&ar), Ok( VariableUnion::from( &dr / ar ) ));
 }
