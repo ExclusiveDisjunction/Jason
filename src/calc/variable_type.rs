@@ -1,7 +1,7 @@
 use std::fmt::{Display, Debug};
 use serde::{Serialize, Deserialize};
 
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum VariableType {
     Scalar,
     Complex,

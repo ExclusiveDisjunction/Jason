@@ -135,14 +135,18 @@ impl VariableData for MathVector {
     }
 }
 
+// VEC ONLY OPERATORS
+// PURE
 impl Neg for MathVector {
     type Output = Self;
-    fn neg(self) -> Self::Output {
-        let contents: Vec<f64> = self.data.into_iter().map(|x| -x).collect();
-        Self::from(contents)
+    fn neg(mut self) -> Self::Output {
+        for item in &mut self.data {
+            *item *= -1.0;
+        }
+
+        self
     }
 }
-
 impl Add for MathVector {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
@@ -172,6 +176,51 @@ impl Sub for MathVector {
         self + (-rhs)
     }
 }
+
+//REF
+impl<'a> Neg for &'a MathVector {
+    type Output = MathVector;
+    fn neg(self) -> Self::Output {
+        let contents: Vec<f64> = self.data.iter().map(|x| -x).collect();
+        MathVector::from(contents)
+    }
+}
+impl<'a, 'b> Add<&'b MathVector> for &'a MathVector {
+    type Output = MathVector;
+    fn add(self, rhs: &'b MathVector) -> Self::Output {
+        let mut result: MathVector;
+        let a: &MathVector;
+        let b: &MathVector;
+
+        if self.dim() < rhs.dim() {
+            a = rhs;
+            b = self;
+        }
+        else {
+            a = self;
+            b = rhs;
+        }
+
+        result = a.clone();
+        for (i, elem) in b.data.iter().enumerate() {
+            result.data[i] += elem;
+        }
+
+        result
+
+    }
+}
+impl<'a, 'b> Sub<&'b MathVector> for &'a MathVector {
+    type Output = MathVector;
+    fn sub(self, rhs: &'b MathVector) -> Self::Output {
+        let rhs = -rhs;
+        self.add(&rhs)
+    }
+}
+
+// VEC - SCA OPERATORS
+// PURE
+// A B
 impl<T> Mul<T> for MathVector where T: ScalarLike {
     type Output = Self;
 
@@ -181,18 +230,47 @@ impl<T> Mul<T> for MathVector where T: ScalarLike {
         MathVector::from(result)
     }
 }
-impl Mul<MathVector> for Scalar {
-    type Output = MathVector;
-    fn mul(self, rhs: MathVector) -> Self::Output {
-        rhs * self
-    }
-}
 impl<T> Div<T> for MathVector where T: ScalarLike {
     type Output = Self;
     fn div(self, rhs: T) -> Self::Output {
         let b = rhs.as_scalar();
         let result: Vec<f64> = self.data.into_iter().map(|x| x / b).collect();
         MathVector::from(result)
+    }
+}
+
+// B A
+impl Mul<MathVector> for Scalar {
+    type Output = MathVector;
+    fn mul(self, rhs: MathVector) -> Self::Output {
+        rhs * self
+    }
+}
+
+// REFERENCE
+// A B
+impl<'a, T> Mul<T> for &'a MathVector where T: ScalarLike {
+    type Output = MathVector;
+    fn mul(self, rhs: T) -> Self::Output {
+        let b = rhs.as_scalar();
+        let result: Vec<f64> = self.data.iter().map(|x| x * b).collect();
+        MathVector::from(result)
+    }
+}
+impl<'a, T> Div<T> for &'a MathVector where T: ScalarLike {
+    type Output = MathVector;
+    fn div(self, rhs: T) -> Self::Output {
+        let b = rhs.as_scalar();
+        let result: Vec<f64> = self.data.iter().map(|x| x / b).collect();
+        MathVector::from(result)
+    }
+}
+
+// B A
+impl<'a> Mul<&'a MathVector> for Scalar {
+    type Output = MathVector;
+    fn mul(self, rhs: &'a MathVector) -> Self::Output {
+        rhs * self
     }
 }
 
@@ -234,4 +312,12 @@ fn test_vector() {
 
     // b / a DNE
     assert_eq!(a.clone() / c, MathVector::from(vec![1.0/4.0, 2.0/4.0, 3.0/4.0]));
+
+    //Assert that &a + &b == a + b, and other operations
+    assert_eq!(&a + &b, a.clone() + b.clone());
+    assert_eq!(&a + &b, &b + &a);
+    assert_eq!(&a - &b, a.clone() - b.clone());
+    assert_eq!(&a * c, a.clone() * c);
+    assert_eq!(&a * c, c * &a);
+    assert_eq!(&a / c, a.clone() / c);
 }
