@@ -44,19 +44,44 @@ impl Neg for VariableUnion {
 impl Add for VariableUnion {
     type Output = CalcResult<VariableUnion>;
     fn add(self, rhs: Self) -> Self::Output {
-        self.get_ref().add(rhs.get_ref())
+        //Some of these have optimizations.
+        match (self, rhs) {
+            (Self::Vec(a), Self::Vec(b)) => Ok(Self::Vec(a + b)),
+            (Self::Mat(a), Self::Mat(b)) => {
+                match a + b {
+                    Ok(m) => Ok(Self::Mat(m)),
+                    Err(e) => Err(CalcError::MatDim(e))
+                }
+            },
+            (a, b) => a.get_ref().add(b.get_ref())
+        }
     }
 }
 impl Sub for VariableUnion {
     type Output = CalcResult<VariableUnion>;
     fn sub(self, rhs: Self) -> Self::Output {
-        self.get_ref().sub(rhs.get_ref())
+        //Some of these have optimizations.
+        match (self, rhs) {
+            (Self::Vec(a), Self::Vec(b)) => Ok(Self::Vec(a - b)),
+            (Self::Mat(a), Self::Mat(b)) => {
+                match a - b {
+                    Ok(m) => Ok(Self::Mat(m)),
+                    Err(e) => Err(CalcError::MatDim(e))
+                }
+            },
+            (a, b) => a.get_ref().sub(b.get_ref())
+        }
     }
 }
 impl Mul for VariableUnion {
     type Output = CalcResult<VariableUnion>;
     fn mul(self, rhs: Self) -> Self::Output {
-        self.get_ref().mul(rhs.get_ref())
+        //Some of these have optimizations.
+        match (self, rhs) {
+            (Self::Sca(a), Self::Vec(b)) | (Self::Vec(b), Self::Sca(a)) => Ok(Self::Vec(a * b)),
+            (Self::Sca(a), Self::Mat(b)) | (Self::Mat(b), Self::Sca(a)) => Ok(Self::Mat(a * b)),
+            (a, b) => a.get_ref().add(b.get_ref())
+        }
     }
 }
 impl Div for VariableUnion {
@@ -283,7 +308,7 @@ impl Div for VariableUnionRef<'_> {
                 Ok(VariableUnion::Cmp(&a / b))
             },
             (Self::Vec(a), Self::Sca(b)) => Ok(VariableUnion::Vec(a / b)),
-            (Self::Mat(a), Self::Vec(b)) => Ok(VariableUnion::Mat(a / b)),
+            (Self::Mat(a), Self::Sca(b)) => Ok(VariableUnion::Mat(a / b)),
             (a, b) => Err(CalcError::Oper(OperationError::new_fmt("/", &a, &b, Some("operator not defined"))))
         }
     }

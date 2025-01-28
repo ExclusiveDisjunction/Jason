@@ -1,6 +1,6 @@
 use super::variable_type::*;
 use super::scalar::{Scalar, ScalarLike};
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
 
@@ -59,6 +59,12 @@ impl Into<Complex> for (f64, f64) {
 }
 
 // PURE
+impl Neg for Complex {
+    type Output = Complex;
+    fn neg(self) -> Complex {
+        Complex { a: -self.a, b: -self.b }
+    }
+}
 impl Add for Complex {
     type Output = Complex;
     fn add(self, rhs: Self) -> Self::Output {
@@ -85,6 +91,12 @@ impl Div for Complex {
 }
 
 // REFERENCE
+impl<'a> Neg for &'a Complex {
+    type Output = Complex;
+    fn neg(self) -> Complex {
+        Complex { a: -self.a, b: -self.b }
+    }
+}
 impl<'a, 'b> Add<&'b Complex> for &'a Complex {
     type Output = Complex;
     fn add(self, rhs: &'b Complex) -> Self::Output {
