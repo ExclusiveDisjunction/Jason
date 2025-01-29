@@ -178,16 +178,16 @@ impl Sub for MathVector {
 }
 
 //REF
-impl<'a> Neg for &'a MathVector {
+impl Neg for &MathVector {
     type Output = MathVector;
     fn neg(self) -> Self::Output {
         let contents: Vec<f64> = self.data.iter().map(|x| -x).collect();
         MathVector::from(contents)
     }
 }
-impl<'a, 'b> Add<&'b MathVector> for &'a MathVector {
+impl<'a> Add<&'a MathVector> for &MathVector {
     type Output = MathVector;
-    fn add(self, rhs: &'b MathVector) -> Self::Output {
+    fn add(self, rhs: &'a MathVector) -> Self::Output {
         let mut result: MathVector;
         let a: &MathVector;
         let b: &MathVector;
@@ -210,9 +210,9 @@ impl<'a, 'b> Add<&'b MathVector> for &'a MathVector {
 
     }
 }
-impl<'a, 'b> Sub<&'b MathVector> for &'a MathVector {
+impl<'a> Sub<&'a MathVector> for &MathVector {
     type Output = MathVector;
-    fn sub(self, rhs: &'b MathVector) -> Self::Output {
+    fn sub(self, rhs: &'a MathVector) -> Self::Output {
         let rhs = -rhs;
         self.add(&rhs)
     }
@@ -241,7 +241,7 @@ impl<T> Div<T> for MathVector where T: ScalarLike {
 
 // REFERENCE
 // A B
-impl<'a, T> Mul<T> for &'a MathVector where T: ScalarLike {
+impl<T> Mul<T> for &MathVector where T: ScalarLike {
     type Output = MathVector;
     fn mul(self, rhs: T) -> Self::Output {
         let b = rhs.as_scalar();
@@ -249,7 +249,7 @@ impl<'a, T> Mul<T> for &'a MathVector where T: ScalarLike {
         MathVector::from(result)
     }
 }
-impl<'a, T> Div<T> for &'a MathVector where T: ScalarLike {
+impl<T> Div<T> for &MathVector where T: ScalarLike {
     type Output = MathVector;
     fn div(self, rhs: T) -> Self::Output {
         let b = rhs.as_scalar();

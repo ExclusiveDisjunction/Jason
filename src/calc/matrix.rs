@@ -108,7 +108,7 @@ impl MatrixLike for MatrixExtraction<'_> {
             let first_rows_removed: Vec<usize> = self.rows.clone().into_iter().skip(1).collect();
             for i in &self.cols {
                 let i = *i;
-                let our_cols: Vec<usize> = self.cols.iter().filter(|x| **x != i).map(|x| *x).collect();
+                let our_cols: Vec<usize> = self.cols.iter().filter(|x| **x != i).copied().collect();
 
                 let minor: MatrixExtraction<'_> = MatrixExtraction::new(
                     self.target,
@@ -627,13 +627,13 @@ impl Mul for Matrix {
 }
 
 // REFERENCE
-impl<'a> Neg for &'a Matrix {
+impl Neg for &Matrix {
     type Output = Matrix;
     fn neg(self) -> Self::Output {
         self.clone().neg()
     }
 }
-impl<'a, 'b> Add<&'a Matrix> for &'b Matrix {
+impl<'a> Add<&'a Matrix> for &Matrix {
     type Output = Result<Matrix, DimensionError<MatrixDimension>>;
     fn add(self, rhs: &'a Matrix) -> Self::Output {
         if self.dimension() != rhs.dimension() { return Err(DimensionError::new(self.dimension(), rhs.dimension())); }
@@ -648,7 +648,7 @@ impl<'a, 'b> Add<&'a Matrix> for &'b Matrix {
         Ok(result)
     }
 }
-impl<'a, 'b> Sub<&'a Matrix> for &'b Matrix {
+impl<'a> Sub<&'a Matrix> for &Matrix {
     type Output = Result<Matrix, DimensionError<MatrixDimension>>;
     fn sub(self, rhs: &'a Matrix) -> Self::Output {
         if self.dimension() != rhs.dimension() { return Err(DimensionError::new(self.dimension(), rhs.dimension())); }
@@ -663,7 +663,7 @@ impl<'a, 'b> Sub<&'a Matrix> for &'b Matrix {
         Ok(result)
     }
 }
-impl<'a, 'b> Mul<&'a Matrix> for &'b Matrix {
+impl<'a> Mul<&'a Matrix> for &Matrix {
     type Output = Result<Matrix, DimensionError<usize>>;
 
     fn mul(self, rhs: &'a Matrix) -> Self::Output {
@@ -718,14 +718,14 @@ impl<T> Div<T> for Matrix where T: ScalarLike {
 }
 
 // REFERENCE
-impl<'a, T> Mul<T> for &'a Matrix where T: ScalarLike {
+impl<T> Mul<T> for &Matrix where T: ScalarLike {
     type Output = Matrix;
     fn mul(self, rhs: T) -> Self::Output {
         let result = self.clone();
         result * rhs
     }
 }
-impl<'a, T> Div<T> for &'a Matrix where T: ScalarLike {
+impl<T> Div<T> for &Matrix where T: ScalarLike {
     type Output = Matrix;
     fn div(self, rhs: T) -> Self::Output {
         let result = self.clone();
@@ -740,7 +740,7 @@ impl Mul<MathVector> for Matrix {
         (&self).mul(&rhs)
     }
 }
-impl<'a, 'b> Mul<&'a MathVector> for &'b Matrix {
+impl<'a> Mul<&'a MathVector> for &Matrix {
     type Output = Result<MathVector, DimensionError<usize>>;
     fn mul(self, rhs: &'a MathVector) -> Self::Output {
         if self.columns() != rhs.dim() {

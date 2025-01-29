@@ -42,19 +42,14 @@ impl VariableData for Complex {
     The approach includes converting scalars to complex numbers, saving the number of operators.
  */
 
-impl Into<Complex> for Scalar {
-    fn into(self) -> Complex {
-        Complex { a: self.a, b: 0.0 }
+impl<T> From<T> for Complex where T: ScalarLike{
+    fn from(value: T) -> Self {
+        Self { a: value.as_scalar(), b: 0.0 }
     }
 }
-impl Into<Complex> for f64 {
-    fn into(self) -> Complex {
-        Complex { a: self, b: 0.0 }
-    }
-}
-impl Into<Complex> for (f64, f64) {
-    fn into(self) -> Complex {
-        Complex { a: self.0, b: self.1 }
+impl<T, U> From<(T, U)> for Complex where T: ScalarLike, U: ScalarLike {
+    fn from(value: (T, U)) -> Self {
+        Self { a: value.0.as_scalar(), b: value.1.as_scalar() }
     }
 }
 
@@ -91,36 +86,36 @@ impl Div for Complex {
 }
 
 // REFERENCE
-impl<'a> Neg for &'a Complex {
+impl Neg for &Complex {
     type Output = Complex;
     fn neg(self) -> Complex {
         Complex { a: -self.a, b: -self.b }
     }
 }
-impl<'a, 'b> Add<&'b Complex> for &'a Complex {
+impl<'a> Add<&'a Complex> for &Complex {
     type Output = Complex;
-    fn add(self, rhs: &'b Complex) -> Self::Output {
+    fn add(self, rhs: &'a Complex) -> Self::Output {
         Complex { a: self.a + rhs.a, b: self.b + rhs.b }
     }
 }
-impl<'a, 'b> Sub<&'b Complex> for &'a Complex {
+impl<'a> Sub<&'a Complex> for &Complex {
     type Output = Complex;
-    fn sub(self, rhs: &'b Complex) -> Self::Output {
+    fn sub(self, rhs: &'a Complex) -> Self::Output {
         Complex{ a: self.a - rhs.a, b: self.b - rhs.b }
     }
 }
-impl<'a, 'b> Mul<&'b Complex> for &'a Complex {
+impl<'a> Mul<&'a Complex> for &Complex {
     type Output = Complex;
-    fn mul(self, rhs: &'b Complex) -> Self::Output {
+    fn mul(self, rhs: &'a Complex) -> Self::Output {
         Complex::new(
             self.a * rhs.a - self.b * rhs.b,
             self.a * rhs.b + self.b * rhs.a
         )
     }
 }
-impl<'a, 'b> Div<&'b Complex> for &'a Complex {
+impl<'a> Div<&'a Complex> for &Complex {
     type Output = Complex;
-    fn div(self, rhs: &'b Complex) -> Self::Output {
+    fn div(self, rhs: &'a Complex) -> Self::Output {
         /*
           (a + bi) / (c + di)
           (a + bi) * (c - di) / (c + di)(c - di)

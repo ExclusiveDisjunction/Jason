@@ -9,47 +9,6 @@ impl DimensionKind for i64 {}
 impl DimensionKind for u32 {}
 impl DimensionKind for u64 {}
 
-pub enum CalcError {
-    Index(IndexOutOfRangeError<usize>),
-    MatDim(DimensionError<MatrixDimension>),
-    Dim(DimensionError<usize>),
-    Oper(OperationError)
-}
-impl Debug for CalcError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Index(a) => (a as &dyn Debug).fmt(f),
-            Self::Dim(a) => (a as &dyn Debug).fmt(f),
-            Self::MatDim(b) => (b as &dyn Debug).fmt(f),
-            Self::Oper(a) => (a as &dyn Debug).fmt(f)
-        }
-    }
-}
-impl Display for CalcError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Index(a) => (a as &dyn Display).fmt(f),
-            Self::Dim(a) => (a as &dyn Display).fmt(f),
-            Self::MatDim(a) => (a as &dyn Display).fmt(f),
-            Self::Oper(a) => (a as &dyn Display).fmt(f)
-        }
-    }
-}
-impl PartialEq for CalcError {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Index(a), Self::Index(b)) => a == b,
-            (Self::Dim(a), Self::Dim(b)) => a == b,
-            (Self::MatDim(a), Self::MatDim(b)) => a == b,
-            (Self::Oper(a), Self::Oper(b)) => a == b,
-            (_, _) => false
-        }
-    }
-}
-
-
-pub type CalcResult<T> = Result<T, CalcError>;
-
 #[derive(Clone)]
 pub struct IndexOutOfRangeError<T> where T: DimensionKind {
     index: T
@@ -142,3 +101,45 @@ impl Debug for OperationError {
         (self as &dyn Display).fmt(f)
     }
 }
+
+#[derive(PartialEq, Debug)]
+pub enum CalcError {
+    Index(IndexOutOfRangeError<usize>),
+    MatDim(DimensionError<MatrixDimension>),
+    Dim(DimensionError<usize>),
+    Oper(OperationError)
+}
+
+impl From<IndexOutOfRangeError<usize>> for CalcError {
+    fn from(value: IndexOutOfRangeError<usize>) -> Self {
+        Self::Index(value)
+    }
+}
+impl From<DimensionError<MatrixDimension>> for CalcError {
+    fn from(value: DimensionError<MatrixDimension>) -> Self {
+        Self::MatDim(value)
+    }
+}
+impl From<DimensionError<usize>> for CalcError {
+    fn from(value: DimensionError<usize>) -> Self {
+        Self::Dim(value)
+    }
+}
+impl From<OperationError> for CalcError {
+    fn from(value: OperationError) -> Self {
+        Self::Oper(value)
+    }
+}
+
+impl Display for CalcError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Index(a) => (a as &dyn Display).fmt(f),
+            Self::Dim(a) => (a as &dyn Display).fmt(f),
+            Self::MatDim(a) => (a as &dyn Display).fmt(f),
+            Self::Oper(a) => (a as &dyn Display).fmt(f)
+        }
+    }
+}
+
+pub type CalcResult<T> = Result<T, CalcError>;

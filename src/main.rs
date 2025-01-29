@@ -1,5 +1,5 @@
 //use std::io::{stdin, stdout, Write};
-use expr::repr::ast_base::basic_tree_functionality;
+use expr::repr::basic_tree_functionality;
 
 use crate::core::version::JASON_CURRENT_VERSION;
 use crate::core::logger::{logging, LoggerLevel};
