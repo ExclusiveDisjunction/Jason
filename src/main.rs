@@ -1,4 +1,6 @@
-use std::io::{stdin, stdout, Write};
+//use std::io::{stdin, stdout, Write};
+use expr::repr::ast_base::basic_tree_functionality;
+
 use crate::core::version::JASON_CURRENT_VERSION;
 use crate::core::logger::{logging, LoggerLevel};
 
@@ -42,6 +44,11 @@ fn main() -> Result<(), String> {
     if logger_level == LoggerLevel::Debug {
         println!("Notice: Debugging mode activated.");
     }
+
+    println!("Starting testing");
+    basic_tree_functionality();
+
+    /*
     println!("Jason CLI mode: If you need help, type 'help' or 'help [command]' to review topics about a list of commands, info about a command.\n");
 
     let mut input: String = String::new();
@@ -67,6 +74,7 @@ fn main() -> Result<(), String> {
             break;
         }
     }
+     */
 
     log_info!("Jason completed, exit code 0.");
     logging.close();
