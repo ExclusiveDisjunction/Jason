@@ -1,6 +1,6 @@
 use std::fmt::{Display, Debug, Formatter};
 
-use super::matrix::MatrixDimension;
+use super::{matrix::MatrixDimension, VariableType};
 
 pub trait DimensionKind : Clone + Copy {}
 impl DimensionKind for usize { }
@@ -102,12 +102,63 @@ impl Debug for OperationError {
     }
 }
 
+/// Describes a specific amount of arguments, and how many were supplied.
+#[derive(Clone, PartialEq)]
+pub struct ArgCountError {
+    expected: usize,
+    got: usize
+}
+impl Display for ArgCountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "expected {} arguments, got {}", self.expected, self.got)
+    }
+}
+impl Debug for ArgCountError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+}
+impl ArgCountError {
+    pub fn new(expected: usize, got: usize) -> Self {
+        Self {
+            expected,
+            got
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct ArgTypeError {
+    expected: VariableType,
+    got: VariableType
+}
+impl Display for ArgTypeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "expected an argument of type {}, got an argument of {}", &self.expected, &self.got)
+    }
+}
+impl Debug for ArgTypeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+}
+impl ArgTypeError {
+    pub fn new(expected: VariableType, got: VariableType) -> Self{
+        Self {
+            expected,
+            got
+        }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum CalcError {
     Index(IndexOutOfRangeError<usize>),
     MatDim(DimensionError<MatrixDimension>),
     Dim(DimensionError<usize>),
-    Oper(OperationError)
+    Oper(OperationError),
+    ArgCount(ArgCountError),
+    ArgType(ArgTypeError)
 }
 
 impl From<IndexOutOfRangeError<usize>> for CalcError {
@@ -130,15 +181,27 @@ impl From<OperationError> for CalcError {
         Self::Oper(value)
     }
 }
+impl From<ArgCountError> for CalcError {
+    fn from(value: ArgCountError) -> Self {
+        Self::ArgCount(value)
+    }
+}
+impl From<ArgTypeError> for CalcError {
+    fn from(value: ArgTypeError) -> Self {
+        Self::ArgType(value)
+    }
+}
 
 impl Display for CalcError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Index(a) => (a as &dyn Display).fmt(f),
-            Self::Dim(a) => (a as &dyn Display).fmt(f),
-            Self::MatDim(a) => (a as &dyn Display).fmt(f),
-            Self::Oper(a) => (a as &dyn Display).fmt(f)
-        }
+            Self::Index(a) => a as &dyn Display,
+            Self::Dim(a) => a as &dyn Display,
+            Self::MatDim(a) => a as &dyn Display,
+            Self::Oper(a) => a as &dyn Display,
+            Self::ArgCount(a) => a as &dyn Display,
+            Self::ArgType(a) => a as &dyn Display
+        }.fmt(f)
     }
 }
 

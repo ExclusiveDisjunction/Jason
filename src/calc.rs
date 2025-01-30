@@ -12,7 +12,7 @@ use std::fmt::{Display, Debug};
 use serde::{Serialize, Deserialize};
 
 pub use variable_type::{VariableData, VariableType};
-pub use scalar::Scalar;
+pub use scalar::{Scalar, ScalarLike};
 pub use complex::Complex;
 pub use vector::MathVector;
 pub use matrix::Matrix;
@@ -92,9 +92,9 @@ impl Div for VariableUnion {
     }
 }
 
-impl From<Scalar> for VariableUnion {
-    fn from(value: Scalar) -> Self {
-        Self::Sca(value)
+impl<T> From<T> for VariableUnion where T: ScalarLike {
+    fn from(value: T) -> Self {
+        Self::Sca(Scalar::new(value))
     }
 }
 impl From<Complex> for VariableUnion {
@@ -162,9 +162,9 @@ pub enum VariableUnionRef<'a> {
     Mat(&'a Matrix)
 }
 
-impl From<Scalar> for VariableUnionRef<'_> {
-    fn from(value: Scalar) -> Self {
-        Self::Sca(value)
+impl<T> From<T> for VariableUnionRef<'_> where T: ScalarLike{
+    fn from(value: T) -> Self {
+        Self::Sca(Scalar::new(value))
     }
 }
 impl<'a> From<&'a Scalar> for VariableUnionRef<'a> {
