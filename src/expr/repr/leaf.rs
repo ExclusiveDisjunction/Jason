@@ -102,7 +102,7 @@ impl ASTNode for ASTLeafNodeKind {
 }
 impl Display for ASTLeafNodeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x: &ASTNode = self.as_ref();
+        let x: &dyn ASTNode = self.as_ref();
         x.display(f)
     }
 }

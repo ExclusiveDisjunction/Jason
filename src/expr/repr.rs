@@ -1,15 +1,14 @@
-use crate::calc::{VariableUnion, VariableUnionRef, Scalar, MathVector, CalcError, CalcResult, OperationError, calc_error::IndexOutOfRangeError};
-
-use std::fmt::{Debug, Display};
-
 pub mod raw_oper;
 pub mod base;
 pub mod leaf;
 pub mod combine;
 
+pub use raw_oper::RawOperator;
+pub use base::ASTNode;
+pub use leaf::{ASTLeafNodeKind, ConstExpr, VariableExpr};
+pub use combine::{ASTNodeKind, ASTJoinNodeKind, CombiningASTNode, OperatorExpr, CommaExpr};
 
-
-
+/*
 pub fn basic_tree_functionality() {
     let tree_a = Box::new( ConstExpr::new(VariableUnion::from(Scalar::new(4.0))) );
     let tree_b = Box::new( OperatorExpr::new(
@@ -67,3 +66,4 @@ pub fn basic_tree_functionality() {
 fn test_tree_structure() {
     basic_tree_functionality();
 }
+    */

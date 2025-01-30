@@ -1,6 +1,5 @@
-use calc::functions::function_base::test_func_display;
 //use std::io::{stdin, stdout, Write};
-use expr::repr::basic_tree_functionality;
+//use expr::repr::basic_tree_functionality;
 
 use crate::core::version::JASON_CURRENT_VERSION;
 use crate::core::logger::{logging, LoggerLevel};
@@ -47,7 +46,7 @@ fn main() -> Result<(), String> {
     }
 
     println!("Starting testing");
-    test_func_display();
+    //test_func_display();
 
     /*
     println!("Jason CLI mode: If you need help, type 'help' or 'help [command]' to review topics about a list of commands, info about a command.\n");

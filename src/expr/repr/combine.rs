@@ -1,5 +1,5 @@
 use super::{base::ASTNode, leaf::ASTLeafNodeKind, raw_oper::RawOperator};
-use crate::calc::{VariableUnion, VariableUnionRef, CalcResult, CalcError};
+use crate::calc::{VariableUnion, CalcResult, CalcError, calc_error::OperationError};
 
 use std::fmt::{Display, Debug};
 
@@ -7,9 +7,91 @@ pub enum ASTNodeKind {
     Join(ASTJoinNodeKind),
     Leaf(ASTLeafNodeKind)
 }
+impl ASTNode for ASTNodeKind {
+    fn evaluate(&self, on: &[VariableUnion]) -> CalcResult<VariableUnion> {
+        match self {
+            Self::Join(j) => j.evaluate(on),
+            Self::Leaf(l) => l.evaluate(on)
+        }
+    }
+
+    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Join(j) => j.display(f),
+            Self::Leaf(l) => l.display(f)
+        }
+    }
+    fn to_string(&self) -> String {
+        match self {
+            Self::Join(j) => j.to_string(),
+            Self::Leaf(l) => (l as &dyn ASTNode).to_string()
+        }
+    }
+}
+impl CombiningASTNode for ASTNodeKind {
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>> {
+        match self {
+            Self::Join(j) => j.evaluate_list(on),
+            Self::Leaf(l) => Ok( vec![ l.evaluate(on)? ] )
+        }
+    }
+
+    fn left(&self) -> Option<&ASTNodeKind> {
+        match self {
+            Self::Join(j) => j.left(),
+            Self::Leaf(_) => None
+        }
+    }
+    fn right(&self) -> Option<&ASTNodeKind> {
+        match self {
+            Self::Join(j) => j.right(),
+            Self::Leaf(_) => None
+        }
+    }
+
+    fn set_left(&mut self, new: ASTNodeKind) {
+        match self {
+            Self::Join(j) => j.set_left(new),
+            Self::Leaf(_) => ()
+        }
+    }
+    fn set_right(&mut self, new: ASTNodeKind) {
+        match self {
+            Self::Join(j) => j.set_right(new),
+            Self::Leaf(_) => ()
+        }
+    }
+
+    fn print_self(&self, kind: PrintKind) -> String {
+        match self {
+            Self::Join(j) => j.print_self(kind),
+            Self::Leaf(s) => (s as &dyn ASTNode).to_string()
+        }
+    }
+}
+impl Display for ASTNodeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.display(f)
+    }
+}
+impl Debug for ASTNodeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+}
+impl From<ASTLeafNodeKind> for ASTNodeKind {
+    fn from(value: ASTLeafNodeKind) -> Self {
+        Self::Leaf(value)
+    }
+}
+impl From<ASTJoinNodeKind> for ASTNodeKind {
+    fn from(value: ASTJoinNodeKind) -> Self {
+        Self::Join(value)
+    }
+}
 
 #[derive(Clone, Copy, PartialEq)]
-enum PrintKind {
+pub enum PrintKind {
     Preorder,
     Inorder,
     Postorder
@@ -43,29 +125,24 @@ impl PrintKind {
     }
 }
 
-pub trait CombiningASTNode: ASTNode{
+pub trait CombiningASTNode: ASTNode {
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>>;
+
+    /// Returns the left node for our combination.
     fn left(&self) -> Option<&ASTNodeKind>;
+    /// Returns the right node for our combination
     fn right(&self) -> Option<&ASTNodeKind>;
 
+    /// Sets the left node. The implementer may ignore this, and calling this does not imply that self.left() will return the value stored here.
     fn set_left(&mut self, new: ASTNodeKind);
+    /// Sets the right node. The implementer may ignore this, and calling this does not imply that self.right() will return the value stored here.
     fn set_right(&mut self, new: ASTNodeKind);
 
-    fn left_print(&self, kind: PrintKind) -> Option<String> {
-        let x = self.left()?;
-        match x {
-            ASTNodeKind::Join(j) => Some(j.print_self(kind)),
-            ASTNodeKind::Leaf(l) => Some(l.to_string())
-        }
-    }
-    fn right_print(&self, kind: PrintKind) -> Option<String> {
-        let x = self.right()?;
-        match x {
-            ASTNodeKind::Join(j) => Some(j.print_self(kind)),
-            ASTNodeKind::Leaf(l) => Some(l.to_string())
-        }
-    }
     fn print_self(&self, kind: PrintKind) -> String {
-        kind.join_strings(self.left_print(kind), self.to_string(), self.right_print(kind))
+        let left = self.left().map(|x| x.print_self(kind) );
+        let right = self.right().map(|x| x.print_self(kind) );
+
+        kind.join_strings(left, self.to_string(), right)
     }
 }
 
@@ -76,17 +153,34 @@ pub enum ASTJoinNodeKind {
 }
 impl ASTNode for ASTJoinNodeKind {
     fn evaluate(&self, on: &[VariableUnion]) -> Result<VariableUnion, CalcError> {
-        todo!()
+        match self {
+            Self::Operator(o) => o.evaluate(on),
+            Self::Comma(c) => c.evaluate(on),
+            Self::Other(o) => o.evaluate(on)
+        }
     }
 
     fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Self::Operator(o) => o.display(f),
+            Self::Comma(c) => c.display(f),
+            Self::Other(o) => o.display(f)
+        }
     }
     fn to_string(&self) -> String {
-        todo!()
+        match self {
+            Self::Operator(o) => o.to_string(),
+            Self::Comma(c) => (c as &dyn ASTNode).to_string(),
+            Self::Other(o) => o.to_string()
+        }
     }
 }
 impl CombiningASTNode for ASTJoinNodeKind {
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>> {
+       let x: &dyn CombiningASTNode = self.as_ref();
+       x.evaluate_list(on)
+    }
+
     fn left(&self) -> Option<&ASTNodeKind> {
         let x: &dyn CombiningASTNode = self.as_ref();
         x.left()
@@ -110,16 +204,7 @@ impl<'a> AsRef<dyn CombiningASTNode + 'a> for ASTJoinNodeKind {
         match self {
             Self::Operator(x) => x,
             Self::Comma(c) => c,
-            Self::Other(b) => b
-        }
-    }
-}
-impl<'a> AsRef<dyn ASTNode + 'a> for ASTJoinNodeKind {
-    fn as_ref(&self) -> &(dyn ASTNode + 'a) {
-        match self {
-            Self::Operator(x) => x,
-            Self::Comma(c) => c,
-            Self::Other(b) => (b.as_ref() as &(dyn ASTNode + 'a))
+            Self::Other(b) => b.as_ref()
         }
     }
 }
@@ -128,15 +213,15 @@ impl<'a> AsMut<dyn CombiningASTNode + 'a> for ASTJoinNodeKind {
         match self {
             Self::Operator(x) => x,
             Self::Comma(c) => c,
-            Self::Other(b) => b
+            Self::Other(b) => b.as_mut()
         }
     }
 }
 
 pub struct OperatorExpr {
     data: RawOperator,
-    left: Box<dyn ASTNode>,
-    right: Box<dyn ASTNode>
+    left: Box<ASTNodeKind>,
+    right: Box<ASTNodeKind>
 }
 impl ASTNode for OperatorExpr {
     fn evaluate(&self, on: &[VariableUnion]) -> Result<VariableUnion, CalcError>{
@@ -154,30 +239,76 @@ impl ASTNode for OperatorExpr {
     }
 }
 impl CombiningASTNode for OperatorExpr {
-    fn left(&self) -> Option<&dyn ASTNode> {
-        Some(self.left.as_ref())
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>> {
+        Ok( vec![ self.evaluate(on)? ] )
     }
-    fn right(&self) -> Option<&dyn ASTNode> {
-        Some(self.right.as_ref())
+
+    fn left(&self) -> Option<&ASTNodeKind> {
+        Some(& self.left )
+    }
+    fn right(&self) -> Option<&ASTNodeKind> {
+        Some( &self.right)
     }
 
     fn set_left(&mut self, new: ASTNodeKind) {
-        
+        self.left = Box::new(new);
     }
     fn set_right(&mut self, new: ASTNodeKind) {
-        
+        self.right = Box::new(new);
     }
 }
 impl OperatorExpr {
-    pub fn new(oper: RawOperator, left: Box<dyn ASTNode>, right: Box<dyn ASTNode>) -> Self {
+    pub fn new(oper: RawOperator, left: ASTNodeKind, right: ASTNodeKind) -> Self {
         Self {
             data: oper,
-            left,
-            right
+            left: Box::new(left),
+            right: Box::new(right)
         }
     }
 }
 
 pub struct CommaExpr {
+    left: Box<ASTNodeKind>,
+    right: Box<ASTNodeKind>
+}
+impl ASTNode for CommaExpr {
+    fn evaluate(&self, _: &[VariableUnion]) -> CalcResult<VariableUnion> {
+        Err( CalcError::from( OperationError::new_fmt(",", &self.left, &self.right, Some("comma can not be combined on one object")) ) )
+    }
 
+    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+    fn to_string(&self) -> String {
+        format!("{}", self)
+    }
+}
+impl Display for CommaExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {}", &self.left, &self.right)
+    }
+}
+impl CombiningASTNode for CommaExpr {
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>> {
+        Ok(
+            vec![
+                self.left.evaluate(on)?,
+                self.right.evaluate(on)?
+            ]
+        )
+    }
+
+    fn left(&self) -> Option<&ASTNodeKind> {
+        Some(&self.left)
+    }
+    fn right(&self) -> Option<&ASTNodeKind> {
+        Some(&self.right)
+    }
+
+    fn set_left(&mut self, new: ASTNodeKind) {
+        self.left = Box::new(new);
+    }
+    fn set_right(&mut self, new: ASTNodeKind) {
+        self.right = Box::new(new);
+    }
 }
