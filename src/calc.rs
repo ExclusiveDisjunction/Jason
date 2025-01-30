@@ -4,6 +4,7 @@ pub mod vector;
 pub mod matrix;
 pub mod variable_type;
 pub mod calc_error;
+pub mod functions;
 
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug};

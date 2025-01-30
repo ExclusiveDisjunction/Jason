@@ -8,6 +8,20 @@ pub enum VariableType {
     Vector,
     Matrix
 }
+impl Display for VariableType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f, 
+            "{}",
+            match self {
+                Self::Scalar => "Scalar",
+                Self::Complex => "Complex",
+                Self::Vector => "Vector",
+                Self::Matrix => "Matrix"
+            }
+        )
+    }
+}
 
 
 pub trait VariableData: Display + Debug + Clone + Serialize + for<'a> Deserialize<'a> + Default {
