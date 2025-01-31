@@ -1,6 +1,8 @@
-use crate::calc::calc_error::{CalcError, ArgCountError, ArgTypeError, OperationError};
-use crate::calc::scalar::ScalarLike;
-use crate::calc::{VariableUnion, CalcResult, VariableType, VariableData};
+use crate::{calc::{
+    calc_error:: {
+        ArgCountError, ArgTypeError, CalcError, OperationError
+    }, scalar::ScalarLike, CalcResult, VariableData, VariableType, VariableUnion
+}, expr::repr::{ASTLeafNodeKind, ConstExpr, RawOperator, VariableExpr, OperatorExpr, ASTJoinNodeKind}};
 use crate::expr::repr::{ASTNode, ASTNodeKind, CombiningASTNode, combine::PrintKind};
 
 use std::fmt::{Display, Debug};
@@ -242,7 +244,7 @@ pub fn make_standard_functions() -> Vec<ImplBasedFunction> {
 
         match (&on[0], &on[1]) {
             (VariableUnion::Vec(a), VariableUnion::Vec(b)) => Ok( VariableUnion::from( a.dot_product(b)? ) ),
-            (a, b) => Err( CalcError::from( OperationError::new_fmt("log", a, b, None) ) )
+            (a, b) => Err( CalcError::from( OperationError::new_fmt("dot", a, b, None) ) )
         }
     };
 
@@ -300,4 +302,26 @@ pub fn test_func_display() {
         );
 
     println!("Signature is: {}", &sig);
+}
+
+#[test]
+fn test_ast_based_function() {
+    let ast = ASTNodeKind::Join(
+        ASTJoinNodeKind::Operator(
+            OperatorExpr::new(
+                RawOperator::new('*').unwrap(),
+                ASTNodeKind::from(
+                    ASTLeafNodeKind::Const( ConstExpr::new(VariableUnion::from(4.0)) )
+                ),
+                ASTNodeKind::from(
+                    ASTLeafNodeKind::Var( VariableExpr::new( 'x', 0) )
+                )
+            )
+        )
+    );
+
+    let func = ASTBasedFunction::new("f", ast, FunctionArgSignature::from(ArgSignature::new(VariableType::Scalar, "x")));
+
+    let on = vec![VariableUnion::from(3.0)];
+    assert_eq!(func.evaluate(&on), Ok(VariableUnion::from(3.0 * 4.0)));
 }
