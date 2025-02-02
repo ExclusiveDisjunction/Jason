@@ -2,6 +2,7 @@ pub mod raw_oper;
 pub mod base;
 pub mod leaf;
 pub mod combine;
+mod poly;
 
 pub use raw_oper::RawOperator;
 pub use base::ASTNode;

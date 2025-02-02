@@ -1,7 +1,7 @@
 use std::fmt::{Display, Debug};
 
-use super::base::ASTNode;
-use crate::calc::{VariableUnion, CalcResult, CalcError, calc_error::IndexOutOfRangeError};
+use super::base::{ASTNode, PrintKind};
+use crate::calc::{VariableUnion, CalcResult, CalcError, calc_error::{IndexOutOfRangeError, OperationError}};
 
 pub struct ConstExpr {
     value: VariableUnion
@@ -9,7 +9,7 @@ pub struct ConstExpr {
 
 impl Display for ConstExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (&self.value as &dyn Display).fmt(f)
+        write!(f, "{}", &self.value)
     }
 }
 impl Debug for ConstExpr {
@@ -23,11 +23,8 @@ impl ASTNode for ConstExpr {
         Ok(self.value.clone())
     }
 
-    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-       (self as &dyn Display).fmt(f)
-    }
-    fn to_string(&self) -> String {
-        format!("{}", &self.value)
+    fn print_self(&self, kind: PrintKind) -> String {
+        format!("{}", self)
     }
 }
 impl ConstExpr {
@@ -64,11 +61,8 @@ impl ASTNode for VariableExpr {
         }
     }
 
-    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
-    }
-    fn to_string(&self) -> String {
-        format!("{}", self.symbol)
+    fn print_self(&self, kind: PrintKind) -> String  {
+        format!("{}", self)
     }
 }
 impl VariableExpr {
@@ -80,38 +74,27 @@ impl VariableExpr {
     }
 }
 
-pub enum ASTLeafNodeKind {
-    Const(ConstExpr),
-    Var(VariableExpr),
-    Other(Box<dyn ASTNode>)
+pub struct RawLeafExpr {
+    contents: String
 }
-impl ASTNode for ASTLeafNodeKind {
-    fn evaluate(&self, on: &[VariableUnion]) -> Result<VariableUnion, CalcError> {
-        let x: &dyn ASTNode = self.as_ref();
-        x.evaluate(on)
+
+impl Display for RawLeafExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.contents)
+    }
+}
+impl Debug for RawLeafExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+}
+
+impl ASTNode for RawLeafExpr {
+    fn evaluate(&self, _: &[VariableUnion]) -> CalcResult<VariableUnion> {
+        Err(OperationError::new("eval", "raw expression".to_string(), String::new(), Some("cannot evaluate a raw expression")).into())
     }
 
-    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x: &dyn ASTNode = self.as_ref();
-        x.display(f)
-    }
-    fn to_string(&self) -> String {
-        let x: &dyn ASTNode = self.as_ref();
-        x.to_string()
-    }
-}
-impl Display for ASTLeafNodeKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x: &dyn ASTNode = self.as_ref();
-        x.display(f)
-    }
-}
-impl<'a> AsRef<dyn ASTNode + 'a> for ASTLeafNodeKind {
-    fn as_ref(&self) -> &(dyn ASTNode + 'a) {
-        match self {
-            Self::Const(c) => c,
-            Self::Var(v) => v,
-            Self::Other(b) => b.as_ref()
-        }
+    fn print_self(&self, kind: PrintKind) -> String {
+        format!("{}", self)
     }
 }
