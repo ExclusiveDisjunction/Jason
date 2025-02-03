@@ -152,6 +152,16 @@ impl VariableUnion {
             Self::Mat(s) => VariableUnionRefMut::Mat(s)
         }
     }
+
+    pub fn pow(self, rhs: Self) -> CalcResult<Self> {
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok( a.pow(b).into() ),
+            (Self::Cmp(a), Self::Sca(b)) => Ok( a.pow_sca(b).into() ),
+            (Self::Cmp(a), Self::Cmp(b)) => Ok( a.pow(&b).into() ),
+            (Self::Mat(a), Self::Sca(b)) => a.pow(b).map( VariableUnion::from ),
+            (a, b) => Err(OperationError::new_fmt('^', &a, &b, None).into())
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -338,6 +348,18 @@ impl Div for VariableUnionRef<'_> {
             (Self::Vec(a), Self::Sca(b)) => Ok(VariableUnion::Vec(a / b)),
             (Self::Mat(a), Self::Sca(b)) => Ok(VariableUnion::Mat(a / b)),
             (a, b) => Err(CalcError::Oper(OperationError::new_fmt("/", &a, &b, Some("operator not defined"))))
+        }
+    }
+}
+
+impl VariableUnionRef<'_> {
+    pub fn pow(self, rhs: Self) -> CalcResult<VariableUnion> {
+        match (self, rhs) {
+            (Self::Sca(a), Self::Sca(b)) => Ok( a.pow(b).into() ),
+            (Self::Cmp(a), Self::Sca(b)) => Ok( a.pow_sca(b).into() ),
+            (Self::Cmp(a), Self::Cmp(b)) => Ok( a.pow(b).into() ),
+            (Self::Mat(a), Self::Sca(b)) => a.pow(b).map(VariableUnion::from ),
+            (a, b) => Err(OperationError::new_fmt('^', &a, &b, None).into())
         }
     }
 }

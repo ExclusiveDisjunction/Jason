@@ -1,7 +1,7 @@
 use super::variable_type::*;
-use super::scalar::ScalarLike;
+use super::scalar::{Scalar, ScalarLike};
 use super::vector::MathVector;
-use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError};
+use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError, OperationError, FeatureError, FeatureErrKind, FeatureReason, CalcError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
@@ -581,6 +581,44 @@ impl Matrix {
         }
         
         Ok(result)
+    }
+
+    pub fn pow<T>(&self, b: T) -> Result<Self, CalcError> where T: ScalarLike {
+        let b = Scalar::new(b);
+        if !self.is_square() {
+            return Err(OperationError::new_fmt("^", &self, &b, Some("matrix must be square")).into())
+        }
+
+        if let Some(mut r) = b.is_rounded(0.003) {
+            let mut acting: Matrix;
+
+            if r == 0 {
+                return Ok( Matrix::identity(self.rows()) );
+            }
+            else if r == 1 {
+                return Ok( self.clone() );
+            }
+            else if r < 0 {
+                acting = match self.inverse() {
+                    Some(s) => s,
+                    None => return Err(OperationError::new_fmt("^", &self, &b, Some("inverse matrix is not valid")).into())
+                }
+            }
+            else {
+                acting = self.clone();
+            }
+
+            r = r.abs();
+            for _ in 0..r {
+                acting = (&acting * &acting)?;
+            }
+
+            Ok(acting)
+        }
+        else {
+            Err(FeatureError::new("pow", FeatureReason::Complexity, FeatureErrKind::NotPlanned).into())
+        }
+
     }
 }
 

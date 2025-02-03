@@ -141,11 +141,54 @@ impl Complex {
             b
         }
     }
+
     pub fn conjugate(&self) -> Complex {
         Complex::new(self.a, -self.b)
     }
     pub fn mul_conjugate(&self) -> Scalar {
         Scalar::new(self.a.powi(2) + self.b.powi(2))
+    }
+    pub fn argument(&self) -> f64 {
+        self.b.atan2(self.a)
+    }
+    pub fn magnitude(&self) -> f64 {
+        (self.a.powi(2) + self.b.powi(2)).sqrt()
+    }
+
+    pub fn complex_ln(&self) -> Self {
+        Self {
+            a: self.magnitude().ln(),
+            b: self.argument()
+        }
+    }
+
+    pub fn pow_sca<T>(&self, b: T) -> Self where T: ScalarLike {
+        let b = b.as_scalar();
+        let r = self.magnitude().powf(b);
+        let theta = self.argument() * b;
+        
+        let x = (theta).cos() * r;
+        let y = (theta).sin() * r;
+
+        Self {
+            a: x,
+            b: y
+        }
+    }
+    /// Returns the priciple value for the complex number 
+    pub fn pow(&self, b: &Self) -> Self {
+        let top = b * &self.complex_ln();
+
+        //This will take the product of e^(z ln b)
+        let a = top.a;
+        let b = top.b;
+
+        let e = std::f64::consts::E.powf(a);
+
+        Self {
+            a: e * b.cos(),
+            b: e * b.sin()
+        }
     }
 }
 

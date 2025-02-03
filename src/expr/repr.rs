@@ -5,9 +5,10 @@ pub mod combine;
 mod poly;
 
 pub use raw_oper::RawOperator;
-pub use base::ASTNode;
-pub use leaf::{ASTLeafNodeKind, ConstExpr, VariableExpr};
-pub use combine::{ASTNodeKind, ASTJoinNodeKind, CombiningASTNode, OperatorExpr, CommaExpr};
+pub use base::{ASTNode, ASTJoinNode};
+pub use leaf::{RawLeafExpr, ConstExpr, VariableExpr};
+pub use combine::{RawJoinExpr, OperatorExpr, CommaExpr};
+pub use poly::{LeafNodes, JoinedNodes, TotalNodes};
 
 /*
 pub fn basic_tree_functionality() {

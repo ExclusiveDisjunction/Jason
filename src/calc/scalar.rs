@@ -58,6 +58,22 @@ impl Scalar {
             a: a.as_scalar()
         }
     }
+
+    pub fn pow<T>(self, other: T) -> Scalar where T: ScalarLike {
+        Scalar::new( self.a.powf(other.as_scalar() ) )
+    }
+    pub fn round_to_zero(self) -> i64 {
+        self.a.floor() as i64
+    }
+    pub fn is_rounded(self, p: f64) -> Option<i64> {
+        let rounded = self.round_to_zero();
+        if (rounded as f64 - self.a).abs() <= p {
+            Some(rounded)
+        }
+        else {
+            None
+        }
+    }
 }
 
 impl<T> PartialEq<T> for Scalar where T: ScalarLike {

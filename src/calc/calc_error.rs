@@ -71,14 +71,14 @@ pub struct OperationError {
     reason: Option<String>
 }
 impl OperationError {
-    pub fn new(operation: &str, a: String, b: String, reason: Option<&str>) -> Self {
+    pub fn new<S>(operation: S, a: String, b: String, reason: Option<&str>) -> Self where S: ToString {
         Self {
             operation: operation.to_string(),
             on: (a, b),
             reason: reason.map(|r| r.to_string())
         }
     }
-    pub fn new_fmt<T1, T2>(operation: &str, a: &T1, b: &T2, reason: Option<&str>) -> Self where T1: Debug, T2: Debug {
+    pub fn new_fmt<S, T1, T2>(operation: S, a: &T1, b: &T2, reason: Option<&str>) -> Self where S: ToString, T1: Debug, T2: Debug {
         Self {
             operation: operation.to_string(),
             on: (format!("{:?}", a), format!("{:?}", b)),
@@ -151,14 +151,97 @@ impl ArgTypeError {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
+pub struct UndefinedError {
+    reason: String
+}
+impl Display for UndefinedError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the operation is undefined because of '{}'", &self.reason)
+    }
+}
+impl Debug for UndefinedError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
+}
+impl UndefinedError {
+    pub fn new<T>(reason: T) -> Self where T: ToString{
+        Self {
+            reason: reason.to_string()
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum FeatureErrKind {
+    /// Will be released later
+    Future,
+    /// No proper decision has been made
+    NotPlanned,
+    /// This feature will not be made
+    Never
+}
+#[derive(Clone, Copy, PartialEq)]
+pub enum FeatureReason {
+    Complexity,
+    Planning,
+    Deadline
+}
+impl Display for FeatureReason {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Complexity => "computational complexity",
+                Self::Planning => "need for planning",
+                Self::Deadline => "deadline constraint(s)"
+            }
+        )
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct FeatureError {
+    kind: FeatureErrKind,
+    name: String,
+    reason: FeatureReason
+}
+impl Display for FeatureError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f, 
+            "the feature '{}' is not availiable, due to {}. This feature {}",
+            &self.name,
+            &self.reason,
+            match self.kind {
+                FeatureErrKind::Future => "will be released later.",
+                FeatureErrKind::NotPlanned => "may or may not be released later.",
+                FeatureErrKind::Never => "will not be released."
+            })
+    }
+}
+impl FeatureError {
+    pub fn new<T>(name: T, reason: FeatureReason, kind: FeatureErrKind) -> Self where T: ToString {
+        Self {
+            name: name.to_string(),
+            kind,
+            reason
+        }
+    }
+}
+
+#[derive(PartialEq)]
 pub enum CalcError {
     Index(IndexOutOfRangeError<usize>),
     MatDim(DimensionError<MatrixDimension>),
     Dim(DimensionError<usize>),
     Oper(OperationError),
     ArgCount(ArgCountError),
-    ArgType(ArgTypeError)
+    ArgType(ArgTypeError),
+    Undefined(UndefinedError),
+    Feature(FeatureError)
 }
 
 impl From<IndexOutOfRangeError<usize>> for CalcError {
@@ -191,6 +274,16 @@ impl From<ArgTypeError> for CalcError {
         Self::ArgType(value)
     }
 }
+impl From<UndefinedError> for CalcError {
+    fn from(value: UndefinedError) -> Self {
+        Self::Undefined(value)
+    }
+}
+impl From<FeatureError> for CalcError {
+    fn from(value: FeatureError) -> Self {
+        Self::Feature(value)
+    }
+}
 
 impl Display for CalcError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -200,8 +293,16 @@ impl Display for CalcError {
             Self::MatDim(a) => a as &dyn Display,
             Self::Oper(a) => a as &dyn Display,
             Self::ArgCount(a) => a as &dyn Display,
-            Self::ArgType(a) => a as &dyn Display
+            Self::ArgType(a) => a as &dyn Display,
+            Self::Undefined(a) => a as &dyn Display,
+            Self::Feature(a) => a as &dyn Display
+
         }.fmt(f)
+    }
+}
+impl Debug for CalcError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
     }
 }
 
