@@ -1,8 +1,9 @@
 pub use crate::expr::repr::{ASTNode, ASTJoinNode, TreeOrderTraversal};
-use crate::calc::calc_error::{ArgCountError, ArgTypeError, OperationError, CalcError, CalcResult};
+use crate::calc::calc_error::{ArgCountError, ArgTypeError, CalcError, CalcResult};
 use crate::calc::{ScalarLike, VariableData, VariableType, VariableUnion};
 
 use std::fmt::{Display, Debug};
+use std::iter::zip;
 
 pub trait FunctionBase {
     fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion>;
@@ -33,6 +34,13 @@ impl ArgSignature {
             name: name.to_string()
         }
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn kind(&self) -> VariableType {
+        self.input_kind
+    }
 }
 
 #[derive(Clone, Default, PartialEq)]
@@ -56,6 +64,35 @@ impl From<ArgSignature> for FunctionArgSignature {
     fn from(value: ArgSignature) -> Self {
         Self {
             sig: vec![ value ]
+        }
+    }
+}
+impl FunctionArgSignature {
+    /// Determines if the signatures stored in `on` are valid against the signature. If this function returns Ok, there is a total guarentee that the data stored in `on` matches what the function "expects", so long as the signature is valid for the function.
+    pub fn validate(&self, on: &[VariableUnion]) -> Result<(), CalcError> {
+        /*
+            There are a few checks.
+            1. The size must match the size of sig.
+            2. For each argument, the type of each argument, in order, should match. 
+         */
+
+        if on.len() != self.sig.len() {
+            Err( ArgCountError::new(self.sig.len(), on.len()).into() )
+        }
+        else {
+            for (a, b) in zip(on.iter(), self.sig.iter()) {
+                if a.get_type() != b.kind() {
+                    return Err( ArgTypeError::new(a.get_type(), b.kind(), b.name()).into() )
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    pub fn just_x() -> Self {
+        Self {
+            sig: vec![ArgSignature::new(VariableType::Scalar, 'x')]
         }
     }
 }
@@ -192,53 +229,43 @@ impl FunctionBase for Function {
 
 pub fn make_standard_functions() -> Vec<ImplBasedFunction> {
     let cos_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        if on.len() != 1 {
-            return Err(CalcError::from(ArgCountError::new(1, on.len())));
-        }
+        sig.validate(on)?;
 
         match &on[0] {
-            VariableUnion::Sca(a) => Ok( VariableUnion::from(a.as_scalar().cos()) ),
-            b => Err( CalcError::from(ArgTypeError::new(VariableType::Scalar, b.get_type()) ))
+            VariableUnion::Sca(a) => Ok( a.as_scalar().cos().into() ),
+            _ => panic!() //This cannot happen
         }
     };
     let sin_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        if on.len() != 1 {
-            return Err(CalcError::from(ArgCountError::new(1, on.len())));
-        }
+        sig.validate(on)?;
 
         match &on[0] {
-            VariableUnion::Sca(a) => Ok( VariableUnion::from(a.as_scalar().sin()) ),
-            b => Err( CalcError::from(ArgTypeError::new(VariableType::Scalar, b.get_type()) ))
+            VariableUnion::Sca(a) => Ok( a.as_scalar().sin().into() ),
+            _ => panic!() //This cannot happen
         }
     };
     let ln_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        if on.len() != 1 {
-            return Err(CalcError::from(ArgCountError::new(1, on.len())));
-        }
+        sig.validate(on)?;
 
         match &on[0] {
-            VariableUnion::Sca(a) => Ok( VariableUnion::from(a.as_scalar().ln()) ),
-            b => Err( CalcError::from(ArgTypeError::new(VariableType::Scalar, b.get_type()) ))
+            VariableUnion::Sca(a) => Ok( a.as_scalar().ln().into() ),
+            _ => panic!() //This cannot happen
         }
     };
     let log_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        if on.len() != 2 {
-            return Err(CalcError::from(ArgCountError::new(2, on.len())));
-        }
+        sig.validate(on)?;
 
         match (&on[0], &on[1]) {
-            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( VariableUnion::from(a.as_scalar().log(b.as_scalar())) ),
-            (a, b) => Err( CalcError::from( OperationError::new_fmt("log", a, b, None) ) )
+            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( a.as_scalar().log(b.as_scalar()).into() ),
+            _ => panic!() //This cannot happen
         }
     };
     let dot_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        if on.len() != 2 {
-            return Err(CalcError::from(ArgCountError::new(2, on.len())));
-        }
+        sig.validate(on)?;
 
         match (&on[0], &on[1]) {
             (VariableUnion::Vec(a), VariableUnion::Vec(b)) => Ok( VariableUnion::from( a.dot_product(b)? ) ),
-            (a, b) => Err( CalcError::from( OperationError::new_fmt("dot", a, b, None) ) )
+            _ => panic!() // Cannot happen
         }
     };
 
@@ -287,6 +314,165 @@ pub fn make_standard_functions() -> Vec<ImplBasedFunction> {
     ]
 }
 
+pub struct StandardFunctions { }
+impl StandardFunctions {
+    //Implementations
+    pub fn cos_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().cos().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn acos_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().acos().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn sin_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().sin().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn asin_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().asin().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn tan_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().tan().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn atan_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().atan().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn atan2_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match (&on[0], &on[1]) {
+            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( a.as_scalar().atan2(b.as_scalar()).into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+
+    pub fn ln_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().ln().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn nlog_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match &on[0] {
+            VariableUnion::Sca(a) => Ok( a.as_scalar().log10().into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn log_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match (&on[0], &on[1]) {
+            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( a.as_scalar().log(b.as_scalar()).into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+
+    pub fn dot_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match (&on[0], &on[1]) {
+            (VariableUnion::Vec(a), VariableUnion::Vec(b)) => Ok( a.dot_product(b)?.into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+    pub fn cross_proc(on: &[VariableUnion], sig: &FunctionArgSignature) -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match (&on[0], &on[1]) {
+            (VariableUnion::Vec(a), VariableUnion::Vec(b)) => Ok( a.cross_product(b)?.into() ),
+            _ => panic!() //This cannot happen
+        }
+    }
+
+    //Functions
+    pub fn cos_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "cos",
+            StandardFunctions::cos_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn acos_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "acos",
+            StandardFunctions::acos_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn sin_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "sin",
+            StandardFunctions::sin_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn asin_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "asin",
+            StandardFunctions::asin_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn tan_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "tan",
+            StandardFunctions::tan_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn atan_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "atan",
+            StandardFunctions::atan_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn atan2_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "atan2",
+            StandardFunctions::atan2_proc,
+            vec![ArgSignature::new(VariableType::Scalar, 'y'), ArgSignature::new(VariableType::Scalar, 'x')].into()
+        )
+    }
+
+    //All
+    pub fn get_all() -> Vec<ImplBasedFunction> {
+
+    }
+}
+
 pub fn test_func_display() {
     let sig = FunctionArgSignature::from(
         vec![
@@ -318,4 +504,33 @@ fn test_ast_based_function() {
 
     let on = vec![VariableUnion::from(3.0)];
     assert_eq!(func.evaluate(&on), Ok(VariableUnion::from(3.0 * 4.0)));
+}
+
+#[test]
+fn test_impl_based_function() {
+    let log_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
+        sig.validate(on)?;
+
+        match (&on[0], &on[1]) {
+            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( a.as_scalar().log(b.as_scalar()).into() ),
+            _ => panic!() //This cannot happen
+        }
+    };
+
+    let func = ImplBasedFunction::new(
+        "log",
+        log_func,
+        FunctionArgSignature::from(
+            vec![
+                ArgSignature::new(VariableType::Scalar, "x"),
+                ArgSignature::new(VariableType::Scalar, "b")
+            ]
+        )
+    );
+
+    let a = 64.0f64;
+    let b = 2.0f64;
+    let on: Vec<VariableUnion> = vec![a.into(), b.into()];
+
+    assert_eq!(func.evaluate(&on), Ok(a.log(b).into()));
 }

@@ -130,11 +130,12 @@ impl ArgCountError {
 #[derive(Clone, PartialEq)]
 pub struct ArgTypeError {
     expected: VariableType,
-    got: VariableType
+    got: VariableType,
+    target: String
 }
 impl Display for ArgTypeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "expected an argument of type {}, got an argument of {}", &self.expected, &self.got)
+        write!(f, "expected an argument of type {} for '{}', got an argument of {}", &self.expected, &self.target, &self.got)
     }
 }
 impl Debug for ArgTypeError {
@@ -143,10 +144,11 @@ impl Debug for ArgTypeError {
     }
 }
 impl ArgTypeError {
-    pub fn new(expected: VariableType, got: VariableType) -> Self{
+    pub fn new<S>(expected: VariableType, got: VariableType, target: S) -> Self where S: ToString{
         Self {
             expected,
-            got
+            got,
+            target: target.to_string() 
         }
     }
 }
