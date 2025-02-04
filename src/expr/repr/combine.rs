@@ -39,7 +39,7 @@ impl ASTJoinNode for OperatorExpr {
     }
 }
 impl OperatorExpr {
-    pub fn new<T, U>(oper: RawOperator, left: Box<dyn ASTNode>, right: Box<dyn ASTNode>) -> Self {
+    pub fn new(oper: RawOperator, left: Box<dyn ASTNode>, right: Box<dyn ASTNode>) -> Self {
         Self {
             data: oper,
             left,

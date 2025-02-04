@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Display};
 use crate::calc::{VariableUnion, VariableUnionRef, CalcResult, OperationError};
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy)]
+/// Represents different operators as a symbol and a rank.
+/// Note that this classes comparisons (PartialEq, Eq, PartialOrd, Ord) all rely on the ***rank***, not the ***symbol***. Therefore `RawOperator::Plus == RawOperator::Minus` is true because they have the same rank. To equal based on characters, call the `eq_symbol` function.
 pub enum RawOperator {
     Plus,
     Minus,
@@ -26,7 +28,26 @@ impl Debug for RawOperator {
         write!(f, "{} rank: {}", self.symbol(), self.rank())
     }
 }
+
+impl PartialEq for RawOperator {
+    fn eq(&self, other: &Self) -> bool {
+        self.rank() == other.rank()
+    }
+}
+impl Eq for RawOperator { }
+impl PartialOrd for RawOperator {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for RawOperator {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rank().cmp(&other.rank())
+    }
+}
+
 impl RawOperator {
+    /// Attempts to resolve the symbol provided, returning an instance of this enum. if the symbol could not be resolved, this returns `None`. 
     pub fn lookup(symbol: char) -> Option<Self> {
         match symbol {
             '+' => Some(Self::Plus),
@@ -45,6 +66,7 @@ impl RawOperator {
         }
     }
 
+    /// Determines the operator rank (lower is less).
     pub fn rank(&self) -> u8 {
         match self {
             Self::Plus | Self::Minus => 1,
@@ -53,6 +75,7 @@ impl RawOperator {
             Self::Comma => 4
         }
     }
+    /// Gets the symbol associated with the current operator.
     pub fn symbol(&self) -> char {
         match self {
             Self::Plus => '+',
@@ -69,10 +92,12 @@ impl RawOperator {
             Self::Comma => ','
         }
     }
+    /// Returns the symbol and rank.
     pub fn properties(&self) -> (char, u8) {
         (self.symbol(), self.rank())
     }
 
+    /// Applies the operator to two `VariableUnionRef` instances.
     pub fn apply(&self, a: VariableUnionRef<'_>, b: VariableUnionRef<'_>) -> CalcResult<VariableUnion> {
         match self {
             Self::Plus => a + b,
@@ -83,6 +108,7 @@ impl RawOperator {
             _ => Err(OperationError::new_fmt(self.symbol(), &a, &b, None).into())
         }
     }
+    /// Applies the operator to two `VariableUnion` instances.
     pub fn apply_owned(&self, a: VariableUnion, b: VariableUnion) -> CalcResult<VariableUnion> {
         match self {
             Self::Plus => a + b,
@@ -91,6 +117,30 @@ impl RawOperator {
             Self::Div => a / b,
             Self::Pow => a.pow(b),
             _ => Err(OperationError::new_fmt(self.symbol(), &a, &b, None).into())
+        }
+    }
+
+    pub fn eq_symbol(&self, other: &Self) -> bool {
+        self.symbol() == other.symbol()
+    }
+    /// Determines if the `other` RawOperator is the closing pair to the current. This only applies to braces.
+    /// For example, if `self` is `RawOperator::LBrace`, and other is `RawOperator::RBrace`, this returns true.
+    pub fn closing_pair_symbol(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::LBrace, Self::RBrace) => true,
+            (Self::LCBrace, Self::RCBrace) => true,
+            (Self::LBBrace, Self::LBBrace) => true,
+            (_, _) => false
+        }
+    }
+    /// Determines if the `other` RawOperator is the opening pair to the current. This only applies to braces.
+    /// For example, if `self` is `RawOperator::RBrace`, and other is `RawOperator::LBrace`, this returns true.
+    pub fn opening_pair_symbol(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::RBrace, Self::LBrace) => true,
+            (Self::RCBrace, Self::LCBrace) => true,
+            (Self::RBBrace, Self::LBBrace) => true,
+            (_, _) => false
         }
     }
 }

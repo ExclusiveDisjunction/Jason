@@ -2,41 +2,42 @@ pub mod raw_oper;
 pub mod base;
 pub mod leaf;
 pub mod combine;
-mod poly;
+pub mod poly;
 
 pub use raw_oper::RawOperator;
-pub use base::{ASTNode, ASTJoinNode};
+pub use base::{ASTNode, ASTJoinNode, TreeOrderTraversal};
 pub use leaf::{RawLeafExpr, ConstExpr, VariableExpr};
 pub use combine::{RawJoinExpr, OperatorExpr, CommaExpr};
 pub use poly::{LeafNodes, JoinedNodes, TotalNodes};
 
-/*
+use crate::calc::{VariableUnion, Scalar, MathVector, CalcError};
+
 pub fn basic_tree_functionality() {
-    let tree_a = Box::new( ConstExpr::new(VariableUnion::from(Scalar::new(4.0))) );
+    let tree_a = Box::new( ConstExpr::new(4.into()) );
     let tree_b = Box::new( OperatorExpr::new(
-        RawOperator::new('*').unwrap(),
+        RawOperator::Mul,
         Box::new(
-            ConstExpr::new(VariableUnion::from(Scalar::new(1.5)))
+            ConstExpr::new(3.into() )
         ),
         Box::new(
-            ConstExpr::new(VariableUnion::from(MathVector::from(vec![1, 2, 3])))
+            ConstExpr::new(MathVector::from(vec![1, 2, 3]).into() )
         )
     ));
     let tree_c = Box::new( OperatorExpr::new( 
-        RawOperator::new('+').unwrap(),
+        RawOperator::Plus,
         Box::new( 
             OperatorExpr::new(
-                RawOperator::new('*').unwrap(),
+                RawOperator::Mul,
                 Box::new(
                     VariableExpr::new('x', 0)
                 ),
                 Box::new(
-                    ConstExpr::new(VariableUnion::from(Scalar::new(4.0)))
+                    ConstExpr::new(4.into() )
                 )
             )
         ),
         Box::new(
-            ConstExpr::new(VariableUnion::from(Scalar::new(1.66)))
+            ConstExpr::new(1.5.into() )
         )
     ));
 
@@ -44,13 +45,13 @@ pub fn basic_tree_functionality() {
     
     println!("Inorder printing:");
     for (i, expr) in our_things.iter().enumerate() {
-        println!("For {i}: {}", expr.print_inorder())
+        println!("For {i}: {}", expr.print_self(TreeOrderTraversal::Inorder))
     }
     println!();
 
     println!("Postorder printing:");
     for (i, expr) in our_things.iter().enumerate() {
-        println!("For {i}: {}", expr.print_postorder())
+        println!("For {i}: {}", expr.print_self(TreeOrderTraversal::Postorder))
     }
     println!();
 
@@ -68,4 +69,3 @@ pub fn basic_tree_functionality() {
 fn test_tree_structure() {
     basic_tree_functionality();
 }
-    */
