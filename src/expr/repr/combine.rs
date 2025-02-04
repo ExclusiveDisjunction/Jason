@@ -15,6 +15,20 @@ impl ASTNode for OperatorExpr {
 
         self.data.apply_owned(left_eval, right_eval)
     }
+    fn evaluate_list(&self, on: &[VariableUnion]) -> CalcResult<Vec<VariableUnion>> {
+        let left = self.left.evaluate_list(on)?;
+        let right = self.right.evaluate_list(on)?;
+
+        if left.len() == 1 && right.len() == 1 { //We can only combine elements together like this
+            let left = left.into_iter().next().unwrap();
+            let right = right.into_iter().next().unwrap();
+
+            self.data.apply_owned(left, right).map(|x| vec![x] )
+        }
+        else {
+            Err( OperationError::new_fmt(self.data.symbol(), &left, &right, Some("operators resulting in lists can only evaluate on left-right lists of length 1")).into() )
+        }
+    }
 
     fn print_self(&self, kind: TreeOrderTraversal) -> String {
         kind.join_strings(Some(self.left.print_self(kind)), self.data.to_string(), Some(self.right.print_self(kind)))

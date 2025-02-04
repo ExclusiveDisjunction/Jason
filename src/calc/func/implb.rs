@@ -1,138 +1,7 @@
-pub use crate::expr::repr::{ASTNode, ASTJoinNode};
-use crate::calc::calc_error::{ArgCountError, ArgTypeError, CalcError, CalcResult};
-use crate::calc::{ScalarLike, VariableData, VariableType, VariableUnion};
-
 use std::fmt::{Display, Debug};
-use std::iter::zip;
 
-pub trait FunctionBase {
-    fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion>;
-
-    fn name(&self) -> &str;
-    fn signature(&self) -> &FunctionArgSignature;
-}
-impl PartialEq for dyn FunctionBase {
-    fn eq(&self, other: &Self) -> bool {
-        self.name() == other.name() && self.signature() == other.signature()
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct ArgSignature {
-    input_kind: VariableType,
-    name: String
-}
-impl Display for ArgSignature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", &self.name, &self.input_kind)
-    }
-}
-impl ArgSignature {
-    pub fn new<T>(kind: VariableType, name: T) -> Self where T: ToString{
-        Self {
-            input_kind: kind,
-            name: name.to_string()
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-    pub fn kind(&self) -> VariableType {
-        self.input_kind
-    }
-}
-
-#[derive(Clone, Default, PartialEq)]
-pub struct FunctionArgSignature {
-    sig: Vec<ArgSignature>
-}
-impl Display for FunctionArgSignature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let desc = self.sig.iter().map(|x| format!("{}", x) ).collect::<Vec<String>>().join(", ");
-        write!(f, "{}", desc)
-    }
-}
-impl From<Vec<ArgSignature>> for FunctionArgSignature {
-    fn from(value: Vec<ArgSignature>) -> Self {
-        Self {
-            sig: value
-        }
-    }
-}
-impl From<ArgSignature> for FunctionArgSignature {
-    fn from(value: ArgSignature) -> Self {
-        Self {
-            sig: vec![ value ]
-        }
-    }
-}
-impl FunctionArgSignature {
-    /// Determines if the signatures stored in `on` are valid against the signature. If this function returns Ok, there is a total guarentee that the data stored in `on` matches what the function "expects", so long as the signature is valid for the function.
-    pub fn validate(&self, on: &[VariableUnion]) -> Result<(), CalcError> {
-        /*
-            There are a few checks.
-            1. The size must match the size of sig.
-            2. For each argument, the type of each argument, in order, should match. 
-         */
-
-        if on.len() != self.sig.len() {
-            Err( ArgCountError::new(self.sig.len(), on.len()).into() )
-        }
-        else {
-            for (a, b) in zip(on.iter(), self.sig.iter()) {
-                if a.get_type() != b.kind() {
-                    return Err( ArgTypeError::new(a.get_type(), b.kind(), b.name()).into() )
-                }
-            }
-
-            Ok(())
-        }
-    }
-
-    pub fn just_x() -> Self {
-        Self {
-            sig: vec![ArgSignature::new(VariableType::Scalar, 'x')]
-        }
-    }
-}
-
-pub struct ASTBasedFunction {
-    name: String,
-    inner: Box<dyn ASTNode>,
-    signature: FunctionArgSignature
-}
-impl Display for ASTBasedFunction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({}) = {}", &self.name, &self.signature, &self.inner)
-    }
-}
-impl Debug for ASTBasedFunction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ast-func '{}' ({}) has: {:?}", &self.name, &self.signature, &self.inner)
-    }
-}
-impl FunctionBase for ASTBasedFunction {
-    fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion> {
-        self.inner.evaluate(args)
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-    fn signature(&self) -> &FunctionArgSignature {
-        &self.signature
-    }
-}
-impl ASTBasedFunction {
-    pub fn new<T>(name: T, inner: Box<dyn ASTNode>, signature: FunctionArgSignature) -> Self where T: ToString {
-        Self {
-            name: name.to_string(),
-            inner,
-            signature
-        }
-    }
-}
+use super::base::*;
+use crate::calc::{VariableUnion, CalcResult, ScalarLike, VariableType};
 
 pub struct ImplBasedFunction {
     name: String,
@@ -168,62 +37,6 @@ impl ImplBasedFunction {
             action,
             signature
         }
-    }
-}
-
-pub enum Function {
-    AST(ASTBasedFunction),
-    Impl(ImplBasedFunction)
-}
-
-impl From<ASTBasedFunction> for Function {
-    fn from(value: ASTBasedFunction) -> Self {
-        Self::AST(value)
-    }
-}
-impl From<ImplBasedFunction> for Function {
-    fn from(value: ImplBasedFunction) -> Self {
-        Self::Impl(value)
-    }
-}
-impl<'a> AsRef<dyn FunctionBase + 'a> for Function {
-    fn as_ref(&self) -> &(dyn FunctionBase + 'a) {
-        match self {
-            Self::AST(a) => a,
-            Self::Impl(i) => i
-        }
-    }
-}
-
-impl Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x: &dyn Display = match self {
-            Self::AST(a) => a as &dyn Display,
-            Self::Impl(i) => i as &dyn Display
-        };
-        x.fmt(f)
-    }
-}
-impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x: &dyn Debug = match self {
-            Self::AST(a) => a as &dyn Debug,
-            Self::Impl(i) => i as &dyn Debug
-        };
-        x.fmt(f)
-    }
-}
-
-impl FunctionBase for Function {
-    fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion> {
-        self.as_ref().evaluate(args)
-    }
-
-    fn name(&self) -> &str {
-        self.as_ref().name()
-    }
-    fn signature(&self) -> &FunctionArgSignature {
-        self.as_ref().signature()
     }
 }
 
@@ -438,45 +251,35 @@ impl StandardFunctions {
     }
 }
 
-pub fn test_func_display() {
-    let sig = FunctionArgSignature::from(
-        vec![
-            ArgSignature::new(VariableType::Scalar, "x"), 
-            ArgSignature::new(VariableType::Vector, "y")
-            ]
-        );
-
-    println!("Signature is: {}", &sig);
-}
-
-#[test]
-fn test_ast_based_function() {
-    use crate::expr::repr::{OperatorExpr, VariableExpr, RawOperator, ConstExpr};
-
-    let ast: Box<dyn ASTNode> = Box::new(
-        OperatorExpr::new(
-            RawOperator::Mul,
-            Box::new( 
-                ConstExpr::new( 4.into() )
-            ),
-            Box::new(
-                VariableExpr::new( 'x', 0 )
-            )
-        )
-    );
-
-    let func = ASTBasedFunction::new("f", ast, FunctionArgSignature::from(ArgSignature::new(VariableType::Scalar, "x")));
-
-    let on = vec![VariableUnion::from(3.0)];
-    assert_eq!(func.evaluate(&on), Ok(VariableUnion::from(3.0 * 4.0)));
-}
-
 #[test]
 fn test_impl_based_function() {
-    let func = StandardFunctions::log_func();
+    use crate::calc::MathVector;
+
     let a = 64.0f64;
     let b = 2.0f64;
-    let on: Vec<VariableUnion> = vec![a.into(), b.into()];
+    let atrig = 2.0f64.sqrt() / 2.0f64;
+    let c = MathVector::from(vec![1, 2, 3]);
+    let d = MathVector::from(vec![3, 2, 1]);
+    let single_on: Vec<VariableUnion> = vec![a.into()];
+    let asingle_on: Vec<VariableUnion> = vec![atrig.into()];
+    let double_on: Vec<VariableUnion> = vec![a.into(), b.into()];
+    let vdouble_on: Vec<VariableUnion> = vec![c.clone().into(), d.clone().into()];
 
-    assert_eq!(func.evaluate(&on), Ok(a.log(b).into()));
+    assert_eq!(StandardFunctions::cos_func().evaluate(&single_on), Ok(a.cos().into()));
+    assert_eq!(StandardFunctions::acos_func().evaluate(&asingle_on), Ok(atrig.acos().into()));
+    assert_eq!(StandardFunctions::sin_func().evaluate(&single_on), Ok(a.sin().into()));
+    assert_eq!(StandardFunctions::asin_func().evaluate(&asingle_on), Ok(atrig.asin().into()));
+    assert_eq!(StandardFunctions::tan_func().evaluate(&single_on), Ok(a.tan().into()));
+    assert_eq!(StandardFunctions::atan_func().evaluate(&asingle_on), Ok(atrig.atan().into()));
+   // assert_eq!(StandardFunctions::atan2_func().evaluate(&asingle_on), Ok(a.atan2(b).into()));
+
+    assert_eq!(StandardFunctions::ln_func().evaluate(&single_on), Ok(a.ln().into()));
+    assert_eq!(StandardFunctions::nlog_func().evaluate(&single_on), Ok(a.log10().into()));
+    assert_eq!(StandardFunctions::log_func().evaluate(&double_on), Ok(a.log(b).into()));
+
+    let dot = c.dot_product(&d).unwrap();
+    let cross = c.cross_product(&d).unwrap();
+
+    assert_eq!(StandardFunctions::dot_func().evaluate(&vdouble_on), Ok( dot.into() ));
+    assert_eq!(StandardFunctions::cross_func().evaluate(&vdouble_on), Ok( cross.into() ));
 }
