@@ -55,7 +55,7 @@ pub fn basic_tree_functionality() {
     }
     println!();
 
-    let on: Vec<VariableUnion> = vec![VariableUnion::from(Scalar::new(4.101))];
+    let on: Vec<VariableUnion> = vec![4.101.into()];
     let evals: Vec<Result<VariableUnion, CalcError>> = our_things.into_iter().map(|x| x.evaluate(&on) ).collect();
     for (i, eval) in evals.iter().enumerate() {
         match eval {
