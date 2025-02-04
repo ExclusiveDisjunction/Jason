@@ -1,4 +1,4 @@
-pub use crate::expr::repr::{ASTNode, ASTJoinNode, TreeOrderTraversal};
+pub use crate::expr::repr::{ASTNode, ASTJoinNode};
 use crate::calc::calc_error::{ArgCountError, ArgTypeError, CalcError, CalcResult};
 use crate::calc::{ScalarLike, VariableData, VariableType, VariableUnion};
 
@@ -467,9 +467,61 @@ impl StandardFunctions {
         )
     }
 
+    pub fn ln_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "ln",
+            StandardFunctions::ln_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn nlog_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "nlog",
+            StandardFunctions::nlog_proc,
+            FunctionArgSignature::just_x()
+        )
+    }
+    pub fn log_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "log",
+            StandardFunctions::log_proc,
+            vec![ArgSignature::new(VariableType::Scalar, 'x'), ArgSignature::new(VariableType::Scalar, 'b')].into()
+        )
+    }
+
+    pub fn dot_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "dot",
+            StandardFunctions::dot_proc,
+            vec![ArgSignature::new(VariableType::Vector, 'a'), ArgSignature::new(VariableType::Vector, 'b')].into()
+        )
+    }
+    pub fn cross_func() -> ImplBasedFunction {
+        ImplBasedFunction::new(
+            "cross",
+            StandardFunctions::cross_proc,
+            vec![ArgSignature::new(VariableType::Vector, 'a'), ArgSignature::new(VariableType::Vector, 'b')].into()
+        )
+    }
+
     //All
     pub fn get_all() -> Vec<ImplBasedFunction> {
+        vec![
+            Self::cos_func(),
+            Self::acos_func(),
+            Self::sin_func(),
+            Self::asin_func(),
+            Self::tan_func(),
+            Self::atan_func(),
+            Self::atan2_func(),
 
+            Self::ln_func(),
+            Self::nlog_func(),
+            Self::log_func(),
+
+            Self::dot_func(),
+            Self::cross_func()
+        ]
     }
 }
 
@@ -508,26 +560,7 @@ fn test_ast_based_function() {
 
 #[test]
 fn test_impl_based_function() {
-    let log_func = | on: &[VariableUnion], sig: &FunctionArgSignature | -> CalcResult<VariableUnion> {
-        sig.validate(on)?;
-
-        match (&on[0], &on[1]) {
-            (VariableUnion::Sca(a), VariableUnion::Sca(b)) => Ok( a.as_scalar().log(b.as_scalar()).into() ),
-            _ => panic!() //This cannot happen
-        }
-    };
-
-    let func = ImplBasedFunction::new(
-        "log",
-        log_func,
-        FunctionArgSignature::from(
-            vec![
-                ArgSignature::new(VariableType::Scalar, "x"),
-                ArgSignature::new(VariableType::Scalar, "b")
-            ]
-        )
-    );
-
+    let func = StandardFunctions::log_func();
     let a = 64.0f64;
     let b = 2.0f64;
     let on: Vec<VariableUnion> = vec![a.into(), b.into()];
