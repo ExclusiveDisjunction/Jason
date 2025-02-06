@@ -1,4 +1,4 @@
-use super::variable_type::*;
+use super::base::*;
 use super::scalar::{Scalar, ScalarLike};
 use super::vector::MathVector;
 use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError, OperationError, FeatureError, FeatureErrKind, FeatureReason, CalcError};

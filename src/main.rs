@@ -7,6 +7,7 @@ use crate::core::logger::{logging, LoggerLevel};
 pub mod core;
 pub mod calc;
 pub mod expr;
+pub mod io;
 
 fn main() -> Result<(), String> {
     println!(" Welcome to Jason ");

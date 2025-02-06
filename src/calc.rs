@@ -2,7 +2,7 @@ pub mod scalar;
 pub mod complex;
 pub mod vector;
 pub mod matrix;
-pub mod variable_type;
+pub mod base;
 pub mod calc_error;
 pub mod func;
 
@@ -11,7 +11,7 @@ use std::fmt::{Display, Debug};
 
 use serde::{Serialize, Deserialize};
 
-pub use variable_type::{VariableData, VariableType};
+pub use base::{VariableData, VariableType};
 pub use scalar::{Scalar, ScalarLike};
 pub use complex::Complex;
 pub use vector::MathVector;

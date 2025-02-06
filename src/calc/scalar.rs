@@ -1,4 +1,4 @@
-use super::variable_type::*;
+use super::base::*;
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};

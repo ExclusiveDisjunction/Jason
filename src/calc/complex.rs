@@ -1,4 +1,4 @@
-use super::variable_type::*;
+use super::base::*;
 use super::scalar::{Scalar, ScalarLike};
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};

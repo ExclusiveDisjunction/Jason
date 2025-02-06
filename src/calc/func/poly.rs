@@ -1,5 +1,4 @@
 use std::fmt::{Debug, Display};
-use std::{rc::Rc, cell::RefCell, sync::Arc};
 
 use super::base::{FunctionArgSignature, FunctionBase};
 use super::astb::ASTBasedFunction;
@@ -61,7 +60,3 @@ impl FunctionBase for Function {
         self.as_ref().signature()
     }
 }
-
-pub type BoxedFunc = Box<Function>;
-pub type RcFunc = Rc<RefCell<Function>>;
-pub type ArcFunc = Arc<RefCell<Function>>;

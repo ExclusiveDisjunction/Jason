@@ -1,4 +1,4 @@
-use super::variable_type::*;
+use super::base::*;
 use super::scalar::ScalarLike;
 use super::calc_error::{DimensionError, OperationError, CalcError, CalcResult};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
