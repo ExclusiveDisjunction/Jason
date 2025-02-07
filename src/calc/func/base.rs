@@ -94,3 +94,32 @@ impl FunctionArgSignature {
         }
     }
 }
+
+#[test]
+fn test_func_signatures() {
+    use crate::calc::{Complex, MathVector};
+
+    let target_a = FunctionArgSignature::just_x();
+    let target_b = FunctionArgSignature::from(vec![ArgSignature::new(VariableType::Complex, 'x'), ArgSignature::new(VariableType::Scalar, 'y')]);
+    let target_c = FunctionArgSignature::from(ArgSignature::new(VariableType::Vector, 'x'));
+
+    let test_a: Vec<VariableUnion> = vec![1.4.into()];
+    let test_b: Vec<VariableUnion> = vec![Complex::new(1.2, 3.6).into(), 1.into()];
+    let test_c: Vec<VariableUnion> = vec![MathVector::from(vec![1, 2, 3]).into()];
+
+    assert_eq!(format!("{}", &target_a), "x: Scalar".to_string());
+    assert_eq!(format!("{}", &target_b), "x: Complex, y: Scalar");
+    assert_eq!(format!("{}", &target_c), "x: Vector");
+
+    for (i, target) in vec![target_a, target_b, target_c].into_iter().enumerate() {
+        for (j, test) in vec![&test_a, &test_b, &test_c].iter().enumerate() {
+            //Along i, the target should pass the current test, but fail everything else. 
+            if i == j {
+                assert!(target.validate(test).is_ok());
+            }
+            else {
+                assert!(target.validate(test).is_err());
+            }
+        }
+    }
+}
