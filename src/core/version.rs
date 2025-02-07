@@ -1,7 +1,8 @@
 use std::{cmp::Ordering, fmt::{Debug, Display}};
-use crate::format_error;
+use serde::{Serialize, Deserialize};
+use super::errors::FormattingError;
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct Version {
     major: u16,
     minor: u16,
@@ -45,7 +46,7 @@ impl Ord for Version {
     }
 }
 impl TryFrom<String> for Version {
-    type Error = super::errors::Error;
+    type Error = FormattingError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let mut parts = [String::new(), String::new(), String::new()];
         let mut i = 0usize;
@@ -53,14 +54,14 @@ impl TryFrom<String> for Version {
             match l {
                 '.' => {
                     if i + 1 >= parts.len() { //Too many periods!
-                        return Err(format_error!(value, "too many periods contained"));
+                        return Err(FormattingError::new(&value, "too many periods contained"));
                     }
                     i += 1;
                 },
                 _ if l.is_numeric() => {
                     parts[i].push(l);
                 },
-                _ => return Err(format_error!(value, "unrecognized token '{}'", l))
+                _ => return Err(FormattingError::new(&value, format!("unrecognized token '{}'", l)))
             }
         }
 
@@ -70,7 +71,7 @@ impl TryFrom<String> for Version {
 
         match (major_try, minor_try, build_try) {
             (Ok(ma), Ok(mi), Ok(bd)) => Ok(Self::new(ma, mi, bd)),
-            _ => Err(format_error!(value, "one or more sub-parts could not be expressed as a u16"))
+            _ => Err(FormattingError::new(&value, "one or more sub-parts could not be expressed as a u16"))
         }
     }
 }

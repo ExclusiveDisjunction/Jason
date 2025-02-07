@@ -2,14 +2,14 @@ use std::fmt::{Display, Debug, Formatter};
 
 use super::{matrix::MatrixDimension, VariableType};
 
-pub trait DimensionKind : Clone + Copy {}
+pub trait DimensionKind : Clone + Copy + PartialEq + Eq {}
 impl DimensionKind for usize { }
 impl DimensionKind for i32 {}
 impl DimensionKind for i64 {}
 impl DimensionKind for u32 {}
 impl DimensionKind for u64 {}
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct IndexOutOfRangeError<T> where T: DimensionKind {
     index: T
 }
@@ -36,6 +36,7 @@ impl<T> Debug for IndexOutOfRangeError<T> where T: DimensionKind + Debug {
     }
 }
 
+#[derive(Clone)]
 pub struct DimensionError<T> where T: DimensionKind {
     a: T,
     b: T
@@ -53,6 +54,7 @@ impl<T> PartialEq for DimensionError<T> where T: DimensionKind + PartialEq {
         self.a == other.a && self.b == other.b
     }
 }
+impl<T> Eq for DimensionError<T> where T: DimensionKind + PartialEq + Eq { }
 impl<T> Display for DimensionError<T> where T: DimensionKind + Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "dimension mismatch between {} and {} (they must be equal)", self.a, self.b)
@@ -64,7 +66,7 @@ impl<T> Debug for DimensionError<T> where T: DimensionKind + Debug {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub struct OperationError {
     operation: String,
     on: (String, String),
@@ -103,7 +105,7 @@ impl Debug for OperationError {
 }
 
 /// Describes a specific amount of arguments, and how many were supplied.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ArgCountError {
     expected: usize,
     got: usize
@@ -127,7 +129,7 @@ impl ArgCountError {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ArgTypeError {
     expected: VariableType,
     got: VariableType,
@@ -153,7 +155,7 @@ impl ArgTypeError {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UndefinedError {
     reason: String
 }
@@ -175,7 +177,7 @@ impl UndefinedError {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FeatureErrKind {
     /// Will be released later
     Future,
@@ -184,7 +186,7 @@ pub enum FeatureErrKind {
     /// This feature will not be made
     Never
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FeatureReason {
     Complexity,
     Planning,
@@ -204,7 +206,7 @@ impl Display for FeatureReason {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FeatureError {
     kind: FeatureErrKind,
     name: String,
@@ -234,7 +236,7 @@ impl FeatureError {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum CalcError {
     Index(IndexOutOfRangeError<usize>),
     MatDim(DimensionError<MatrixDimension>),

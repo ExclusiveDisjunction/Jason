@@ -6,7 +6,7 @@ use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct MatrixDimension {
     rows: usize,
     cols: usize

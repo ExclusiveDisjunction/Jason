@@ -1,12 +1,13 @@
-use std::{fmt::Debug, fs::File};
+use std::fmt::Debug;
+use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+
 use lazy_static::lazy_static;
 
-use super::errors::Error;
-use crate::{io_error, argument_error, operation_error};
+use super::errors::{Error, ArgumentValueError, OperationError};
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum LoggerLevel {
     None = 0,
     Debug = 1,
@@ -33,33 +34,29 @@ impl Debug for LoggerLevel {
 }
 
 pub struct LoggerData {
-    file: Option<std::fs::File>,
+    file: Option<File>,
     state: LoggerLevel, //Currently being used
     level: LoggerLevel //The level of the logger (what we will accept)
 }
 impl Default for LoggerData {
     fn default() -> Self {
-        Self::new()
-    }
-}
-impl LoggerData {
-    pub fn new() -> Self {
         Self {
             file: None,
             state: LoggerLevel::None,
             level: LoggerLevel::None
         }
     }
-
+}
+impl LoggerData {
     pub fn open(&mut self, path: &str, level: LoggerLevel) -> Result<(), Error> {
         if self.is_open() {
-            Err(operation_error!("open", "already open"))
+            Err( OperationError::new("open", "already open").into() )
         } else if level == LoggerLevel::None {
-            Err(argument_error!("level", "cannot open under level '{:?}'", LoggerLevel::None))
+            Err( ArgumentValueError::new("level", &LoggerLevel::None).into() )
         } else {
             self.file = match std::fs::File::create(path) {
                 Ok(f) => Some(f),
-                Err(e) => return Err(io_error!(e))
+                Err(e) => return Err(e.into())
             };
 
             self.state = LoggerLevel::None;
@@ -94,16 +91,16 @@ impl LoggerData {
 
     pub fn write(&mut self, obj: &impl Debug) -> Result<(), Error> {
         if !self.is_open() {
-            Err(operation_error!("write", "no file currently open"))
+            Err( OperationError::new("write", "no file currently open").into() )
         }
         else if !self.is_in_log() {
-            Err(operation_error!("write", "not in writing mode"))
+            Err( OperationError::new("write", "not in writing mode").into() )
         }
         else {
             if !self.curr_log_ignored() {
                 let t_file: &mut File = self.file.as_mut().unwrap();
                 if let Err(e) = t_file.write(format!("{:?}", obj).as_bytes()) {
-                    return Err(io_error!(e));
+                    return Err(e.into());
                 }
             }
 
@@ -112,19 +109,19 @@ impl LoggerData {
     }
     pub fn start_log(&mut self, level: LoggerLevel) -> Result<(), Error> {
         if !self.is_open() {
-            return Err(operation_error!("start log", "log not open"));
+            return Err( OperationError::new("start log", "log not open").into() );
         }
         else if level == LoggerLevel::None {
-            return Err(operation_error!("start log", "cannot start a log at level {:?}", LoggerLevel::None));
+            return Err( OperationError::new("start log", format!("cannot start a log at level {:?}", LoggerLevel::None)).into() );
         }
         else if self.is_in_log() {
-            return Err(operation_error!("start log", "log already started at level {:?}", &self.state));
+            return Err( OperationError::new("start log", format!("log already started at level {:?}", &self.state)).into() );
         }
 
         self.state = level;
         if !self.curr_log_ignored() {
             if let Err(e) =  self.get_file().write(format!("{:?} {:?} ", chrono::Local::now(), level).as_bytes()) {
-                return Err(io_error!(e));
+                return Err(e.into());
             }
         }
 
@@ -132,14 +129,14 @@ impl LoggerData {
     }
     pub fn end_log(&mut self) -> Result<(), Error> {
         if !self.is_open() {
-            return Err(operation_error!("end log", "log not open"));
+            return Err( OperationError::new("end log", "log not open").into() );
         }
         else if !self.is_in_log() {
-            return Err(operation_error!("end log", "not in log"));
+            return Err( OperationError::new("end log", "not in log").into() );
         }
 
         if let Err(e) = self.get_file().write("\n".as_bytes()) {
-            return Err(io_error!(e));
+            return Err(e.into());
         }
 
         self.state = LoggerLevel::None;
@@ -158,7 +155,7 @@ impl Default for Logger {
 impl Logger {
     pub fn new() -> Self {
         Self {
-            data: Arc::new(Mutex::new(LoggerData::new()))
+            data: Arc::new(Mutex::new(LoggerData::default()))
         }
     }
 
@@ -294,9 +291,12 @@ fn test_logger_write() {
     logger_write!(LoggerLevel::Error, "hello");
     logger_write!(LoggerLevel::Critical, "hello");
 
-    log_debug!("hello");
-    log_info!("hello");
-    log_warning!("hello");
-    log_error!("hello");
-    log_critical!("hello");
+    log_debug!("hello 2");
+    log_info!("hello 2");
+    log_warning!("hello 2");
+    log_error!("hello 2");
+    log_critical!("hello 2");
+
+    logging.close();
+    assert!(logging.write(&"hello".to_string()).is_err())
 }

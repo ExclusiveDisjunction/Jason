@@ -1,36 +1,240 @@
 use std::fmt::{Debug, Display};
+use std::io;
+use crate::calc::CalcError;
+
+#[derive(PartialEq, Eq)]
+pub struct ArgumentMissingError {
+    arg: String
+}
+impl Debug for ArgumentMissingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "argument '{}' is missing & required", &self.arg)
+    }
+}
+impl ArgumentMissingError {
+    pub fn new<T: Into<String>>(arg: T) -> Self {
+        Self {
+            arg: arg.into()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct ArgumentValueError {
+    arg: String,
+    value: String
+}
+impl Debug for ArgumentValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the value '{}' stored in argument '{}' is invalid", &self.value, &self.arg)
+    }
+}
+impl ArgumentValueError {
+    pub fn new<T: Into<String>, U: Debug>(arg: T, value: &U) -> Self {
+        Self {
+            arg: arg.into(),
+            value: format!("{:?}", value)
+        }
+    }
+    pub fn new_display<T: Into<String>, U: Display>(arg: T, value: &U) -> Self {
+        Self {
+            arg: arg.into(),
+            value: value.to_string()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct NullError {
+    target: String
+}
+impl Debug for NullError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the target '{}' is null, and this is disallowed", &self.target)
+    }
+}
+impl NullError {
+    pub fn new<T: Into<String>>(target: T) -> Self {
+        Self {
+            target: target.into()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct FormattingError {
+    processed: String,
+    reason: String
+}
+impl Debug for FormattingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the expression '{}' is invalid due to '{}'", &self.processed, &self.reason)
+    }
+}
+impl FormattingError {
+    pub fn new<T: ToString, U: Into<String>>(processed: &T, reason: U) -> Self {
+        Self {
+            processed: processed.to_string(),
+            reason: reason.into()
+        }
+    }
+}
+
+pub struct RangeError<T> {
+    var: String,
+    val: T,
+    range: Option<(T, T)>
+}
+impl<T> PartialEq for RangeError<T> where T: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        self.var == other.var && self.val == other.val && self.range == other.range
+    }
+}
+impl<T> Eq for RangeError<T> where T: PartialEq + Eq { }
+impl<T> Debug for RangeError<T> where T: std::fmt::Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.range.as_ref() {
+            Some((a, b)) => write!(f, "the value '{}' is out of range ({} - {}) in the target '{}'", &self.val, a, b, &self.var),
+            None => write!(f, "the value '{}' is out of range in the target '{}'", &self.val, &self.var)
+        }
+    }
+}
+impl<T> RangeError<T>  {
+    pub fn new<S: Into<String>>(var: S, val: T, range: Option<(T, T)>) -> Self {
+        Self {
+            var: var.into(),
+            val,
+            range
+        }
+    }
+}
+pub type IndexRangeError = RangeError<usize>;
+
+#[derive(PartialEq, Eq)]
+pub struct PermissionError {
+    resource: String
+}
+impl Debug for PermissionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the resource '{}' cannot be accessed due to lack of permissions", &self.resource)
+    }
+}
+impl PermissionError {
+    pub fn new<T: Into<String>>(resource: T) -> Self {
+        Self {
+            resource: resource.into()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct OperationError {
+    action: String,
+    reason: String
+}
+impl Debug for OperationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the operation '{}' is not allowed due to '{}'", &self.action, &self.action)
+    }
+}
+impl OperationError {
+    pub fn new<T: Into<String>, U: Into<String>>(action: T, reason: U) -> Self {
+        Self {
+            action: action.into(),
+            reason: reason.into()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct ConversionError {
+    from: String,
+    reason: String
+}
+impl Debug for ConversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the value '{}' could not be converted due to '{}'", &self.from, &self.reason)
+    }
+}
+impl ConversionError {
+    pub fn new<T: Into<String>, U: Into<String>>(from: T, reason: U) -> Self {
+        Self {
+            from: from.into(),
+            reason: reason.into()
+        }
+    }
+    pub fn new_fmt<T: ToString, U: Into<String>>(from: &T, reason: U) -> Self {
+        Self {
+            from: from.to_string(),
+            reason: reason.into()
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct UnexpectedError {
+    reason: String
+}
+impl Debug for UnexpectedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "an unexpected error occured: '{}'", &self.reason)
+    }
+}
+impl UnexpectedError {
+    pub fn new<T: Into<String>>(reason: T) -> Self {
+        Self {
+            reason: reason.into()
+        }
+    }
+}
 
 pub enum Error {
-    ArgumentError(String, String), //Name, Value
-    NullError(String), //name
-    FormatError(String, String), //string, reason
-    RangeError(String, String, Option<String>, Option<String>), //variable, value, range min, range max
-    NotFoundError(String), //identifier
-    PermissionError,
-    UnexpectedError(String), //Reason
-    OperationError(String, String), //Action, Reason (for activities)
-    ConversionError(String), //Reason
-    IOError(std::io::Error)
+    ArgVal(ArgumentValueError),
+    ArgMiss(ArgumentMissingError),
+    Null(NullError),
+    Format(FormattingError),
+    Range(IndexRangeError),
+    Operation(OperationError),
+    Conv(ConversionError),
+    Unexpected(UnexpectedError),
+    Calc(CalcError),
+    IO(io::Error)
 }
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::ArgVal(a), Self::ArgVal(b)) => a == b,
+            (Self::ArgMiss(a), Self::ArgMiss(b)) => a == b,
+            (Self::Null(a), Self::Null(b)) => a == b,
+            (Self::Format(a), Self::Format(b)) => a == b,
+            (Self::Range(a), Self::Range(b)) => a == b,
+            (Self::Operation(a), Self::Operation(b)) => a == b,
+            (Self::Conv(a), Self::Conv(b)) => a == b,
+            (Self::Calc(a), Self::Calc(b)) => a == b,
+            (Self::IO(a), Self::IO(b)) => {
+                a.kind() == b.kind()
+            }
+            _ => false
+        }
+    }
+}
+impl Eq for Error { }
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ArgumentError(name, value) => write!(f, "argument '{}' held an invalid value of '{}'", name, value),
-            Self::NullError(name) => write!(f, "'{}' is null", name),
-            Self::FormatError(string, reason) => write!(f, "the value '{}' held an invalid format because of '{}'", string, reason),
-            Self::RangeError(variable, value, range_min, range_max) => {
-                match (range_min, range_max) {
-                    (Some(min), Some(max)) => write!(f, "the value '{value}' in variable '{variable}' is out of range ({min} to {max})"),
-                    (_, _) => write!(f, "the value '{value}' in variable '{variable}' is out of range")
-                }
-            },
-            Self::NotFoundError(value) => write!(f, "the value '{}' was not found", value),
-            Self::PermissionError => write!(f, "invalid permissions"),
-            Self::ConversionError(s) => write!(f, "conversion failed because of '{s}'"),
-            Self::UnexpectedError(s) => write!(f, "unexpected error: '{s}'"),
-            Self::OperationError(action, reason) => write!(f, "operation '{action}' is not permitted because of '{reason}'"),
-            Self::IOError(e) => (e as &dyn Debug).fmt(f)
-        }
+        let x: &dyn Debug = match self {
+            Self::ArgVal(x) => x,
+            Self::ArgMiss(x) => x,
+            Self::Null(x) => x,
+            Self::Format(f) => f,
+            Self::Range(x) => x,
+            Self::Operation(x) => x,
+            Self::Conv(x) => x,
+            Self::Unexpected(x) => x,
+            Self::Calc(x) => x,
+            Self::IO(x) => x
+        };
+
+        x.fmt(f)
     }
 }
 impl Display for Error {
@@ -39,171 +243,53 @@ impl Display for Error {
     }
 }
 
-#[macro_export]
-macro_rules! argument_error {
-    // name, value
-    ($name: expr, $value: expr) => { // name, value
-        {
-            Error::ArgumentError($name.to_string(), format!("{:?}", &$value))
-        }
-    };
-    ($name: expr, $fmt_str: expr, $($v: expr), *) => {
-        {
-            Error::ArgumentError($name.to_string(), format!($fmt_str, $(&$v)* ))
-        }
+impl From<ArgumentValueError> for Error {
+    fn from(value: ArgumentValueError) -> Self {
+        Self::ArgVal(value)
     }
 }
-/// Returns Error of NullError, containing a name passed
-/// ```
-/// assert_eq!(null_error!("arg0"), Error::NullError("arg0".to_string()))
-/// ```
-#[macro_export]
-macro_rules! null_error {
-    
-    ($name: expr) => {
-        {
-            $crate::core::errors::Error::NullError($name.to_string())
-        }
+impl From<ArgumentMissingError> for Error {
+    fn from(value: ArgumentMissingError) -> Self {
+        Self::ArgMiss(value)
     }
 }
-#[macro_export]
-macro_rules! format_error {
-    
-    ($content: expr, $reason_str: expr, $($v: expr), *) => {
-        {
-            // content, reason formatting string, values...
-            $crate::core::errors::Error::FormatError($content.to_string(), format!($reason_str, $(&$v)*))
-        }
-    };
-    ($content: expr, $reason: expr) => {
-        {
-            $crate::core::errors::Error::FormatError($content.to_string(), $reason.to_string())
-        }
+impl From<NullError> for Error {
+    fn from(value: NullError) -> Self {
+        Self::Null(value)
     }
 }
-#[macro_export]
-macro_rules! range_error {
-    // 
-    ($variable: expr, $value: expr) => {
-        {
-            $crate::core::errors::Error::RangeError($variable.to_string(), format!("{:?}", &$value), None, None)
-        }
-    };
-    ($variable: expr, $value: expr, $min: expr, $max: expr) => {
-        {
-            $crate::core::errors::Error::RangeError($variable.to_string(), format!("{:?}", &$value), Some(format!("{:?}", $min)), Some(format!("{:?}", $max)))
-        }
+impl From<FormattingError> for Error {
+    fn from(value: FormattingError) -> Self {
+        Self::Format(value)
     }
 }
-#[macro_export]
-macro_rules! not_found_error {
-    ($identifier: expr) => {
-        {
-            $crate::core::errors::Error::NotFoundError($identifier.to_string())
-        }
+impl From<IndexRangeError> for Error {
+    fn from(value: IndexRangeError) -> Self {
+        Self::Range(value)
     }
 }
-#[macro_export]
-macro_rules! permission_error {
-    () => {
-        {
-            $crate::core::errors::Error::PermissionError()
-        }
+impl From<OperationError> for Error {
+    fn from(value: OperationError) -> Self {
+        Self::Operation(value)
     }
 }
-#[macro_export]
-macro_rules! conversion_error {
-    ($reason: expr) => {
-        {
-            $crate::core::errors::Error::ConversionError($reason.to_string())
-        }
-    };
-    ($reason_fmt: expr, $($v: expr), *) => {
-        {
-            $crate::core::errors::Error::ConversionError(format!($reason_fmt, $(&$v), *))
-        }
+impl From<ConversionError> for Error {
+    fn from(value: ConversionError) -> Self {
+        Self::Conv(value)
     }
 }
-#[macro_export]
-macro_rules! unexpected_error {
-    ($fmt_str: expr, $( $v: expr), *) => {
-        {
-            $crate::core::errors::Error::UnexpectedError(format!($fmt_str, $(&$v)*))
-        }
-    };
-    ($reason: expr) => {
-        {
-            $crate::core::errors::Error::UnexpectedError($reason.to_string())
-        }
+impl From<UnexpectedError> for Error {
+    fn from(value: UnexpectedError) -> Self {
+        Self::Unexpected(value)
     }
 }
-#[macro_export]
-macro_rules! operation_error {
-    ($action: expr, $fmt_str: expr, $( $v: expr), *) => {
-        {
-            $crate::core::errors::Error::OperationError($action.to_string(), format!($fmt_str, $(&$v)*))
-        }
-    };
-    ($action: expr, $reason: expr) => {
-        {
-            $crate::core::errors::Error::OperationError($action.to_string(), $reason.to_string())
-        }
+impl From<CalcError> for Error {
+    fn from(value: CalcError) -> Self {
+        Self::Calc(value)
     }
 }
-#[macro_export]
-macro_rules! io_error {
-    ($kind: expr, $fmt_str: expr, $( $v: expr), *) => {
-        {
-            $crate::core::errors::Error::IOError(std::io::Error($kind, format!($fmt_str, $(&$v)*)))
-        }
-    };
-    ($kind: expr, $reason: expr) => {
-        {
-            $crate::core::errors::Error::IOError(std::io::Error($kind, $reason.to_string()))
-        }
-    };
-    ($io_error: expr) => {
-        {
-            $crate::core::errors::Error::IOError($io_error)
-        }
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Self::IO(value)
     }
 }
-
-/*
-pub fn argument_error(name: &str, value: &impl Debug) -> Error {
-    Error::ArgumentError(name.to_string(), format!("{value:?}"))
-}
-pub fn null_error(name: &str) -> Error {
-    Error::NullError(name.to_string())
-}
-pub fn format_error(string: &str, reason: &str) -> Error {
-    Error::FormatError(string.to_string(), reason.to_string())
-}
-pub fn range_error(variable: &str, value: &impl Debug, min_value: impl Debug, max_value: impl Debug) -> Error {
-    Error::RangeError(variable.to_string(), format!("{value:?}"), format!("{min_value:?}"), format!("{max_value:?}"))
-}
-pub fn not_found_error(identifyer: &str) -> Error {
-    Error::NotFoundError(identifyer.to_string())
-}
-pub fn permission_error() -> Error {
-    Error::PermissionError
-}
-pub fn operator_error(operator: &impl Debug, operand1: &impl Debug, operand2: Option<&impl Debug>) -> Error {
-    match operand2 {
-        None => Error::OperatorError(format!("{operator:?}"), format!("{operand1:?}"), None),
-        Some(o2) => Error::OperatorError(format!("{operator:?}"), format!("{operand1:?}"), Some(format!("{o2:?}")))
-    }
-}
-pub fn conversion_error(reason: &str) -> Error {
-    Error::ConversionError(reason.to_string())
-}
-pub fn unexpected_error(reason: &str) -> Error {
-    Error::UnexpectedError(reason.to_string())
-}
-pub fn operation_error(action: &str, reason: &str) -> Error {
-    Error::OperationError(action.to_string(), reason.to_string())
-}
-pub fn io_error(error: std::io::Error) -> Error {
-    Error::IOError(error)
-}
-*/
