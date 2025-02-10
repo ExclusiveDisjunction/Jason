@@ -4,6 +4,7 @@ use std::fmt::Display;
 use serde::{Serialize, Deserialize};
 
 use crate::core::errors::FormattingError;
+use super::super::found::LineParsing;
 
 #[derive(Clone, Eq, Default, Debug, Serialize, Deserialize)]
 pub struct EntryKey {
@@ -43,14 +44,11 @@ impl Ord for EntryKey {
     }
 }
 
-impl EntryKey {
-    pub fn new(pack_id: u32, entry_id: u32) -> Self {
-        Self {
-            pack_id,
-            entry_id
-        }
+impl LineParsing for EntryKey {
+    fn combine_line(&self) -> String {
+        format!("{}", self)
     }
-    pub fn try_parse(from: &str) -> Result<Self, FormattingError> {
+    fn parse_from_line(from: &str) -> Result<Self, FormattingError> where Self: Sized {
         let splits: Vec<&str> = from.split('.').collect();
         if splits.len() != 2 {
             return Err(FormattingError::new(&from, "too many or not enough arguments, should be two"));
@@ -62,6 +60,15 @@ impl EntryKey {
         match (a, b) {
             (Ok(pack_id), Ok(entry_id)) => Ok(Self::new(pack_id, entry_id)),
             _ => Err(FormattingError::new(&from, "expected two numerical values")),
+        }
+    }
+}
+
+impl EntryKey {
+    pub fn new(pack_id: u32, entry_id: u32) -> Self {
+        Self {
+            pack_id,
+            entry_id
         }
     }
 
