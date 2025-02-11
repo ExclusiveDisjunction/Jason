@@ -28,7 +28,7 @@ impl Package {
     }
     
     fn get_next_id(&mut self) -> Option<u32> {
-        if self.current_id == std::u32::MAX {
+        if self.current_id == u32::MAX {
             None
         }
         else {

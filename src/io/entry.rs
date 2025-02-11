@@ -44,9 +44,9 @@ impl Ord for EntryKey {
     }
 }
 
-impl Into<String> for EntryKey {
-    fn into(self) -> String {
-        self.to_string()
+impl From<EntryKey> for String {
+    fn from(val: EntryKey) -> Self {
+        val.to_string()
     }
 }
 impl TryFrom<String> for EntryKey {
@@ -124,9 +124,9 @@ impl TryFrom<String> for EntryType {
         }
     }
 }
-impl Into<String> for EntryType {
-    fn into(self) -> String {
-        self.to_string()
+impl From<EntryType> for String {
+    fn from(val: EntryType) -> Self {
+        val.to_string()
     }
 }
 impl EntryType {
