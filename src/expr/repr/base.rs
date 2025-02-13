@@ -1,5 +1,9 @@
 use std::fmt::{Display, Debug};
+use serde::{Serialize, Deserialize};
+
 use crate::calc::{VariableUnion, CalcResult};
+
+use super::poly::TotalNodes;
 
  /// A untility for the requesting and evlauation of pre-order, inorder, and post-order traversal of something. 
 #[derive(Clone, Copy, PartialEq)]
@@ -51,7 +55,17 @@ impl TreeOrderTraversal {
 }
 
 /// The base representation for a node that can be evaluated (in singular or list form), and supports printing through methods.
-pub trait ASTNode {
+pub trait ASTNode: Serialize + for<'a> Deserialize<'a> + Display + Debug + PartialEq + Clone {
+    /// Returns the left node for our combination.
+    fn left(&self) -> Option<&TotalNodes> { None }
+    /// Returns the right node for our combination
+    fn right(&self) -> Option<&TotalNodes> { None }
+
+    /// Sets the left node. The implementer may ignore this, and calling this does not imply that self.left() will return the value stored here.
+    fn set_left(&mut self, _: Box<TotalNodes>) { }
+    /// Sets the right node. The implementer may ignore this, and calling this does not imply that self.right() will return the value stored here.
+    fn set_right(&mut self, _: Box<TotalNodes>) { }
+        
     /// Evaluates the node based on an input and returns a singular element.
     fn evaluate(&self, on: &[VariableUnion]) -> CalcResult<VariableUnion>;
     /// Evaluates the nodes based on an input and returns a list of elements, depending on the implementing node.
@@ -59,37 +73,12 @@ pub trait ASTNode {
         Ok( vec![ self.evaluate(on)? ] )
     }
 
+    fn print_self(&self) -> String;
     /// Prints the node using `PrintKind`.
-    fn print_self(&self, kind: TreeOrderTraversal) -> String;
-    /// Prints who the node is, and some debug information. 
-    fn debug_print(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-}
+    fn print_traversal(&self, kind: TreeOrderTraversal) -> String{
+        let left: Option<String> = self.left().map(|x| x.print_self() );
+        let right: Option<String> = self.right().map(|x| x.print_self() );
 
-impl Display for dyn ASTNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.print_self(TreeOrderTraversal::Inorder))
+        kind.join_strings(left, self.print_self(), right)
     }
-}
-impl Debug for dyn ASTNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.debug_print(f)
-    }
-}
-
-/// Represents an ASTNode that also can has children. Supports reading and writing these children.
-pub trait ASTJoinNode: ASTNode {
-    /// Returns the left node for our combination.
-    fn left(&self) -> Option<&dyn ASTNode>;
-    /// Returns the right node for our combination
-    fn right(&self) -> Option<&dyn ASTNode>;
-
-    /// Sets the left node. The implementer may ignore this, and calling this does not imply that self.left() will return the value stored here.
-    fn set_left(&mut self, new: Box<dyn ASTNode>);
-    /// Sets the right node. The implementer may ignore this, and calling this does not imply that self.right() will return the value stored here.
-    fn set_right(&mut self, new: Box<dyn ASTNode>);
-}
-
-pub trait ASTRawNode : ASTNode {
-    fn get_contents(&self) -> &str;
-    fn set_contents(&mut self, new: String);
 }

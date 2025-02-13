@@ -1,14 +1,43 @@
-use super::{base::{ASTJoinNode, ASTNode, ASTRawNode, TreeOrderTraversal}, raw_oper::RawOperator, RawLeafExpr};
-use crate::calc::{calc_error::{OperationError, UndefinedError}, CalcError, CalcResult, VariableUnion};
+use std::fmt::{Display, Debug};
 
+use serde::{Deserialize, Serialize};
+
+use super::{base::{ASTNode, TreeOrderTraversal}, raw_oper::RawOperator};
+use crate::calc::{calc_error::{OperationError, UndefinedError}, CalcError, CalcResult, VariableUnion};
+use super::poly::TotalNodes;
 
 /// Represents an operation done on two sub children nodes. This is a joined node.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct OperatorExpr {
     data: RawOperator,
-    left: Box<dyn ASTNode>,
-    right: Box<dyn ASTNode>
+    left: Box<TotalNodes>,
+    right: Box<TotalNodes>
+}
+impl Display for OperatorExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.print_traversal(TreeOrderTraversal::Inorder))
+    }
+}
+impl Debug for OperatorExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "oper-expr {} left: '{:?}' right: '{:?}'", &self.data, &self.left, &self.right)
+    }
 }
 impl ASTNode for OperatorExpr {
+    fn left(&self) -> Option<&TotalNodes> {
+        Some( self.left.as_ref() )
+    }
+    fn right(&self) -> Option<&TotalNodes> {
+        Some( self.right.as_ref() )
+    }
+
+    fn set_left(&mut self, new: Box<TotalNodes>) {
+        self.left = new;
+    }
+    fn set_right(&mut self, new: Box<TotalNodes>) {
+        self.right = new;
+    }
+
     fn evaluate(&self, on: &[VariableUnion]) -> Result<VariableUnion, CalcError>{
         let left_eval = self.left.evaluate(on)?;
         let right_eval = self.right.evaluate(on)?;
@@ -30,44 +59,58 @@ impl ASTNode for OperatorExpr {
         }
     }
 
-    fn print_self(&self, kind: TreeOrderTraversal) -> String {
-        kind.join_strings(Some(self.left.print_self(kind)), self.data.to_string(), Some(self.right.print_self(kind)))
-    }
-    fn debug_print(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "operator-expr {} left: {:?} right: {:?}", &self.data, &self.left, &self.right)
-    }
-}
-impl ASTJoinNode for OperatorExpr {
-    fn left(&self) -> Option<&dyn ASTNode> {
-        Some( self.left.as_ref() )
-    }
-    fn right(&self) -> Option<&dyn ASTNode> {
-        Some( self.right.as_ref() )
-    }
-
-    fn set_left(&mut self, new: Box<dyn ASTNode>) {
-        self.left = new;
-    }
-    fn set_right(&mut self, new: Box<dyn ASTNode>) {
-        self.right = new;
+    fn print_self(&self) -> String {
+        self.data.to_string()
     }
 }
 impl OperatorExpr {
-    pub fn new(oper: RawOperator, left: Box<dyn ASTNode>, right: Box<dyn ASTNode>) -> Self {
+    pub fn new(oper: RawOperator, left: TotalNodes, right: TotalNodes) -> Self {
+        Self {
+            data: oper,
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+    pub fn new_box(oper: RawOperator, left: Box<TotalNodes>, right: Box<TotalNodes>) -> Self {
         Self {
             data: oper,
             left,
-            right,
+            right
         }
     }
 }
 
 /// Represents a join between two nodes. Note that calling `evaluate` will always fail, as it does not make sense. 
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct CommaExpr {
-    left: Box<dyn ASTNode>,
-    right: Box<dyn ASTNode>
+    left: Box<TotalNodes>,
+    right: Box<TotalNodes>
+}
+impl Display for CommaExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.print_traversal(TreeOrderTraversal::Inorder))
+    }
+}
+impl Debug for CommaExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "comma-expr left: '{:?}' right: '{:?}'", &self.left, &self.right)
+    }
 }
 impl ASTNode for CommaExpr {
+    fn left(&self) -> Option<&TotalNodes> {
+        Some(self.left.as_ref())
+    }
+    fn right(&self) -> Option<&TotalNodes> {
+        Some(self.right.as_ref())
+    }
+
+    fn set_left(&mut self, new: Box<TotalNodes>) {
+        self.left = new;
+    }
+    fn set_right(&mut self, new: Box<TotalNodes>) {
+        self.right = new;
+    }
+
     fn evaluate(&self, _: &[VariableUnion]) -> CalcResult<VariableUnion> {
         Err( CalcError::from( OperationError::new_fmt(",", &self.left, &self.right, Some("comma can not be combined on objects, unless a list is the expected result")) ) )
     }
@@ -80,30 +123,18 @@ impl ASTNode for CommaExpr {
         Ok(left)
     }
 
-    fn print_self(&self, kind: TreeOrderTraversal) -> String {
-        kind.join_strings(Some(self.left.print_self(kind)), ",".to_string(), Some(self.right.print_self(kind)))
-    }
-    fn debug_print(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "comma-expr left: {:?} right: {:?}", &self.left, &self.right)
-    }
-}
-impl ASTJoinNode for CommaExpr {
-    fn left(&self) -> Option<&dyn ASTNode> {
-        Some(self.left.as_ref())
-    }
-    fn right(&self) -> Option<&dyn ASTNode> {
-        Some(self.right.as_ref())
-    }
-
-    fn set_left(&mut self, new: Box<dyn ASTNode>) {
-        self.left = new;
-    }
-    fn set_right(&mut self, new: Box<dyn ASTNode>) {
-        self.right = new;
+    fn print_self(&self) -> String {
+        ",".to_string()
     }
 }
 impl CommaExpr {
-    pub fn new(left: Box<dyn ASTNode>, right: Box<dyn ASTNode>) -> Self {
+    pub fn new(left: TotalNodes, right: TotalNodes) -> Self {
+        Self {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+    pub fn new_box(left: Box<TotalNodes>, right: Box<TotalNodes>) -> Self {
         Self {
             left,
             right,
@@ -112,72 +143,66 @@ impl CommaExpr {
 }
 
 /// Represents a joined, but not yet processed node. Calling `evaluate` or `evaluate_list` will always result in an error
-#[derive(Default)]
-pub struct RawJoinExpr {
+#[derive(Default, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RawExpr {
     data: String,
-    left: Option<Box<dyn ASTNode>>,
-    right: Option<Box<dyn ASTNode>>
+    left: Option<Box<TotalNodes>>,
+    right: Option<Box<TotalNodes>>
 }
-impl ASTNode for RawJoinExpr {
+impl Display for RawExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.print_traversal(TreeOrderTraversal::Inorder))
+    }
+}
+impl Debug for RawExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "raw-expr '{}' left: '{:?}' right: '{:?}'", &self.data, &self.left, &self.right)
+    }
+}
+impl ASTNode for RawExpr {
+    fn left(&self) -> Option<&TotalNodes> {
+        self.left.as_deref()
+    }
+    fn right(&self) -> Option<&TotalNodes> {
+        self.right.as_deref()
+    }
+
+    fn set_left(&mut self, new: Box<TotalNodes>) {
+        self.left = Some(new);
+    }
+    fn set_right(&mut self, new: Box<TotalNodes>) {
+        self.right = Some(new);
+    }
+
     fn evaluate(&self, _: &[VariableUnion]) -> Result<VariableUnion, CalcError> {
         Err(UndefinedError::new("raw expressions have no evaluation").into())
     }
 
-    fn print_self(&self, kind: TreeOrderTraversal) -> String {
-        kind.join_strings(self.left.as_ref().map(|x| x.print_self(kind)), self.data.clone(), self.right.as_ref().map(|x| x.print_self(kind)))
-    }
-    fn debug_print(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "raw-joined-expr '{}' left: {:?} right: {:?}", &self.data, &self.left, &self.right)
+    fn print_self(&self) -> String {
+        "'".to_string() + self.data.as_str() + "'"
     }
 }
-impl ASTJoinNode for RawJoinExpr {
-    fn left(&self) -> Option<&dyn ASTNode> {
-        self.left.as_deref()
-    }
-    fn right(&self) -> Option<&dyn ASTNode> {
-        self.right.as_deref()
-    }
-
-    fn set_left(&mut self, new: Box<dyn ASTNode>) {
-        self.left = Some(new);
-    }
-    fn set_right(&mut self, new: Box<dyn ASTNode>) {
-        self.right = Some(new);
-    }
-}
-impl ASTRawNode for RawJoinExpr {
-    fn get_contents(&self) -> &str {
-        &self.data
-    }
-    fn set_contents(&mut self, new: String) {
-        self.data = new
-    }
-}
-impl From<RawLeafExpr> for RawJoinExpr {
-    fn from(value: RawLeafExpr) -> Self {
-        Self {
-            data: value.into(),
-            left: None,
-            right: None
+impl RawExpr {
+    pub fn new<S>(contents: S, left: Option<TotalNodes>, right: Option<TotalNodes>) -> Self where S: ToString {
+        Self{
+            data: contents.to_string(),
+            left: left.map(|x| Box::new(x)),
+            right: right.map(|x| Box::new(x))
         }
     }
-}
-impl From<RawJoinExpr> for (String, Option<Box<dyn ASTNode>>, Option<Box<dyn ASTNode>>) {
-    fn from(value: RawJoinExpr) -> Self {
-        (value.data, value.left, value.right)
-    }
-}
-impl From<RawJoinExpr> for (RawLeafExpr, Option<Box<dyn ASTNode>>, Option<Box<dyn ASTNode>>) {
-    fn from(value: RawJoinExpr) -> Self {
-        (RawLeafExpr::from(value.data), value.left, value.right)
-    }
-}
-impl RawJoinExpr {
-    pub fn new<S>(contents: S, left: Option<Box<dyn ASTNode>>, right: Option<Box<dyn ASTNode>>) -> Self where S: ToString {
+    pub fn new_box<S>(contents: S, left: Option<Box<TotalNodes>>, right: Option<Box<TotalNodes>>) -> Self where S: ToString {
         Self{
             data: contents.to_string(),
             left,
             right
         }
+    }
+    
+
+    fn get_contents(&self) -> &str {
+        &self.data
+    }
+    fn set_contents(&mut self, new: String) {
+        self.data = new
     }
 }

@@ -199,38 +199,38 @@ lazy_static! {
 macro_rules! logger_write {
     ($level: expr, $($arg:tt)*) => {
         {
-            if logging.is_open() { //Do nothing, so that standard error is not flooded with 'not open' errors.
+            if crate::core::logger::logging.is_open() { //Do nothing, so that standard error is not flooded with 'not open' errors.
                 #[allow(unreachable_patterns)]
-                let true_level: LoggerLevel = match $level {
-                    LoggerLevel::None => panic!("cannot record information about a None log"),
-                    LoggerLevel::Debug => LoggerLevel::Debug,
-                    LoggerLevel::Info => LoggerLevel::Info,
-                    LoggerLevel::Warning => LoggerLevel::Warning,
-                    LoggerLevel::Error => LoggerLevel::Error,
-                    LoggerLevel::Critical => LoggerLevel::Critical,
+                let true_level: crate::core::logger::LoggerLevel = match $level {
+                    crate::core::logger::LoggerLevel::None => panic!("cannot record information about a None log"),
+                    crate::core::logger::LoggerLevel::Debug => crate::core::logger::LoggerLevel::Debug,
+                    crate::core::logger::LoggerLevel::Info => crate::core::logger::LoggerLevel::Info,
+                    crate::core::logger::LoggerLevel::Warning => crate::core::logger::LoggerLevel::Warning,
+                    crate::core::logger::LoggerLevel::Error => crate::core::logger::LoggerLevel::Error,
+                    crate::core::logger::LoggerLevel::Critical => crate::core::logger::LoggerLevel::Critical,
                     _ => panic!("the type {:?} cannot be interpreted as a valid `LoggerLevel` instance", $level)
                 };
-                if true_level >= logging.open_level() {
+                if true_level >= crate::core::logger::logging.open_level() {
                     let contents: String = format!($($arg)*);
 
-                    match logging.start_log(true_level) {
+                    match crate::core::logger::logging.start_log(true_level) {
                         Ok(_) => {
-                            match logging.write(&contents) {
+                            match crate::core::logger::logging.write(&contents) {
                                 Ok(_) => {
-                                    if let Err(e) = logging.end_log() {
+                                    if let Err(e) = crate::core::logger::logging.end_log() {
                                         eprintln!("log error: '{:?}'. closing log", e);
-                                        logging.close();
+                                        crate::core::logger::logging.close();
                                     }
                                 },
                                 Err(e) => {
                                     eprintln!("log error: '{:?}'. closing log", e);
-                                    logging.close();
+                                    crate::core::logger::logging.close();
                                 }
                             }
                         },
                         Err(e) => {
                             eprintln!("log error: '{:?}'. closing log", e);
-                            logging.close();
+                            crate::core::logger::logging.close();
                         }
                     }
                 }
@@ -242,7 +242,8 @@ macro_rules! logger_write {
 macro_rules! log_debug {
     ($($arg:tt)*) => {
         {
-            logger_write!(LoggerLevel::Debug, $($arg)*)
+            use crate::logger_write;
+            logger_write!(crate::core::logger::LoggerLevel::Debug, $($arg)*)
         }
     }
 }
@@ -250,7 +251,8 @@ macro_rules! log_debug {
 macro_rules! log_info {
     ($($arg:tt)*) => {
         {
-            logger_write!(LoggerLevel::Info, $($arg)*)
+            use crate::logger_write;
+            logger_write!(crate::core::logger::LoggerLevel::Info, $($arg)*)
         }
     }
 }
@@ -258,7 +260,8 @@ macro_rules! log_info {
 macro_rules! log_warning {
     ($($arg:tt)*) => {
         {
-            logger_write!(LoggerLevel::Warning, $($arg)*)
+            use crate::logger_write;
+            logger_write!(crate::core::logger::LoggerLevel::Warning, $($arg)*)
         }
     }
 }
@@ -266,7 +269,8 @@ macro_rules! log_warning {
 macro_rules! log_error {
     ($($arg:tt)*) => {
         {
-            logger_write!(LoggerLevel::Error, $($arg)*)
+            use crate::logger_write;
+            logger_write!(crate::core::logger::LoggerLevel::Error, $($arg)*)
         }
     }
 }
@@ -274,7 +278,8 @@ macro_rules! log_error {
 macro_rules! log_critical {
     ($($arg:tt)*) => {
         {
-            logger_write!(LoggerLevel::Critical, $($arg)*)
+            use crate::logger_write;
+            logger_write!(crate::core::logger::LoggerLevel::Critical, $($arg)*)
         }
     }
 }

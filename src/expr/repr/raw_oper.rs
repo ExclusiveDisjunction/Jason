@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Display};
 use crate::calc::{VariableUnion, VariableUnionRef, CalcResult, OperationError};
 
-#[derive(Clone, Copy)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
 /// Represents different operators as a symbol and a rank.
 /// Note that this classes comparisons (PartialEq, Eq, PartialOrd, Ord) all rely on the ***rank***, not the ***symbol***. Therefore `RawOperator::Plus == RawOperator::Minus` is true because they have the same rank. To equal based on characters, call the `eq_symbol` function.
 pub enum RawOperator {

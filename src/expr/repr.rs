@@ -5,47 +5,47 @@ pub mod combine;
 pub mod poly;
 
 pub use raw_oper::RawOperator;
-pub use base::{ASTNode, ASTJoinNode, TreeOrderTraversal};
-pub use leaf::{RawLeafExpr, ConstExpr, VariableExpr};
-pub use combine::{RawJoinExpr, OperatorExpr, CommaExpr};
-pub use poly::{LeafNodes, JoinedNodes, TotalNodes};
+pub use base::{ASTNode, TreeOrderTraversal};
+pub use leaf::{ConstExpr, VariableExpr};
+pub use combine::{OperatorExpr, CommaExpr, RawExpr};
+pub use poly::TotalNodes;
 
 #[test]
 fn test_tree_eval() {
     use crate::calc::{VariableUnion, MathVector, CalcResult, Matrix};
 
-    let tree_a = Box::new( ConstExpr::new(4.into()) );
-    let tree_b = Box::new( OperatorExpr::new(
+    let tree_a: TotalNodes = ConstExpr::new(4.into()).into();
+    let tree_b: TotalNodes = OperatorExpr::new_box(
         RawOperator::Mul,
         Box::new(
-            ConstExpr::new(3.into() )
+            ConstExpr::new(3.into() ).into()
         ),
         Box::new(
-            ConstExpr::new(MathVector::from(vec![1, 2, 3]).into() )
+            ConstExpr::new(MathVector::from(vec![1, 2, 3]).into() ).into()
         )
-    ));
-    let mut tree_c = Box::new( OperatorExpr::new( 
+    ).into();
+    let mut tree_c: TotalNodes = OperatorExpr::new_box( 
         RawOperator::Plus,
         Box::new( 
-            OperatorExpr::new(
+            OperatorExpr::new_box(
                 RawOperator::Mul,
                 Box::new(
-                    VariableExpr::new('x', 0)
+                    VariableExpr::new('x', 0).into()
                 ),
                 Box::new(
-                    ConstExpr::new(4.into() )
+                    ConstExpr::new(4.into() ).into()
                 )
-            )
+            ).into()
         ),
         Box::new(
-            ConstExpr::new(1.5.into() )
+            ConstExpr::new(1.5.into() ).into()
         )
-    ));
+    ).into();
 
     let on: Vec<VariableUnion> = vec![4.into()];
 
     {
-        let ours: Vec<&dyn ASTNode> = vec![tree_a.as_ref(), tree_b.as_ref(), tree_c.as_ref()];
+        let ours: Vec<&TotalNodes> = vec![&tree_a, &tree_b, &tree_c];
         let eval: Vec<CalcResult<VariableUnion>> = ours.into_iter().map(|x| x.evaluate(&on) ).collect();
 
         assert_eq!(eval[0], Ok( 4.0.into() ) );
@@ -55,15 +55,15 @@ fn test_tree_eval() {
 
     tree_c.set_right(
         Box::new(
-            OperatorExpr::new (
+            OperatorExpr::new_box (
                 RawOperator::Pow,
                 Box::new(
-                    VariableExpr::new('x', 0)
+                    VariableExpr::new('x', 0).into()
                 ),
                 Box::new(
-                    ConstExpr::new( 2.into() )
+                    ConstExpr::new( 2.into() ).into()
                 )
-            )
+            ).into()
         )
     );
 
@@ -71,53 +71,38 @@ fn test_tree_eval() {
 
     tree_c.set_left(
         Box::new(
-            RawLeafExpr::new("Hello there, I will not evaluate")
+            RawExpr::new("Hello there, I will not evaluate", None, None).into()
         )
     );
     assert!(tree_c.evaluate(&on).is_err());
 
     tree_c.set_left(
         Box::new(
-            CommaExpr::new(
+            CommaExpr::new_box(
                 Box::new(
-                    ConstExpr::new(4.into())
+                    ConstExpr::new(4.into()).into()
                 ),
                 Box::new(
-                    ConstExpr::new(5.into())
+                    ConstExpr::new(5.into()).into()
                 )
-            )
+            ).into()
         )
     );
     assert!(tree_c.evaluate(&on).is_err());
     assert!(tree_c.evaluate_list(&on).is_err()); //Error because comma is stored under operator.
     
-    let tree_d: Box<dyn ASTNode> = Box::new(
+    let tree_d: TotalNodes = CommaExpr::new(
         CommaExpr::new(
-            Box::new(
-                CommaExpr::new(
-                    Box::new(
-                        VariableExpr::new('x', 0)
-                    ),
-                    Box::new(
-                        ConstExpr::new( Matrix::identity(2).into() )
-                    )
-                )
-            ),
-            Box::new(
-                ConstExpr::new(MathVector::from(vec![1, 2, 3]).into() )
-            )
-        )
-    );
+            VariableExpr::new('x', 0).into(),
+            ConstExpr::new( Matrix::identity(2).into() ).into(),
+        ).into(),
+        ConstExpr::new(MathVector::from(vec![1, 2, 3]).into() ).into()
+    ).into();
+
     assert_eq!(tree_d.evaluate_list(&on), Ok( vec![VariableUnion::from(4), Matrix::identity(2).into(), MathVector::from(vec![1, 2, 3]).into() ] ));
 
-    let tree_e: Box<dyn ASTNode> = Box::new(
-        RawJoinExpr::new("hello", None, None)
-    );
-    assert!(tree_e.evaluate(&on).is_err() && tree_e.evaluate_list(&on).is_err());
+    let tree_e = RawExpr::new("hello", None, None);
 
-    let tree_f: Box<dyn ASTNode> = Box::new(
-        RawLeafExpr::new("hello")
-    );
-    assert!(tree_f.evaluate(&on).is_err() && tree_f.evaluate_list(&on).is_err());
+    assert!(tree_e.evaluate(&on).is_err() && tree_e.evaluate_list(&on).is_err());
 
 }

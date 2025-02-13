@@ -1,6 +1,8 @@
 use std::fmt::{Display, Debug};
 use std::iter::zip;
 
+use serde::{Serialize, Deserialize};
+
 use crate::calc::{VariableUnion, CalcResult, VariableType, CalcError, VariableData, calc_error::{ArgCountError, ArgTypeError}};
 
 pub trait FunctionBase: Display + Debug {
@@ -8,14 +10,13 @@ pub trait FunctionBase: Display + Debug {
 
     fn name(&self) -> &str;
     fn signature(&self) -> &FunctionArgSignature;
-}
-impl PartialEq for dyn FunctionBase {
-    fn eq(&self, other: &Self) -> bool {
+
+    fn func_eq<T: FunctionBase>(&self, other: &T) -> bool {
         self.name() == other.name() && self.signature() == other.signature()
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArgSignature {
     input_kind: VariableType,
     name: String
@@ -41,7 +42,7 @@ impl ArgSignature {
     }
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FunctionArgSignature {
     sig: Vec<ArgSignature>
 }
