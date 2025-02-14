@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use std::fs::{File, copy, remove_file};
 use std::io::{Write, Read};
 
-
 pub struct Package {
     pack_id: StrongPackID,
     current_id: u32,
@@ -95,7 +94,7 @@ impl Package {
     }
 
     pub fn resolve<T>(&self, id: T) -> Option<&PackageEntry> where T: ResourceID {
-        id.looking_at_sc(&self.pack_id)?;
+        id.contained_in_pack_sc(&self.pack_id)?;
 
         for entry in &self.entries {
             if entry.accepts_id(&id) {
@@ -106,7 +105,7 @@ impl Package {
         None
     }
     pub fn resolve_mut<T>(&mut self, id: T) -> Option<&mut PackageEntry> where T: ResourceID {
-        id.looking_at_sc(&self.pack_id)?;
+        id.contained_in_pack_sc(&self.pack_id)?;
 
         for entry in &mut self.entries {
             if entry.accepts_id(&id) {
@@ -121,7 +120,7 @@ impl Package {
         self.release(id).is_some()
     }
     pub fn release<T: ResourceID>(&mut self, id: T) -> Option<PackageEntry> {
-        id.looking_at_sc(&self.pack_id)?;
+        id.contained_in_pack_sc(&self.pack_id)?;
 
         let index = match self.entries.iter().position(|x| x.accepts_id(&id)) {
             Some(i) => i,
