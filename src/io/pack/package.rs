@@ -14,8 +14,9 @@ use std::fs::{File, copy, remove_file};
 use std::io::{Write, Read};
 
 pub struct Package {
-    pack_id: StrongPackID,
+    pack_id: NumericalPackID,
     current_id: u32,
+    name: String,
     header: PackageHeader,
     entries: Vec<PackageEntry>,
     func: Vec<ASTBasedFunction>,
@@ -41,9 +42,16 @@ impl Package {
     pub fn location(&self) -> &Path {
         &self.location
     }
-    pub fn id(&self) -> &StrongPackID {
-        &self.pack_id
+    pub fn id(&self) -> NumericalPackID {
+        self.pack_id
     }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn make_pack_id(&self) -> PackageID {
+        PackageID::Strong(self.name.clone(), self.pack_id)
+    }
+
     pub fn header(&self) -> &PackageHeader {
         &self.header
     }
@@ -93,8 +101,12 @@ impl Package {
         Ok(())
     }
 
-    pub fn resolve<T>(&self, id: T) -> Option<&PackageEntry> where T: ResourceID {
-        id.contained_in_pack_sc(&self.pack_id)?;
+    pub fn resolve(&self, loc: &ResourceLocator) -> Option<NumericalResourceID> {
+
+    }
+
+    pub fn get(&self, id: NumericalResourceID) -> Option<&PackageEntry> {
+        id.contained_in_sc(&self.pack_id)?;
 
         for entry in &self.entries {
             if entry.accepts_id(&id) {
@@ -104,8 +116,8 @@ impl Package {
 
         None
     }
-    pub fn resolve_mut<T>(&mut self, id: T) -> Option<&mut PackageEntry> where T: ResourceID {
-        id.contained_in_pack_sc(&self.pack_id)?;
+    pub fn get_mut(&mut self, id: NumericalResourceID) -> Option<&mut PackageEntry>{
+        id.contained_in_sc(&self.pack_id)?;
 
         for entry in &mut self.entries {
             if entry.accepts_id(&id) {
@@ -116,11 +128,11 @@ impl Package {
         None
     }
  
-    pub fn remove<T: ResourceID> (&mut self, id: T) -> bool {
+    pub fn remove(&mut self, id: NumericalResourceID) -> bool {
         self.release(id).is_some()
     }
-    pub fn release<T: ResourceID>(&mut self, id: T) -> Option<PackageEntry> {
-        id.contained_in_pack_sc(&self.pack_id)?;
+    pub fn release(&mut self, id: NumericalResourceID) -> Option<PackageEntry> {
+        id.contained_in_sc(&self.pack_id)?;
 
         let index = match self.entries.iter().position(|x| x.accepts_id(&id)) {
             Some(i) => i,
@@ -142,7 +154,7 @@ impl Package {
             Some(i) => i,
             None => return Err(UnexpectedError::new("the max ID has been taken already for this package").into())
         };
-        let new_id = StrongResourceID::new(self.pack_id.id(), next_id);
+        let new_id = NumericalResourceID::new(self.pack_id, next_id);
 
         let result = match PackageEntry::new(
             new_id,

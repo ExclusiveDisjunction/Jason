@@ -9,16 +9,22 @@ use std::cmp::Ordering;
 use serde::{Serialize, Deserialize};
 
 /*
-    Various Identification tools for Packages and Resources. There are two major kinds: Weak and Strong.
-    1. Weak - Text based, may or may not exist. 
-    2. Strong - u32 based, usually exists unless it gets removed. 
 
-    Futhermore, there is the the trait ResourceID. This trait provides functionality for determining if a resource is owned by a package, or if the ID points to the current object. 
 */
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct NumericalPackID {
     id: u32
+}
+impl PartialOrd for NumericalPackID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for NumericalPackID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
 }
 impl NumericalPackID {
     pub fn new(id: u32) -> Self {
@@ -48,152 +54,132 @@ impl NumericalPackID {
     pub fn is_specific(&self) -> bool { self.id > 2 }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub enum WeakPackID {
-    Spec(String),
-    Any,
-    Usr,
-    Std
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct NumericalResourceID {
+    package: NumericalPackID,
+    resx: u32
 }
-impl Display for WeakPackID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", 
-            match self {
-                Self::Spec(s) => s.as_str(),
-                Self::Any => "*",
-                Self::Usr => "usr",
-                Self::Std => "std"
-            }
-        )
+impl PartialOrd for NumericalResourceID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
-impl WeakPackID {
-    pub fn looking_at(&self, name: &str) -> bool {
-        if name == "usr" && matches!(self, Self::Usr) { return true; }
-        else if name == "std" && matches!(self, Self::Std) { return true; }
-
-        match self {
-            WeakPackID::Any => true,
-            WeakPackID::Spec(s) => s.as_str() == name,
-            _ => false
+impl Ord for NumericalResourceID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let parent = self.package.cmp(&other.package);
+        if parent == Ordering::Equal {
+            self.resx.cmp(&other.resx)
         }
-    }
-    pub fn is_usr(&self) -> bool {
-        matches!(self, Self::Usr)
-    }
-    pub fn is_std(&self) -> bool {
-        matches!(self, Self::Std)
-    }
-    pub fn is_any(&self) -> bool {
-        matches!(self, Self::Any)
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub enum StrongPackID {
-    Spec(String, NumericalPackID),
-    SpecNum(NumericalPackID),
-    Any,
-    Usr,
-    Std
-}
-impl PartialEq<WeakPackID> for StrongPackID {
-    fn eq(&self, other: &WeakPackID) -> bool {
-        match (self, other) {
-            (Self::Any, WeakPackID::Any) => true,
-            (Self::Std, WeakPackID::Std) => true,
-            (Self::Usr, WeakPackID::Usr) => true,
-            (Self::Spec(s, _), WeakPackID::Spec(t)) => s == t, 
-            (Self::SpecNum(_), WeakPackID::Any) => true,
-            _ => false
+        else {
+            parent
         }
     }
 }
-impl Into<WeakPackID> for StrongPackID {
-    fn into(self) -> WeakPackID {
-        match self {
-            Self::Any => WeakPackID::Any,
-            Self::Std => WeakPackID::Std,
-            Self::Usr => WeakPackID::Usr,
-            Self::Spec(s, _) => WeakPackID::Spec(s),
-            Self::SpecNum(_) => WeakPackID::Any
-        }
-    }
-}
-impl StrongPackID {
-    pub fn id(&self) -> NumericalPackID {
-        match self {
-            Self::Spec(_, id) => id.clone(),
-            Self::SpecNum(id) => id.clone(),
-            Self::Any => NumericalPackID::any_id(),
-            Self::Usr => NumericalPackID::usr_id(),
-            Self::Std => NumericalPackID::std_id()
-        }
-    }
-    pub fn name(&self) -> &str {
-        match self {
-            Self::Spec(s, _) => s.as_str(),
-            Self::SpecNum(_) => "(id)",
-            Self::Any => "*",
-            Self::Usr => "usr",
-            Self::Std => "std"
+impl NumericalResourceID {
+    pub fn new(package: NumericalPackID, resx: u32) -> Self {
+        Self {
+            package,
+            resx
         }
     }
 
-    pub fn is_any(&self) -> bool {
-        matches!(self, Self::Any)
+    pub fn contained_in(&self, parent: &NumericalPackID) -> bool {
+        &self.package == parent
     }
-    pub fn is_usr(&self) -> bool {
-        matches!(self, Self::Usr)
-    }
-    pub fn is_std(&self) -> bool {
-        matches!(self, Self::Std)
-    }
-    pub fn is_specific(&self) -> bool {
-        matches!(self, Self::Spec(_, _)) || matches!(self, Self::SpecNum(_))
+    pub fn contained_in_sc(&self, parent: &NumericalPackID) -> Option<()> {
+        if self.contained_in(parent) {
+            Some(())
+        }
+        else {
+            None
+        }
     }
 }
 
 #[derive(Eq, Clone)]
 pub enum PackageID {
-    Weak(WeakPackID),
-    Strong(StrongPackID)
+    Any,
+    Usr,
+    Std,
+    Weak(String),
+    Strong(String, NumericalPackID),
+    Num(NumericalPackID)
+}
+impl Display for PackageID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Any => write!(f, "*"),
+            Self::Usr => write!(f, "usr"),
+            Self::Std => write!(f, "std"),
+            Self::Strong(s, _) | Self::Weak(s) => write!(f, "{}", s),
+            Self::Num(a) => write!(f, "(id: {})", a)
+        }
+    }
+}
+impl Debug for PackageID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Display).fmt(f)
+    }
 }
 impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Strong(a), Self::Strong(b)) => a == b,
+            (Self::Any, Self::Any) => true,
+            (Self::Usr, Self::Usr) => true,
+            (Self::Std, Self::Std) => true,
             (Self::Weak(a), Self::Weak(b)) => a == b,
-            (Self::Strong(a), Self::Weak(b)) | (Self::Weak(b), Self::Strong(a)) => a == b
+            (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
+            (Self::Num(a), Self::Num(b)) => a == b,
+            (Self::Weak(a), Self::Strong(b, _)) | (Self::Strong(b, _), Self::Weak(a)) => a == b,
+            (Self::Num(a), Self::Strong(_, b)) | (Self::Strong(b, _), Self::Num(a)) => a == b,
+            _ => false
         }
     }
 }
-impl From<WeakPackID> for PackageID {
-    fn from(value: WeakPackID) -> Self {
-        Self::Weak(value)
-    }
-}
-impl From<StrongPackID> for PackageID {
-    fn from(value: StrongPackID) -> Self {
-        Self::Strong(value)
-    }
-}
-impl Into<WeakPackID> for PackageID {
-    fn into(self) -> WeakPackID {
+impl PartialEq<NumericalPackID> for PackageID {
+    fn eq(&self, other: &NumericalPackID) -> bool {
         match self {
-            Self::Weak(w) => w,
-            Self::Strong(s) => s.into()
+            Self::Any => other.id == 0,
+            Self::Std => other.id == 1,
+            Self::Usr => other.id == 2,
+            Self::Strong(_, a) | Self::Num(a) => a == other,
+            Self::Weak(_) => false
+        }
+    }
+}
+impl PackageID {
+
+    pub fn is_any(&self) -> bool { matches!(self, Self::Any) }
+    pub fn is_std(&self) -> bool { matches!(self, Self::Std) }
+    pub fn is_usr(&self) -> bool { matches!(self, Self::Usr) }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Any => "any",
+            Self::Std => "std",
+            Self::Usr => "usr",
+            Self::Weak(w) | Self::Strong(w, _) => w.as_str(),
+            Self::Num(id) => "(id)"
+        }
+    }
+    pub fn id(&self) -> NumericalPackID {
+        match self {
+            Self::Any => NumericalPackID::any_id(),
+            Self::Std => NumericalPackID::std_id(),
+            Self::Usr => NumericalPackID::usr_id(),
+            Self::Weak(_) => NumericalPackID::any_id(),
+            Self::Strong(_, id) | Self::Num(id) => *id
         }
     }
 }
 
 #[derive(Clone, Eq)]
-pub enum ResxID {
+pub enum ResourceID {
     Numeric(u32),
     Strong(String, u32),
     Weak(String)
 }
-impl Display for ResxID {
+impl Display for ResourceID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Strong(a, _) | Self::Weak(a) => write!(f, "{a}"),
@@ -201,7 +187,7 @@ impl Display for ResxID {
         }
     }
 }
-impl Debug for ResxID {
+impl Debug for ResourceID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Numeric(a) => write!(f, "resx-id: {a}"),
@@ -210,7 +196,7 @@ impl Debug for ResxID {
         }
     }
 }
-impl PartialEq for ResxID {
+impl PartialEq for ResourceID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Numeric(a), Self::Numeric(b)) => a == b,
@@ -222,10 +208,18 @@ impl PartialEq for ResxID {
         }
     }
 }
-impl ResxID {
+impl PartialEq<u32> for ResourceID {
+    fn eq(&self, other: &u32) -> bool {
+        match self {
+            Self::Numeric(a) | Self::Strong(_, a) => a == other,
+            Self::Weak(_) => false
+        }
+    }
+}
+impl ResourceID {
     pub fn id(&self) -> Option<u32> {
         match self {
-            Self::Numeric(a) | Self::Strong(_, a) => Some(a),
+            Self::Numeric(a) | Self::Strong(_, a) => Some(*a),
             _ => None
         }
     }
@@ -239,7 +233,7 @@ impl ResxID {
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum ResourceKind {
-    Function(Vec<String>),
+    Function,
     Entry(EntryType)
 }
 impl From<EntryType> for ResourceKind {
@@ -250,7 +244,7 @@ impl From<EntryType> for ResourceKind {
 impl Display for ResourceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Function(a) => write!(f, "%({})", a.join(", ")),
+            Self::Function => write!(f, "%"),
             Self::Entry(e) => (e as &dyn Display).fmt(f)
         }
     }
@@ -258,30 +252,97 @@ impl Display for ResourceKind {
 impl Debug for ResourceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Function(a) => write!(f, "%({})", a.join(", ")),
+            Self::Function => write!(f, "%"),
             Self::Entry(e) => (e as &dyn Debug).fmt(f)
         }
     }
 }
 
-pub struct dick {
-    parent: NumericalPackID,
-    entry: u32
-}
-
+#[derive(Clone, PartialEq, Eq)]
 pub struct ResourceLocator {
     parent: PackageID,
-    resource: ResxID,
+    resource: ResourceID,
     kind: ResourceKind
 }
+impl Debug for ResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}::{:?} kind: {:?}", &self.parent, &self.resource, &self.kind)
+    }
+}
+impl Display for ResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", &self.parent, &self.resource)
+    }
+}
+impl PartialEq<NumericalResourceID> for ResourceLocator {
+    fn eq(&self, other: &NumericalResourceID) -> bool {
+        self.parent == other.package && self.resource == other.resx
+    }
+}
+impl ResourceLocator {
+    pub fn new(parent: PackageID, resource: ResourceID, kind: ResourceKind) -> Self {
+        Self {
+            parent,
+            resource,
+            kind
+        }
+    }
+    pub fn new_entry(parent: PackageID, resource: ResourceID, kind: EntryType) -> Self {
+        Self {
+            parent,
+            resource,
+            kind: kind.into()
+        }
+    }
+    pub fn new_func(parent: PackageID, resource: ResourceID) -> Self {
+        Self {
+            parent,
+            resource,
+            kind: ResourceKind::Function
+        }
+    }
 
-impl TryFrom<String> for ResourceLocator {
+    pub fn parent(&self) -> &PackageID {
+        &self.parent
+    }
+    pub fn resource(&self) -> &ResourceID {
+        &self.resource
+    }
+
+    pub fn contained_in(&self, parent: &PackageID) -> bool {
+        &self.parent == parent
+    }
+    pub fn contained_in_sc(&self, parent: &PackageID) -> Option<()> {
+        if self.contained_in(parent) {
+            Some(())
+        }
+        else {
+            None
+        }
+    }
+}
+
+pub struct ParsedResourceLocator {
+    loc: ResourceLocator,
+    residual: Option<String>
+}
+impl Debug for ParsedResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} residual: {}", &self.loc, &self.residual)
+    }
+}
+impl Display for ParsedResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (&self.loc as &dyn Display).fmt(f)
+    }
+}
+impl TryFrom<String> for ParsedResourceLocator {
     type Error = FormattingError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
     }
 }
-impl TryFrom<&str> for ResourceLocator {
+impl TryFrom<&str> for ParsedResourceLocator {
     type Error = FormattingError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         /*
@@ -305,20 +366,20 @@ impl TryFrom<&str> for ResourceLocator {
         //First we check for the existence of the package. Then we will worry about the other part.
         let splits: Vec<&str> = value.split("::").collect();
 
-        let parent: WeakPackID;
+        let parent: PackageID;
         let raw_child: &str;
 
         match splits.len() {
             1 => {
-                parent = WeakPackID::Usr;
+                parent = PackageID::Usr;
                 raw_child = splits[0];
             },
             2 => {
                 match splits[0] {
-                    "usr" => parent = WeakPackID::Usr,
-                    "std" => parent = WeakPackID::Std,
-                    "*" => parent = WeakPackID::Any,
-                    a if !a.is_empty() && !is_string_whitespace(a) => parent = WeakPackID::Spec(a.trim().to_string()),
+                    "usr" => parent = PackageID::Usr,
+                    "std" => parent = PackageID::Std,
+                    "*" => parent = PackageID::Any,
+                    a if !a.is_empty() && !is_string_whitespace(a) => parent = PackageID::Weak(a.trim().to_string()),
                     b => return Err(FormattingError::new(&b, "the parent package must not be just whitespace or empty"))
                 }
                 raw_child = splits[1];
@@ -338,9 +399,12 @@ impl TryFrom<&str> for ResourceLocator {
 
             Ok( 
                 Self {
-                    parent: parent.into(),
-                    kind: EntryType::Variable.into(),
-                    resource: ResxID::Weak(c.trim().to_string())
+                    loc: ResourceLocator::new(
+                        parent.into(),
+                        ResourceID::Weak(c.trim().to_string()),
+                        EntryType::Variable.into()
+                    ),
+                    residual: None
                 }
             )
         }
@@ -361,19 +425,14 @@ impl TryFrom<&str> for ResourceLocator {
                     return Err(FormattingError::new(&name, "functions cannot have an empty name"));
                 }
 
-                let split_args: Vec<String>;
-                if !args.is_empty() && !is_string_whitespace(args) {
-                    split_args = args.split(',').map(|x| x.trim().to_string()).collect();
-                }
-                else {
-                    split_args = vec![];
-                }
-
                 Ok(
                     Self {
-                        parent: parent.into(),
-                        kind: ResourceKind::Function(split_args),
-                        resource: ResxID::Weak(name)
+                        loc: ResourceLocator::new(
+                            parent.into(),
+                            ResourceID::Weak(name),
+                            ResourceKind::Function
+                        ),
+                        residual: if args.is_empty() || is_string_whitespace(args) { None } else { Some(args.to_string()) },
                     }
                 )
             }
@@ -384,57 +443,40 @@ impl TryFrom<&str> for ResourceLocator {
         else {
             Ok(
                 Self {
-                    parent: parent.into(),
-                    kind: EntryType::Environment.into(),
-                    resource: ResxID::Weak(raw_child.to_string())
+                    loc: ResourceLocator::new(
+                        parent.into(),
+                        ResourceID::Weak(raw_child.to_string()),
+                        EntryType::Environment.into()
+                    ),
+                    residual: None
                 }
             )
         }
     }
 }
-impl ResourceLocator {
-    pub fn strong_entry(parent: NumericalPackID, resource: u32, kind: EntryType) -> Self {
-
+impl ParsedResourceLocator {
+    pub fn get_residual(&self) -> Option<&str> {
+        self.residual.as_deref()
     }
-    pub fn new(parent: PackageID, resource: ResxID, kind: ResourceKind) -> Self {
-        Self {
-            parent,
-            resource,
-            kind
-        }
-    }
-    pub fn new_entry(parent: PackageID, resource: ResxID, kind: EntryType) -> Self {
-        Self {
-            parent,
-            resource,
-            kind: kind.into()
-        }
-    }
-    pub fn new_func(parent: PackageID, resource: ResxID, args: Vec<String>) -> Self {
-        Self {
-            parent,
-            resource,
-            kind: ResourceKind::Function(args)
-        }
+    pub fn get_loc(&self) -> &ResourceLocator {
+        &self.loc
     }
 
-    pub fn parent(&self) -> &PackageID {
-        &self.parent
+    pub fn is_entry(&self) -> bool {
+        matches!(self.loc.kind, ResourceKind::Entry(_))
     }
-    pub fn resource(&self) -> &ResxID {
-        &self.resource
+    pub fn is_function(&self) -> bool {
+        matches!(self.loc.kind, ResourceKind::Function)
     }
-
-    pub fn contained_in(&self, parent: &PackageID) -> bool {
-        &self.parent == parent
+}
+impl From<ParsedResourceLocator> for (ResourceLocator, Option<String>) {
+    fn from(value: ParsedResourceLocator) -> Self {
+        (value.loc, value.residual)
     }
-    pub fn contained_in_sc(&self, parent: &PackageID) -> Option<()> {
-        if self.contained_in(parent) {
-            Some(())
-        }
-        else {
-            None
-        }
+}
+impl From<ParsedResourceLocator> for ResourceLocator {
+    fn from(value: ParsedResourceLocator) -> Self {
+        value.loc
     }
 }
 
@@ -463,45 +505,45 @@ fn test_io_id() {
         2: If a function is called, the parenthesis are required, no matter what
     */
 
-    assert_eq!( ResourceLocator::try_from("aa"), Ok(ResourceLocator::new_entry(WeakPackID::Usr, EntryType::Environment, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("").is_err() );
-    assert_eq!( ResourceLocator::try_from("$aa"), Ok(ResourceLocator::new_entry(WeakPackID::Usr, EntryType::Variable, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("$").is_err() );
-    assert_eq!( ResourceLocator::try_from("%aa()"), Ok(ResourceLocator::new_func(WeakPackID::Usr, "aa".to_string(), vec![])) ) ;
-    assert!( ResourceLocator::try_from("%aa").is_err() );
-    assert!( ResourceLocator::try_from("%").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
+    assert!( ParsedResourceLocator::try_from("").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
+    assert!( ParsedResourceLocator::try_from("$").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) )) ) ;
+    assert!( ParsedResourceLocator::try_from("%aa").is_err() );
+    assert!( ParsedResourceLocator::try_from("%").is_err() );
 
-    assert_eq!( ResourceLocator::try_from("usr::aa"), Ok(ResourceLocator::new_entry(WeakPackID::Usr, EntryType::Environment, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("usr::").is_err() );
-    assert_eq!( ResourceLocator::try_from("usr::$aa"), Ok(ResourceLocator::new_entry(WeakPackID::Usr, EntryType::Variable, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("usr::$").is_err() );
-    assert_eq!( ResourceLocator::try_from("usr::%aa()"), Ok(ResourceLocator::new_func(WeakPackID::Usr, "aa".to_string(), vec![])) ) ;
-    assert!( ResourceLocator::try_from("usr::%aa").is_err() );
-    assert!( ResourceLocator::try_from("usr::%").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("usr::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
+    assert!( ParsedResourceLocator::try_from("usr::").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("usr::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
+    assert!( ParsedResourceLocator::try_from("usr::$").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("usr::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) )) ) ;
+    assert!( ParsedResourceLocator::try_from("usr::%aa").is_err() );
+    assert!( ParsedResourceLocator::try_from("usr::%").is_err() );
 
-    assert_eq!( ResourceLocator::try_from("std::aa"), Ok(ResourceLocator::new_entry(WeakPackID::Std, EntryType::Environment, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("std::").is_err() );
-    assert_eq!( ResourceLocator::try_from("std::$aa"), Ok(ResourceLocator::new_entry(WeakPackID::Std, EntryType::Variable, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("std::$").is_err() );
-    assert_eq!( ResourceLocator::try_from("std::%aa()"), Ok(ResourceLocator::new_func(WeakPackID::Std, "aa".to_string(), vec![])) ) ;
-    assert!( ResourceLocator::try_from("std::%aa").is_err() );
-    assert!( ResourceLocator::try_from("std::%").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("std::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
+    assert!( ParsedResourceLocator::try_from("std::").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("std::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
+    assert!( ParsedResourceLocator::try_from("std::$").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("std::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Std, ResourceID::Weak("aa".to_string()) )) ) ;
+    assert!( ParsedResourceLocator::try_from("std::%aa").is_err() );
+    assert!( ParsedResourceLocator::try_from("std::%").is_err() );
 
-    assert_eq!( ResourceLocator::try_from("*::aa"), Ok(ResourceLocator::new_entry(WeakPackID::Any, EntryType::Environment, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("*::").is_err() );
-    assert_eq!( ResourceLocator::try_from("*::$aa"), Ok(ResourceLocator::new_entry(WeakPackID::Any, EntryType::Variable, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("*::$").is_err() );
-    assert_eq!( ResourceLocator::try_from("*::%aa()"), Ok(ResourceLocator::new_func(WeakPackID::Any, "aa".to_string(), vec![])) ) ;
-    assert!( ResourceLocator::try_from("*::%aa").is_err() );
-    assert!( ResourceLocator::try_from("*::%").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("*::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
+    assert!( ParsedResourceLocator::try_from("*::").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("*::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
+    assert!( ParsedResourceLocator::try_from("**::$").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("*::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Any, ResourceID::Weak("aa".to_string()) )) ) ;
+    assert!( ParsedResourceLocator::try_from("*::%aa").is_err() );
+    assert!( ParsedResourceLocator::try_from("*::%").is_err() );
 
-    assert_eq!( ResourceLocator::try_from("foo::aa"), Ok(ResourceLocator::new_entry(WeakPackID::Spec("foo".to_string()), EntryType::Environment, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("foo::").is_err() );
-    assert_eq!( ResourceLocator::try_from("foo::$aa"), Ok(ResourceLocator::new_entry(WeakPackID::Spec("foo".to_string()), EntryType::Variable, "aa".to_string()))) ;
-    assert!( ResourceLocator::try_from("foo::$").is_err() );
-    assert_eq!( ResourceLocator::try_from("foo::%aa()"), Ok(ResourceLocator::new_func(WeakPackID::Spec("foo".to_string()), "aa".to_string(), vec![])) ) ;
-    assert!( ResourceLocator::try_from("foo::%aa").is_err() );
-    assert!( ResourceLocator::try_from("foo::%").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("foo::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
+    assert!( ParsedResourceLocator::try_from("foo::").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("foo::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
+    assert!( ParsedResourceLocator::try_from("foo::$").is_err() );
+    assert_eq!( ParsedResourceLocator::try_from("foo::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Weak("foo".into()), ResourceID::Weak("aa".to_string()) )) ) ;
+    assert!( ParsedResourceLocator::try_from("foo::%aa").is_err() );
+    assert!( ParsedResourceLocator::try_from("foo::%").is_err() );
 
-    assert!( ResourceLocator::try_from("::").is_err() );
+    assert!( ParsedResourceLocator::try_from("::").is_err() );
 }

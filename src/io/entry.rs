@@ -1,6 +1,6 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
 use crate::core::{is_string_whitespace, errors::{FormattingError, ArgumentValueError, Error, OperationError as CoreOperErr}};
-use super::id::{ResourceID, StrongResourceID};
+use super::id::{ResourceID, NumericalResourceID};
 
 use std::fmt::{Display, Debug};
 use serde::{Serialize, Deserialize};
@@ -57,7 +57,7 @@ impl EntryType {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct PackageEntry {
-    key: StrongResourceID,
+    key: NumericalResourceID,
     name: String,
     kind: EntryType,
     data: VariableUnion
