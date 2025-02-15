@@ -61,7 +61,7 @@ impl Package {
 
     pub fn snapshot(&self) -> PackageSnapshot {
         let header = self.header.clone();
-        let name = self.pack_id.name().to_string();
+        let name = self.name.clone();
         let entries = json!(&self.entries).to_string();
         let functions = json!(&self.func).to_string();
         
@@ -102,7 +102,7 @@ impl Package {
     }
 
     pub fn resolve(&self, loc: &ResourceLocator) -> Option<NumericalResourceID> {
-
+        todo!()
     }
 
     pub fn get(&self, id: NumericalResourceID) -> Option<&PackageEntry> {

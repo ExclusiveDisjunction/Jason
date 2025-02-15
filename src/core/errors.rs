@@ -188,6 +188,24 @@ impl UnexpectedError {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum NamingError {
+    Empty,
+    InvalidCharacters,
+    TooLong,
+    TooShort
+}
+impl Debug for NamingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "the name provided was empty or just whitespace"),
+            Self::InvalidCharacters => write!(f, "the name provided has invalid characters"),
+            Self::TooLong => write!(f, "the name provided is too long"),
+            Self::TooShort => write!(f, "the name provided is too short"),
+        }
+    }
+}
+
 pub enum Error {
     ArgVal(ArgumentValueError),
     ArgMiss(ArgumentMissingError),
@@ -197,6 +215,7 @@ pub enum Error {
     Operation(OperationError),
     Conv(ConversionError),
     Unexpected(UnexpectedError),
+    Name(NamingError),
     Calc(CalcError),
     IO(io::Error)
 }
@@ -210,6 +229,7 @@ impl PartialEq for Error {
             (Self::Range(a), Self::Range(b)) => a == b,
             (Self::Operation(a), Self::Operation(b)) => a == b,
             (Self::Conv(a), Self::Conv(b)) => a == b,
+            (Self::Name(a), Self::Name(b)) => a == b,
             (Self::Calc(a), Self::Calc(b)) => a == b,
             (Self::IO(a), Self::IO(b)) => {
                 a.kind() == b.kind()
@@ -230,6 +250,7 @@ impl Debug for Error {
             Self::Operation(x) => x,
             Self::Conv(x) => x,
             Self::Unexpected(x) => x,
+            Self::Name(x) => x,
             Self::Calc(x) => x,
             Self::IO(x) => x
         };
@@ -281,6 +302,11 @@ impl From<ConversionError> for Error {
 impl From<UnexpectedError> for Error {
     fn from(value: UnexpectedError) -> Self {
         Self::Unexpected(value)
+    }
+}
+impl From<NamingError> for Error {
+    fn from(value: NamingError) -> Self {
+        Self::Name(value)
     }
 }
 impl From<CalcError> for Error {

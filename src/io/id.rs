@@ -1,4 +1,4 @@
-use crate::core::errors::FormattingError;
+use crate::core::errors::{FormattingError, NamingError};
 use crate::core::is_string_whitespace;
 use super::entry::EntryType;
 
@@ -6,15 +6,30 @@ use std::fmt::{Display, Debug};
 use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
 
-use serde::{Serialize, Deserialize};
+/// Checks to see if the name provided meets the following criteria:
+/// 1. No starting with numerical values
+/// 2. No 0x or *b patterns (addresses)
+/// 3. No symbols other than '_' or '-' (no format specifiers)
+/// 4. Only latin or greek letters.
+///
+/// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
+pub fn is_name_valid(name: &str) -> Result<String, NamingError> {
+    todo!()
+}
 
-/*
-
-*/
-
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct NumericalPackID {
     id: u32
+}
+impl Debug for NumericalPackID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+impl Display for NumericalPackID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
 }
 impl PartialOrd for NumericalPackID {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -24,6 +39,11 @@ impl PartialOrd for NumericalPackID {
 impl Ord for NumericalPackID {
     fn cmp(&self, other: &Self) -> Ordering {
         self.id.cmp(&other.id)
+    }
+}
+impl Hash for NumericalPackID {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
     }
 }
 impl NumericalPackID {
@@ -54,10 +74,20 @@ impl NumericalPackID {
     pub fn is_specific(&self) -> bool { self.id > 2 }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct NumericalResourceID {
     package: NumericalPackID,
     resx: u32
+}
+impl Display for NumericalResourceID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", &self.package, &self.resx)
+    }
+}
+impl Debug for NumericalResourceID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}.{}", &self.package, &self.resx)
+    }
 }
 impl PartialOrd for NumericalResourceID {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -75,6 +105,12 @@ impl Ord for NumericalResourceID {
         }
     }
 }
+impl Hash for NumericalResourceID {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.package.hash(state);
+        self.resx.hash(state);
+    }
+}
 impl NumericalResourceID {
     pub fn new(package: NumericalPackID, resx: u32) -> Self {
         Self {
@@ -82,6 +118,9 @@ impl NumericalResourceID {
             resx
         }
     }
+
+    pub fn package(&self) -> &NumericalPackID { &self.package }
+    pub fn resx(&self) -> u32 { self.resx }
 
     pub fn contained_in(&self, parent: &NumericalPackID) -> bool {
         &self.package == parent
@@ -131,7 +170,7 @@ impl PartialEq for PackageID {
             (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
             (Self::Num(a), Self::Num(b)) => a == b,
             (Self::Weak(a), Self::Strong(b, _)) | (Self::Strong(b, _), Self::Weak(a)) => a == b,
-            (Self::Num(a), Self::Strong(_, b)) | (Self::Strong(b, _), Self::Num(a)) => a == b,
+            (Self::Num(a), Self::Strong(_, b)) | (Self::Strong(_, b), Self::Num(a)) => a == b,
             _ => false
         }
     }
@@ -153,13 +192,15 @@ impl PackageID {
     pub fn is_std(&self) -> bool { matches!(self, Self::Std) }
     pub fn is_usr(&self) -> bool { matches!(self, Self::Usr) }
 
+    pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_) ) }
+
     pub fn name(&self) -> &str {
         match self {
             Self::Any => "any",
             Self::Std => "std",
             Self::Usr => "usr",
             Self::Weak(w) | Self::Strong(w, _) => w.as_str(),
-            Self::Num(id) => "(id)"
+            Self::Num(_) => "(id)"
         }
     }
     pub fn id(&self) -> NumericalPackID {
@@ -229,6 +270,8 @@ impl ResourceID {
             _ => None
         }
     }
+
+    pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_)) }
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -328,7 +371,13 @@ pub struct ParsedResourceLocator {
 }
 impl Debug for ParsedResourceLocator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} residual: {}", &self.loc, &self.residual)
+        if let Some(s) = self.residual.as_deref() {
+            write!(f, "{:?} residual: {}", &self.loc, s)
+        }
+        else {
+            write!(f, "{:?}", &self.loc)
+        }
+
     }
 }
 impl Display for ParsedResourceLocator {

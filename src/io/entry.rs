@@ -1,6 +1,6 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
 use crate::core::{is_string_whitespace, errors::{FormattingError, ArgumentValueError, Error, OperationError as CoreOperErr}};
-use super::id::{ResourceID, NumericalResourceID};
+use super::id::{ResourceID, PackageID, ResourceKind, NumericalResourceID, ResourceLocator};
 
 use std::fmt::{Display, Debug};
 use serde::{Serialize, Deserialize};
@@ -57,6 +57,7 @@ impl EntryType {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct PackageEntry {
+    #[serde(skip)]
     key: NumericalResourceID,
     name: String,
     kind: EntryType,
@@ -80,7 +81,7 @@ impl Display for PackageEntry {
 }
 
 impl PackageEntry {
-    pub fn new(key: StrongResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, ArgumentValueError> {
+    pub fn new(key: NumericalResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, ArgumentValueError> {
         if name.is_empty() || is_string_whitespace(&name) {
             return Err(ArgumentValueError::new("name", &name));
         }
@@ -94,10 +95,7 @@ impl PackageEntry {
             else {
                 EntryType::Environment
             },
-            data: match data {
-                Some(d) => d,
-                None => 0.0f64.into()
-            }
+            data: data.unwrap_or_else(|| 0.0f64.into())
         };
 
         match result.set_name(name) {
@@ -112,15 +110,24 @@ impl PackageEntry {
 
         Ok(result)
     }
-    pub fn new_temp(key: StrongResourceID, data: Option<VariableUnion>) -> Self {
+    pub fn new_temp(key: NumericalResourceID, data: Option<VariableUnion>) -> Self {
         Self {
             name: String::new(), //Temporaries do not have names
             key,
             kind: EntryType::Temporary,
-            data: match data {
-                Some(d) => d,
-                None => 0.0f64.into()
-            }
+            data: data.unwrap_or_else(|| 0.0f64.into())
+        }
+    }
+
+    pub fn accepts_id(&self, id: &NumericalResourceID) -> bool {
+        &self.key == id
+    }
+    pub fn accepts_locator(&self, locator: &ResourceLocator) -> bool {
+        if locator.parent().is_weak() && locator.resource().is_weak() {
+            locator.resource().name() == Some(&self.name)
+        }
+        else {
+            locator == &self.key
         }
     }
 
@@ -134,23 +141,18 @@ impl PackageEntry {
         self.data = new;
     }
 
-    pub fn accepts_id<T>(&self, id: &T) -> bool where T: ResourceID {
-        if let Some((_, ent)) = id.by_name() {
-            Some(ent.as_str()) == self.name()
-        }
-        else if let Some((pack, ent)) = id.by_id() {
-            self.key.pack_id() == pack && self.key.entry_id() == ent
-        }
-        else {
-            false
-        }
-    }
-
-    pub fn key(&self) -> &StrongResourceID {
+    pub fn key(&self) -> &NumericalResourceID {
         &self.key
     }
-    pub fn key_mut(&mut self) -> &mut StrongResourceID {
+    pub fn key_mut(&mut self) -> &mut NumericalResourceID  {
         &mut self.key
+    }
+    pub fn get_strong_locator(&self) -> ResourceLocator {
+        ResourceLocator::new(
+            PackageID::Num(self.key.package().clone()),
+            ResourceID::Strong(self.name.clone(), self.key.resx()),
+            ResourceKind::Entry(self.kind.clone())
+        )
     }
     pub fn kind(&self) -> EntryType {
         self.kind

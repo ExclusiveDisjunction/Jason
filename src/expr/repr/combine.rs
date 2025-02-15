@@ -182,27 +182,3 @@ impl ASTNode for RawExpr {
         "'".to_string() + self.data.as_str() + "'"
     }
 }
-impl RawExpr {
-    pub fn new<S>(contents: S, left: Option<TotalNodes>, right: Option<TotalNodes>) -> Self where S: ToString {
-        Self{
-            data: contents.to_string(),
-            left: left.map(|x| Box::new(x)),
-            right: right.map(|x| Box::new(x))
-        }
-    }
-    pub fn new_box<S>(contents: S, left: Option<Box<TotalNodes>>, right: Option<Box<TotalNodes>>) -> Self where S: ToString {
-        Self{
-            data: contents.to_string(),
-            left,
-            right
-        }
-    }
-    
-
-    fn get_contents(&self) -> &str {
-        &self.data
-    }
-    fn set_contents(&mut self, new: String) {
-        self.data = new
-    }
-}
