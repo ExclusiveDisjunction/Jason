@@ -1,4 +1,4 @@
-use crate::core::errors::{FormattingError, NamingError};
+use crate::core::errors::{FormattingError, NamingError, Error as CoreError};
 use crate::core::is_string_whitespace;
 use super::entry::EntryType;
 
@@ -10,11 +10,38 @@ use std::cmp::Ordering;
 /// 1. No starting with numerical values
 /// 2. No 0x or *b patterns (addresses)
 /// 3. No symbols other than '_' or '-' (no format specifiers)
-/// 4. Only latin or greek letters.
+/// 4. Only latin letters.
+/// 5. No whitespace inbetween 
 ///
 /// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
-pub fn is_name_valid(name: &str) -> Result<String, NamingError> {
-    todo!()
+pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
+    let name = name.trim();
+    
+    if name.is_empty() || is_string_whitespace(name) {
+        return Err(NamingError::Empty);
+    }
+
+    if let Some(c) = name.chars().next() {
+        if c.is_numeric() {
+            return Err(NamingError::InvalidCharacters);
+        }
+    }
+
+    if name.contains("0x") {
+        return Err(NamingError::Address)
+    }
+
+    //From this point, no addresses, empty strings, or starting with numeric strings have been found. Now we have to just ensure that everything is alphabetic, and only the '_' and '-' sumbols are allowed. No whitespace.
+    for c in name.chars() {
+        match c {
+            '_' | '-' => continue,
+            x if x.is_alphabetic() || x.is_numeric() => continue,
+            x if x.is_whitespace() => return Err(NamingError::Whitespace),
+            _ => return Err(NamingError::InvalidCharacters)
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -119,7 +146,7 @@ impl NumericalResourceID {
         }
     }
 
-    pub fn package(&self) -> &NumericalPackID { &self.package }
+    pub fn package(&self) -> NumericalPackID { self.package }
     pub fn resx(&self) -> u32 { self.resx }
 
     pub fn contained_in(&self, parent: &NumericalPackID) -> bool {
@@ -163,7 +190,7 @@ impl Debug for PackageID {
 impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Any, Self::Any) => true,
+            (Self::Any, _) | (_, Self::Any) => true,
             (Self::Usr, Self::Usr) => true,
             (Self::Std, Self::Std) => true,
             (Self::Weak(a), Self::Weak(b)) => a == b,
@@ -191,16 +218,31 @@ impl PackageID {
     pub fn is_any(&self) -> bool { matches!(self, Self::Any) }
     pub fn is_std(&self) -> bool { matches!(self, Self::Std) }
     pub fn is_usr(&self) -> bool { matches!(self, Self::Usr) }
-
     pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_) ) }
 
-    pub fn name(&self) -> &str {
+    /// Determines if the name stored internally is valid. If it returns None, then the variant has no name property.
+    /// ```
+    ///     assert_eq!(PackageID::Std.is_name_valid(), Some(true));
+    ///     assert_eq!(PackageID::Usr.is_name_valid(), Some(true));
+    ///     assert_eq!(PackageID::Num(NumericalPackID::new_std()), None); //No name is provided
+    ///     assert_eq!(PackageID::Weak("hello".to_string()).is_name_valid(), Some(true)); //The name is valid
+    ///     assert_eq!(PackageID::Weak("0x444".to_string()).is_name_valid(), Some(false)); //The name is flagged as an address, or the first character is interpreted as a number and rejected.
+    /// ```
+    pub fn is_name_valid(&self) -> Option<bool> {
         match self {
-            Self::Any => "any",
-            Self::Std => "std",
-            Self::Usr => "usr",
-            Self::Weak(w) | Self::Strong(w, _) => w.as_str(),
-            Self::Num(_) => "(id)"
+            Self::Any | Self::Usr | Self::Std => Some(true),
+            Self::Num(_) => None,
+            Self::Strong(s, _) | Self::Weak(s) => Some(is_name_valid(s).is_ok())
+        }
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::Any => Some("any"),
+            Self::Std => Some("std"),
+            Self::Usr => Some("usr"),
+            Self::Weak(w) | Self::Strong(w, _) => Some(w.as_str()),
+            Self::Num(_) => None
         }
     }
     pub fn id(&self) -> NumericalPackID {
@@ -272,9 +314,16 @@ impl ResourceID {
     }
 
     pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_)) }
+
+    pub fn is_name_valid(&self) -> Option<bool> {
+        match self {
+            Self::Numeric(_) => None,
+            Self::Strong(s, _) | Self::Weak(s) => Some(is_name_valid(s).is_ok())
+        }
+    }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ResourceKind {
     Function,
     Entry(EntryType)
@@ -302,27 +351,27 @@ impl Debug for ResourceKind {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct ResourceLocator {
+pub struct Locator {
     parent: PackageID,
     resource: ResourceID,
     kind: ResourceKind
 }
-impl Debug for ResourceLocator {
+impl Debug for Locator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}::{:?} kind: {:?}", &self.parent, &self.resource, &self.kind)
     }
 }
-impl Display for ResourceLocator {
+impl Display for Locator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", &self.parent, &self.resource)
     }
 }
-impl PartialEq<NumericalResourceID> for ResourceLocator {
+impl PartialEq<NumericalResourceID> for Locator {
     fn eq(&self, other: &NumericalResourceID) -> bool {
         self.parent == other.package && self.resource == other.resx
     }
 }
-impl ResourceLocator {
+impl Locator {
     pub fn new(parent: PackageID, resource: ResourceID, kind: ResourceKind) -> Self {
         Self {
             parent,
@@ -344,12 +393,22 @@ impl ResourceLocator {
             kind: ResourceKind::Function
         }
     }
+    pub fn new_weak(parent: String, resource: String, kind: ResourceKind) -> Self {
+        Self{
+            parent: PackageID::Weak(parent),
+            resource: ResourceID::Weak(resource),
+            kind
+        }
+    }
 
     pub fn parent(&self) -> &PackageID {
         &self.parent
     }
     pub fn resource(&self) -> &ResourceID {
         &self.resource
+    }
+    pub fn kind(&self) -> ResourceKind {
+        self.kind
     }
 
     pub fn contained_in(&self, parent: &PackageID) -> bool {
@@ -365,11 +424,45 @@ impl ResourceLocator {
     }
 }
 
-pub struct ParsedResourceLocator {
-    loc: ResourceLocator,
+#[derive(Clone, PartialEq, Eq)]
+pub enum LocatorParsingError {
+    Name(NamingError),
+    Format(FormattingError)
+}
+impl Debug for LocatorParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x: &dyn Debug =  match self {
+            Self::Format(f) => f,
+            Self::Name(n) => n
+        };
+        x.fmt(f)
+    }
+}
+impl From<LocatorParsingError> for CoreError {
+    fn from(value: LocatorParsingError) -> Self {
+        match value {
+            LocatorParsingError::Name(n) => Self::Name(n),
+            LocatorParsingError::Format(f) => Self::Format(f)
+        }
+    }
+}
+impl From<NamingError> for LocatorParsingError {
+    fn from(value: NamingError) -> Self {
+        Self::Name(value)
+    }
+}
+impl From<FormattingError> for LocatorParsingError {
+    fn from(value: FormattingError) -> Self {
+        Self::Format(value)
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub struct ParsedLocator {
+    loc: Locator,
     residual: Option<String>
 }
-impl Debug for ParsedResourceLocator {
+impl Debug for ParsedLocator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(s) = self.residual.as_deref() {
             write!(f, "{:?} residual: {}", &self.loc, s)
@@ -380,19 +473,19 @@ impl Debug for ParsedResourceLocator {
 
     }
 }
-impl Display for ParsedResourceLocator {
+impl Display for ParsedLocator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         (&self.loc as &dyn Display).fmt(f)
     }
 }
-impl TryFrom<String> for ParsedResourceLocator {
-    type Error = FormattingError;
+impl TryFrom<String> for ParsedLocator {
+    type Error = LocatorParsingError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
     }
 }
-impl TryFrom<&str> for ParsedResourceLocator {
-    type Error = FormattingError;
+impl TryFrom<&str> for ParsedLocator {
+    type Error = LocatorParsingError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         /*
             We have the following formats:
@@ -428,27 +521,33 @@ impl TryFrom<&str> for ParsedResourceLocator {
                     "usr" => parent = PackageID::Usr,
                     "std" => parent = PackageID::Std,
                     "*" => parent = PackageID::Any,
-                    a if !a.is_empty() && !is_string_whitespace(a) => parent = PackageID::Weak(a.trim().to_string()),
-                    b => return Err(FormattingError::new(&b, "the parent package must not be just whitespace or empty"))
+                    a if a.is_empty() || is_string_whitespace(a) => return Err(NamingError::Empty.into()),
+                    a => {
+                        if let Err(e) = is_name_valid(a) {
+                            return Err(e.into())
+                        }
+
+                        parent = PackageID::Weak(a.trim().to_lowercase())
+                    }
                 }
                 raw_child = splits[1];
             },
-            _ => return Err(FormattingError::new(&value, "there can only be one or two values before and after the '::'"))
+            _ => return Err(FormattingError::new(&value, "there can only be one or two values before and after the '::'").into())
         }
 
         let raw_child = raw_child.trim();
         if raw_child.is_empty() || is_string_whitespace(raw_child) {
-            return Err(FormattingError::new(&raw_child, "the identifier cannot be empty or just whitespace"));
+            return Err(NamingError::Empty.into())
         }
 
         if let Some(c) = raw_child.strip_prefix("$") {
-            if c.is_empty() || is_string_whitespace(c) {
-                return Err(FormattingError::new(&value, "the name following the $ must not be white space nor empty"));
+            if let Err(e) = is_name_valid(c) {
+                return Err(e.into())
             }
 
             Ok( 
                 Self {
-                    loc: ResourceLocator::new(
+                    loc: Locator::new(
                         parent.into(),
                         ResourceID::Weak(c.trim().to_string()),
                         EntryType::Variable.into()
@@ -464,19 +563,19 @@ impl TryFrom<&str> for ParsedResourceLocator {
             if let Some(beg) = c.strip_suffix(')') {
                 let splits: Vec<&str> = beg.split('(').collect();
                 if splits.len() != 2 {
-                    return Err(FormattingError::new(&value, "functions must have a name followed by a '(', and then the arguments (if specified)"));
+                    return Err(FormattingError::new(&value, "functions must have a name followed by a '(', and then the arguments (if specified)").into());
                 }
 
                 let name = splits[0].trim().to_string();
                 let args = splits[1].trim();
 
-                if name.is_empty() || is_string_whitespace(&name) {
-                    return Err(FormattingError::new(&name, "functions cannot have an empty name"));
+                if let Err(e) = is_name_valid(&name) {
+                    return Err(e.into())
                 }
 
                 Ok(
                     Self {
-                        loc: ResourceLocator::new(
+                        loc: Locator::new(
                             parent.into(),
                             ResourceID::Weak(name),
                             ResourceKind::Function
@@ -486,13 +585,17 @@ impl TryFrom<&str> for ParsedResourceLocator {
                 )
             }
             else {
-                return Err(FormattingError::new(&value, "the function signature does not end with a ')'"));
+                return Err(FormattingError::new(&value, "the function signature does not end with a ')'").into());
             }
         }
         else {
+            if let Err(e) = is_name_valid(raw_child) {
+                return Err(e.into())
+            }
+
             Ok(
                 Self {
-                    loc: ResourceLocator::new(
+                    loc: Locator::new(
                         parent.into(),
                         ResourceID::Weak(raw_child.to_string()),
                         EntryType::Environment.into()
@@ -503,11 +606,11 @@ impl TryFrom<&str> for ParsedResourceLocator {
         }
     }
 }
-impl ParsedResourceLocator {
+impl ParsedLocator {
     pub fn get_residual(&self) -> Option<&str> {
         self.residual.as_deref()
     }
-    pub fn get_loc(&self) -> &ResourceLocator {
+    pub fn get_loc(&self) -> &Locator {
         &self.loc
     }
 
@@ -518,14 +621,22 @@ impl ParsedResourceLocator {
         matches!(self.loc.kind, ResourceKind::Function)
     }
 }
-impl From<ParsedResourceLocator> for (ResourceLocator, Option<String>) {
-    fn from(value: ParsedResourceLocator) -> Self {
+impl From<ParsedLocator> for (Locator, Option<String>) {
+    fn from(value: ParsedLocator) -> Self {
         (value.loc, value.residual)
     }
 }
-impl From<ParsedResourceLocator> for ResourceLocator {
-    fn from(value: ParsedResourceLocator) -> Self {
+impl From<ParsedLocator> for Locator {
+    fn from(value: ParsedLocator) -> Self {
         value.loc
+    }
+}
+impl From<Locator> for ParsedLocator {
+    fn from(value: Locator) -> Self {
+        Self {
+            loc: value,
+            residual: None
+        }
     }
 }
 
@@ -554,45 +665,45 @@ fn test_io_id() {
         2: If a function is called, the parenthesis are required, no matter what
     */
 
-    assert_eq!( ParsedResourceLocator::try_from("aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
-    assert!( ParsedResourceLocator::try_from("").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
-    assert!( ParsedResourceLocator::try_from("$").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) )) ) ;
-    assert!( ParsedResourceLocator::try_from("%aa").is_err() );
-    assert!( ParsedResourceLocator::try_from("%").is_err() );
+    assert_eq!( ParsedLocator::try_from("aa"), Ok(ParsedLocator::from(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()).into(), EntryType::Environment))) );
+    assert!( ParsedLocator::try_from("").is_err() );
+    assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert!( ParsedLocator::try_from("$").is_err() );
+    assert_eq!( ParsedLocator::try_from("%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert!( ParsedLocator::try_from("%aa").is_err() );
+    assert!( ParsedLocator::try_from("%").is_err() );
 
-    assert_eq!( ParsedResourceLocator::try_from("usr::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
-    assert!( ParsedResourceLocator::try_from("usr::").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("usr::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
-    assert!( ParsedResourceLocator::try_from("usr::$").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("usr::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) )) ) ;
-    assert!( ParsedResourceLocator::try_from("usr::%aa").is_err() );
-    assert!( ParsedResourceLocator::try_from("usr::%").is_err() );
+    assert_eq!( ParsedLocator::try_from("usr::aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into() ) );
+    assert!( ParsedLocator::try_from("usr::").is_err() );
+    assert_eq!( ParsedLocator::try_from("usr::$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into() ) );
+    assert!( ParsedLocator::try_from("usr::$").is_err() );
+    assert_eq!( ParsedLocator::try_from("usr::%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert!( ParsedLocator::try_from("usr::%aa").is_err() );
+    assert!( ParsedLocator::try_from("usr::%").is_err() );
 
-    assert_eq!( ParsedResourceLocator::try_from("std::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
-    assert!( ParsedResourceLocator::try_from("std::").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("std::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
-    assert!( ParsedResourceLocator::try_from("std::$").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("std::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Std, ResourceID::Weak("aa".to_string()) )) ) ;
-    assert!( ParsedResourceLocator::try_from("std::%aa").is_err() );
-    assert!( ParsedResourceLocator::try_from("std::%").is_err() );
+    assert_eq!( ParsedLocator::try_from("std::aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert!( ParsedLocator::try_from("std::").is_err() );
+    assert_eq!( ParsedLocator::try_from("std::$aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert!( ParsedLocator::try_from("std::$").is_err() );
+    assert_eq!( ParsedLocator::try_from("std::%aa()"), Ok(Locator::new_func(PackageID::Std, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert!( ParsedLocator::try_from("std::%aa").is_err() );
+    assert!( ParsedLocator::try_from("std::%").is_err() );
 
-    assert_eq!( ParsedResourceLocator::try_from("*::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
-    assert!( ParsedResourceLocator::try_from("*::").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("*::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
-    assert!( ParsedResourceLocator::try_from("**::$").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("*::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Any, ResourceID::Weak("aa".to_string()) )) ) ;
-    assert!( ParsedResourceLocator::try_from("*::%aa").is_err() );
-    assert!( ParsedResourceLocator::try_from("*::%").is_err() );
+    assert_eq!( ParsedLocator::try_from("*::aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert!( ParsedLocator::try_from("*::").is_err() );
+    assert_eq!( ParsedLocator::try_from("*::$aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert!( ParsedLocator::try_from("**::$").is_err() );
+    assert_eq!( ParsedLocator::try_from("*::%aa()"), Ok(Locator::new_func(PackageID::Any, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert!( ParsedLocator::try_from("*::%aa").is_err() );
+    assert!( ParsedLocator::try_from("*::%").is_err() );
 
-    assert_eq!( ParsedResourceLocator::try_from("foo::aa").into(), Ok(ResourceLocator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Environment.into())) );
-    assert!( ParsedResourceLocator::try_from("foo::").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("foo::$aa").into(), Ok(ResourceLocator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Variable.into() )) );
-    assert!( ParsedResourceLocator::try_from("foo::$").is_err() );
-    assert_eq!( ParsedResourceLocator::try_from("foo::%aa()").into(), Ok(ResourceLocator::new_func(PackageID::Weak("foo".into()), ResourceID::Weak("aa".to_string()) )) ) ;
-    assert!( ParsedResourceLocator::try_from("foo::%aa").is_err() );
-    assert!( ParsedResourceLocator::try_from("foo::%").is_err() );
+    assert_eq!( ParsedLocator::try_from("foo::aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert!( ParsedLocator::try_from("foo::").is_err() );
+    assert_eq!( ParsedLocator::try_from("foo::$aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert!( ParsedLocator::try_from("foo::$").is_err() );
+    assert_eq!( ParsedLocator::try_from("foo::%aa()"), Ok(Locator::new_func(PackageID::Weak("foo".into()), ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert!( ParsedLocator::try_from("foo::%aa").is_err() );
+    assert!( ParsedLocator::try_from("foo::%").is_err() );
 
-    assert!( ParsedResourceLocator::try_from("::").is_err() );
+    assert!( ParsedLocator::try_from("::").is_err() );
 }

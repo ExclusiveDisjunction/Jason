@@ -1,6 +1,7 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
-use crate::core::{is_string_whitespace, errors::{FormattingError, ArgumentValueError, Error, OperationError as CoreOperErr}};
-use super::id::{ResourceID, PackageID, ResourceKind, NumericalResourceID, ResourceLocator};
+use crate::calc::func::{ASTBasedFunction, FunctionBase};
+use crate::core::errors::{FormattingError, NamingError};
+use super::id::{is_name_valid, Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceID, ResourceKind};
 
 use std::fmt::{Display, Debug};
 use serde::{Serialize, Deserialize};
@@ -8,13 +9,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EntryType {
     Variable,
-    Temporary,
     Environment
-}
-impl Default for EntryType {
-    fn default() -> Self {
-        Self::Temporary
-    }
 }
 impl Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -23,7 +18,6 @@ impl Display for EntryType {
             "{}",
             match self {
                 Self::Variable => "Variable",
-                Self::Temporary => "Temporary",
                 Self::Environment => "Environment"
             }
         )
@@ -34,7 +28,6 @@ impl TryFrom<String> for EntryType {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.as_str() {
             "Variable" => Ok(Self::Variable),
-            "Temporary" => Ok(Self::Temporary),
             "Environment" => Ok(Self::Environment),
             a => Err(FormattingError::new(&a, "cannot parse value"))
         }
@@ -49,45 +42,94 @@ impl EntryType {
     pub fn symbol(&self) -> String {
         match self {
             Self::Environment => String::new(),
-            Self::Temporary => "tmp.".to_string(),
             Self::Variable => "$".to_string()
         }
     }
 }
 
+pub trait IOEntry: Serialize + for<'a> Deserialize<'a> + Clone + PartialEq + Display + Debug {
+    fn name(&self) -> &str;
+    fn set_name(&mut self, new: String) -> Result<(), NamingError>;
+
+    fn accepts_id(&self, id: NumericalResourceID) -> bool {
+        self.id() == id
+    }
+    fn accepts_locator(&self, id: &Locator) -> bool {
+        if id.kind() != self.resource_kind() { return false; }
+
+        if id.parent().is_weak() && id.resource().is_weak() {
+            id.resource().name() == Some(self.name())
+        }
+        else {
+            id == &self.id()
+        }
+    }
+
+    fn resource_kind(&self) -> ResourceKind;
+    fn id(&self) -> NumericalResourceID;
+    fn package_id(&self) -> NumericalPackID {
+        self.id().package()
+    }
+    fn id_mut(&mut self) -> &mut NumericalResourceID;
+    fn strong_locator(&self) -> Locator {
+        Locator::new(
+            PackageID::Num(self.package_id()),
+            ResourceID::Strong(self.name().to_string(), self.id().resx()),
+            self.resource_kind()
+        )
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct PackageEntry {
+pub struct VariableEntry {
     #[serde(skip)]
     key: NumericalResourceID,
     name: String,
     kind: EntryType,
     data: VariableUnion
 }
-
-impl Display for PackageEntry {
+impl Display for VariableEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}{}:{}", 
             match self.kind {
                 EntryType::Environment => "",
-                EntryType::Variable => "$",
-                EntryType::Temporary => "tmp"
+                EntryType::Variable => "$"
             },
             &self.name,
             self.data.get_type()
         )
     }
 }
-
-impl PackageEntry {
-    pub fn new(key: NumericalResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, ArgumentValueError> {
-        if name.is_empty() || is_string_whitespace(&name) {
-            return Err(ArgumentValueError::new("name", &name));
+impl IOEntry for VariableEntry {
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
+        if let Err(e) = is_name_valid(&new) {
+            Err(e)
         }
+        else {
+            self.name = new.trim().to_lowercase();
+            Ok(())
+        }
+    }
 
+    fn resource_kind(&self) -> ResourceKind {
+        ResourceKind::Entry(self.kind)
+    }
+    fn id(&self) -> NumericalResourceID {
+        self.key
+    }
+    fn id_mut(&mut self) -> &mut NumericalResourceID {
+        &mut self.key
+    }
+}
+impl VariableEntry {
+    pub fn new(key: NumericalResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, NamingError> {
         let mut result = Self {
-            name: String::new(), //Temporary string, we will use the set name function
+            name: String::new(), //Temporary string, we will use the set_name function
             key,
             kind: if is_var {
                 EntryType::Variable
@@ -98,37 +140,9 @@ impl PackageEntry {
             data: data.unwrap_or_else(|| 0.0f64.into())
         };
 
-        match result.set_name(name) {
-            Ok(_) => (),
-            Err(e) => {
-                match e {
-                    Error::ArgVal(v) => return Err(v),
-                    e => panic!("cannot get error from value '{e}'")
-                }
-            }
-        }
+        result.set_name(name)?;
 
         Ok(result)
-    }
-    pub fn new_temp(key: NumericalResourceID, data: Option<VariableUnion>) -> Self {
-        Self {
-            name: String::new(), //Temporaries do not have names
-            key,
-            kind: EntryType::Temporary,
-            data: data.unwrap_or_else(|| 0.0f64.into())
-        }
-    }
-
-    pub fn accepts_id(&self, id: &NumericalResourceID) -> bool {
-        &self.key == id
-    }
-    pub fn accepts_locator(&self, locator: &ResourceLocator) -> bool {
-        if locator.parent().is_weak() && locator.resource().is_weak() {
-            locator.resource().name() == Some(&self.name)
-        }
-        else {
-            locator == &self.key
-        }
     }
 
     pub fn get_data(&self) -> VariableUnionRef<'_> {
@@ -140,41 +154,61 @@ impl PackageEntry {
     pub fn set_data(&mut self, new: VariableUnion) {
         self.data = new;
     }
+}
 
-    pub fn key(&self) -> &NumericalResourceID {
-        &self.key
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct FunctionEntry {
+    inner: ASTBasedFunction,
+    #[serde(skip)]
+    key: NumericalResourceID
+}
+impl Display for FunctionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.inner)
     }
-    pub fn key_mut(&mut self) -> &mut NumericalResourceID  {
-        &mut self.key
+}
+impl IOEntry for FunctionEntry {
+    fn name(&self) -> &str {
+        self.inner.name()
     }
-    pub fn get_strong_locator(&self) -> ResourceLocator {
-        ResourceLocator::new(
-            PackageID::Num(self.key.package().clone()),
-            ResourceID::Strong(self.name.clone(), self.key.resx()),
-            ResourceKind::Entry(self.kind.clone())
-        )
-    }
-    pub fn kind(&self) -> EntryType {
-        self.kind
-    }
-    pub fn name(&self) -> Option<&str> {
-        if self.kind == EntryType::Temporary {
-            None
+    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
+        if let Err(e) = is_name_valid(&new) {
+            Err(e)
         }
         else {
-            Some(&self.name)
+            self.inner.set_name( new.trim().to_lowercase() );
+            Ok(())
         }
     }
-    pub fn set_name(&mut self, new: String) -> Result<(), Error> {
-        if self.kind == EntryType::Temporary {
-            return Err(CoreOperErr::new("set name", "cannot set a name on a temporary variable").into());
-        }
 
-        if new.is_empty() || is_string_whitespace(&new) {
-            return Err(FormattingError::new(&new, "cannot store an empty or only white space name").into())
-        }
+    fn id(&self) -> NumericalResourceID {
+        self.key
+    }
+    fn id_mut(&mut self) -> &mut NumericalResourceID {
+        &mut self.key
+    }
+    fn resource_kind(&self) -> ResourceKind {
+        ResourceKind::Function   
+    }
+}
+impl FunctionEntry {
+    pub fn new(key: NumericalResourceID, name: String, data: ASTBasedFunction) -> Result<Self, NamingError> {
+        let mut result = Self {
+            inner: data,
+            key
+        };
 
-        self.name = new.trim().to_string();
-        Ok(())
+        result.set_name(name)?;
+        Ok(result)        
+    }
+
+    pub fn get_func(&self) -> &ASTBasedFunction {
+        &self.inner
+    }
+    pub fn get_func_mut(&mut self) -> &mut ASTBasedFunction {
+        &mut self.inner
+    }
+    pub fn set_func(&mut self, new: ASTBasedFunction) {
+        self.inner = new
     }
 }

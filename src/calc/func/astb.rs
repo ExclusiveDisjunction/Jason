@@ -7,7 +7,7 @@ use crate::calc::{VariableUnion, CalcResult};
 use serde::{Serialize, Deserialize};
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct ASTBasedFunction {
     name: String,
     inner: TotalNodes,
@@ -44,6 +44,10 @@ impl ASTBasedFunction {
             inner,
             signature
         }
+    }
+
+    pub fn set_name(&mut self, new: String) {
+        self.name = new
     }
 }
 

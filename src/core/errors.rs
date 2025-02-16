@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 use std::io;
 use crate::calc::CalcError;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ArgumentMissingError {
     arg: String
 }
@@ -19,7 +19,7 @@ impl ArgumentMissingError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ArgumentValueError {
     arg: String,
     value: String
@@ -44,7 +44,7 @@ impl ArgumentValueError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct NullError {
     target: String
 }
@@ -61,7 +61,7 @@ impl NullError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct FormattingError {
     processed: String,
     reason: String
@@ -80,6 +80,7 @@ impl FormattingError {
     }
 }
 
+#[derive(Clone)]
 pub struct RangeError<T> {
     var: String,
     val: T,
@@ -110,7 +111,7 @@ impl<T> RangeError<T>  {
 }
 pub type IndexRangeError = RangeError<usize>;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct PermissionError {
     resource: String
 }
@@ -127,7 +128,7 @@ impl PermissionError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct OperationError {
     action: String,
     reason: String
@@ -146,7 +147,7 @@ impl OperationError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ConversionError {
     from: String,
     reason: String
@@ -171,7 +172,7 @@ impl ConversionError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct UnexpectedError {
     reason: String
 }
@@ -193,7 +194,12 @@ pub enum NamingError {
     Empty,
     InvalidCharacters,
     TooLong,
-    TooShort
+    TooShort,
+    Whitespace,
+    StaringWithNumber,
+    Scripting,
+    FormatSpecifier,
+    Address
 }
 impl Debug for NamingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -202,6 +208,9 @@ impl Debug for NamingError {
             Self::InvalidCharacters => write!(f, "the name provided has invalid characters"),
             Self::TooLong => write!(f, "the name provided is too long"),
             Self::TooShort => write!(f, "the name provided is too short"),
+            Self::Whitespace => write!(f, "the name contains whitespace internally. no spaces are allowed inside the name"),
+            Self::StaringWithNumber => write!(f, "the name starts with a number, and this is not allowed"),
+            Self::Scripting | Self::FormatSpecifier | Self::Address => write!(f, "the name looks like it is trying to do something it is not supposed to (scriptiong, format specifier, or address); this is disallowed")
         }
     }
 }

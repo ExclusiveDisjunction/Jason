@@ -71,7 +71,7 @@ fn test_tree_eval() {
 
     tree_c.set_left(
         Box::new(
-            RawExpr::new("Hello there, I will not evaluate", None, None).into()
+            RawExpr::new("Hello there, I will not evaluate".to_string(), None, None).into()
         )
     );
     assert!(tree_c.evaluate(&on).is_err());
@@ -101,7 +101,7 @@ fn test_tree_eval() {
 
     assert_eq!(tree_d.evaluate_list(&on), Ok( vec![VariableUnion::from(4), Matrix::identity(2).into(), MathVector::from(vec![1, 2, 3]).into() ] ));
 
-    let tree_e = RawExpr::new("hello", None, None);
+    let tree_e = RawExpr::new("hello".to_string(), None, None);
 
     assert!(tree_e.evaluate(&on).is_err() && tree_e.evaluate_list(&on).is_err());
 

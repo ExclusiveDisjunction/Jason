@@ -66,7 +66,7 @@ impl<T> Debug for DimensionError<T> where T: DimensionKind + Debug {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct OperationError {
     operation: String,
     on: (String, String),
@@ -236,7 +236,7 @@ impl FeatureError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum CalcError {
     Index(IndexOutOfRangeError<usize>),
     MatDim(DimensionError<MatrixDimension>),
