@@ -5,15 +5,10 @@ use serde::{Serialize, Deserialize};
 
 use crate::calc::{VariableUnion, CalcResult, VariableType, CalcError, VariableData, calc_error::{ArgCountError, ArgTypeError}};
 
-pub trait FunctionBase: Display + Debug {
+pub trait FunctionBase: Display + Debug + PartialEq {
     fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion>;
 
-    fn name(&self) -> &str;
     fn signature(&self) -> &FunctionArgSignature;
-
-    fn func_eq<T: FunctionBase>(&self, other: &T) -> bool {
-        self.name() == other.name() && self.signature() == other.signature()
-    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

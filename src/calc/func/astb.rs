@@ -9,18 +9,17 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct ASTBasedFunction {
-    name: String,
     inner: TotalNodes,
     signature: FunctionArgSignature
 }
 impl Display for ASTBasedFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({}) = {}", &self.name, &self.signature, &self.inner)
+        write!(f, "({}) = {}", &self.signature, &self.inner)
     }
 }
 impl Debug for ASTBasedFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ast-func '{}' ({}) has: {:?}", &self.name, &self.signature, &self.inner)
+        write!(f, "ast-func sig: ({}) has: '{:?}'", &self.signature, &self.inner)
     }
 }
 impl FunctionBase for ASTBasedFunction {
@@ -30,24 +29,16 @@ impl FunctionBase for ASTBasedFunction {
         self.inner.evaluate(args)
     }
 
-    fn name(&self) -> &str {
-        &self.name
-    }
     fn signature(&self) -> &FunctionArgSignature {
         &self.signature
     }
 }
 impl ASTBasedFunction {
-    pub fn new<T>(name: T, inner: TotalNodes, signature: FunctionArgSignature) -> Self where T: ToString {
+    pub fn new( inner: TotalNodes, signature: FunctionArgSignature) -> Self {
         Self {
-            name: name.to_string(),
             inner,
             signature
         }
-    }
-
-    pub fn set_name(&mut self, new: String) {
-        self.name = new
     }
 }
 
@@ -61,7 +52,7 @@ fn test_ast_based_function() {
         VariableExpr::new( 'x', 0 ).into()
     ).into();
 
-    let func = ASTBasedFunction::new("f", ast, FunctionArgSignature::just_x());
+    let func = ASTBasedFunction::new(ast, FunctionArgSignature::just_x());
 
     let on = vec![3.into()];
     assert_eq!(func.evaluate(&on), Ok( (3 * 4).into() ));

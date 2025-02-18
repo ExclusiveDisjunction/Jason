@@ -1,6 +1,6 @@
 use crate::core::errors::{FormattingError, NamingError, Error as CoreError};
 use crate::core::is_string_whitespace;
-use super::entry::EntryType;
+use super::entry::VarEntryType;
 
 use std::fmt::{Display, Debug};
 use std::hash::{Hash, Hasher};
@@ -48,6 +48,12 @@ pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
     }
 
     Ok(())
+}
+pub fn validate_name(name: String) -> Result<String, NamingError> {
+    match is_name_valid(&name) {
+        Ok(_) => Ok(name.trim().to_lowercase()),
+        Err(e) => Err(e)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -359,10 +365,10 @@ impl ResourceID {
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ResourceKind {
     Function,
-    Entry(EntryType)
+    Entry(VarEntryType)
 }
-impl From<EntryType> for ResourceKind {
-    fn from(value: EntryType) -> Self {
+impl From<VarEntryType> for ResourceKind {
+    fn from(value: VarEntryType) -> Self {
         Self::Entry(value)
     }
 }
@@ -412,7 +418,7 @@ impl Locator {
             kind
         }
     }
-    pub fn new_entry(parent: PackageID, resource: ResourceID, kind: EntryType) -> Self {
+    pub fn new_entry(parent: PackageID, resource: ResourceID, kind: VarEntryType) -> Self {
         Self {
             parent,
             resource,
@@ -583,7 +589,7 @@ impl TryFrom<&str> for ParsedLocator {
                     loc: Locator::new(
                         parent,
                         ResourceID::Weak(c.trim().to_string()),
-                        EntryType::Variable.into()
+                        VarEntryType::Variable.into()
                     ),
                     residual: None
                 }
@@ -631,7 +637,7 @@ impl TryFrom<&str> for ParsedLocator {
                     loc: Locator::new(
                         parent,
                         ResourceID::Weak(raw_child.to_string()),
-                        EntryType::Environment.into()
+                        VarEntryType::Environment.into()
                     ),
                     residual: None
                 }
@@ -733,9 +739,9 @@ mod test {
         2: If a function is called, the parenthesis are required, no matter what
     */
 
-    assert_eq!( ParsedLocator::try_from("aa"), Ok(ParsedLocator::from(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()).into(), EntryType::Environment))) );
+    assert_eq!( ParsedLocator::try_from("aa"), Ok(ParsedLocator::from(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()).into(), VarEntryType::Environment))) );
     assert!( ParsedLocator::try_from("").is_err() );
-    assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("$").is_err() );
     assert_eq!( ParsedLocator::try_from("%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
     assert_eq!( 
@@ -750,33 +756,33 @@ mod test {
     assert!( ParsedLocator::try_from("%aa").is_err() );
     assert!( ParsedLocator::try_from("%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("usr::aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into() ) );
+    assert_eq!( ParsedLocator::try_from("usr::aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into() ) );
     assert!( ParsedLocator::try_from("usr::").is_err() );
-    assert_eq!( ParsedLocator::try_from("usr::$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into() ) );
+    assert_eq!( ParsedLocator::try_from("usr::$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into() ) );
     assert!( ParsedLocator::try_from("usr::$").is_err() );
     assert_eq!( ParsedLocator::try_from("usr::%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
     assert!( ParsedLocator::try_from("usr::%aa").is_err() );
     assert!( ParsedLocator::try_from("usr::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("std::aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert_eq!( ParsedLocator::try_from("std::aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("std::").is_err() );
-    assert_eq!( ParsedLocator::try_from("std::$aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("std::$aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("std::$").is_err() );
     assert_eq!( ParsedLocator::try_from("std::%aa()"), Ok(Locator::new_func(PackageID::Std, ResourceID::Weak("aa".to_string()) ).into()) ) ;
     assert!( ParsedLocator::try_from("std::%aa").is_err() );
     assert!( ParsedLocator::try_from("std::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("*::aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert_eq!( ParsedLocator::try_from("*::aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("*::").is_err() );
-    assert_eq!( ParsedLocator::try_from("*::$aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("*::$aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("**::$").is_err() );
     assert_eq!( ParsedLocator::try_from("*::%aa()"), Ok(Locator::new_func(PackageID::Any, ResourceID::Weak("aa".to_string()) ).into()) ) ;
     assert!( ParsedLocator::try_from("*::%aa").is_err() );
     assert!( ParsedLocator::try_from("*::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("foo::aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Environment.into()).into()) );
+    assert_eq!( ParsedLocator::try_from("foo::aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("foo::").is_err() );
-    assert_eq!( ParsedLocator::try_from("foo::$aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("foo::$aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("foo::$").is_err() );
     assert_eq!( ParsedLocator::try_from("foo::%aa()"), Ok(Locator::new_func(PackageID::Weak("foo".into()), ResourceID::Weak("aa".to_string()) ).into()) ) ;
     assert!( ParsedLocator::try_from("foo::%aa").is_err() );

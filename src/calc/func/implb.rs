@@ -4,18 +4,25 @@ use super::base::*;
 use crate::calc::{VariableUnion, CalcResult, ScalarLike, VariableType};
 
 pub struct ImplBasedFunction {
-    name: String,
     action: fn (&[VariableUnion], &FunctionArgSignature) -> CalcResult<VariableUnion>,
     signature: FunctionArgSignature
 }
 impl Display for ImplBasedFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", &self.name, &self.signature)
+        write!(f, "({})", &self.signature)
     }
 }
 impl Debug for ImplBasedFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "impl-func {}({})", &self.name, &self.signature)
+        write!(f, "impl-func sig: ({})", &self.signature)
+    }
+}
+impl PartialEq for ImplBasedFunction {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
+    fn ne(&self, _: &Self) -> bool {
+        true
     }
 }
 impl FunctionBase for ImplBasedFunction {
@@ -23,17 +30,13 @@ impl FunctionBase for ImplBasedFunction {
         (self.action)(args, &self.signature)    
     }
 
-    fn name(&self) -> &str {
-        &self.name
-    }
     fn signature(&self) -> &FunctionArgSignature {
         &self.signature
     }
 }
 impl ImplBasedFunction {
-    pub fn new<T>(name: T, action: fn (&[VariableUnion], &FunctionArgSignature) -> CalcResult<VariableUnion>, signature: FunctionArgSignature) -> Self where T: ToString {
+    pub fn new(action: fn (&[VariableUnion], &FunctionArgSignature) -> CalcResult<VariableUnion>, signature: FunctionArgSignature) -> Self {
         Self {
-            name: name.to_string(),
             action,
             signature
         }
@@ -145,49 +148,42 @@ impl StandardFunctions {
     //Functions
     pub fn cos_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "cos",
             StandardFunctions::cos_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn acos_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "acos",
             StandardFunctions::acos_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn sin_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "sin",
             StandardFunctions::sin_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn asin_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "asin",
             StandardFunctions::asin_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn tan_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "tan",
             StandardFunctions::tan_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn atan_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "atan",
             StandardFunctions::atan_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn atan2_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "atan2",
             StandardFunctions::atan2_proc,
             vec![ArgSignature::new(VariableType::Scalar, 'y'), ArgSignature::new(VariableType::Scalar, 'x')].into()
         )
@@ -195,21 +191,18 @@ impl StandardFunctions {
 
     pub fn ln_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "ln",
             StandardFunctions::ln_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn nlog_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "nlog",
             StandardFunctions::nlog_proc,
             FunctionArgSignature::just_x()
         )
     }
     pub fn log_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "log",
             StandardFunctions::log_proc,
             vec![ArgSignature::new(VariableType::Scalar, 'x'), ArgSignature::new(VariableType::Scalar, 'b')].into()
         )
@@ -217,36 +210,32 @@ impl StandardFunctions {
 
     pub fn dot_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "dot",
             StandardFunctions::dot_proc,
             vec![ArgSignature::new(VariableType::Vector, 'a'), ArgSignature::new(VariableType::Vector, 'b')].into()
         )
     }
     pub fn cross_func() -> ImplBasedFunction {
         ImplBasedFunction::new(
-            "cross",
             StandardFunctions::cross_proc,
             vec![ArgSignature::new(VariableType::Vector, 'a'), ArgSignature::new(VariableType::Vector, 'b')].into()
         )
     }
 
     //All
-    pub fn get_all() -> Vec<ImplBasedFunction> {
+    pub fn get_all() -> Vec<(ImplBasedFunction, String)> {
         vec![
-            Self::cos_func(),
-            Self::acos_func(),
-            Self::sin_func(),
-            Self::asin_func(),
-            Self::tan_func(),
-            Self::atan_func(),
-            Self::atan2_func(),
-
-            Self::ln_func(),
-            Self::nlog_func(),
-            Self::log_func(),
-
-            Self::dot_func(),
-            Self::cross_func()
+            (Self::cos_func(), "cos".to_string()),
+            (Self::acos_func(), "acos".to_string()),
+            (Self::sin_func(), "sin".to_string()),
+            (Self::asin_func(), "asin".to_string()),
+            (Self::tan_func(), "tan".to_string()),
+            (Self::atan_func(), "atan".to_string()),
+            (Self::atan2_func(), "atan2".to_string()),
+            (Self::ln_func(), "ln".to_string()),
+            (Self::nlog_func(), "nlog".to_string()),
+            (Self::log_func(), "log".to_string()),
+            (Self::dot_func(), "dot".to_string()),
+            (Self::cross_func(), "cross".to_string())
         ]
     }
 }

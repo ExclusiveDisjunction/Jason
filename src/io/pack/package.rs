@@ -284,7 +284,7 @@ fn test_package() {
     assert_eq!(pack.header().author(), Some(author.as_str()));
 
     assert!(pack.add_entry("var1".to_string(), true, 5.5.into()).is_ok());
-    let loc = Locator::new(PackageID::Any, ResourceID::Weak("var1".to_string()), ResourceKind::Entry(EntryType::Variable));
+    let loc = Locator::new(PackageID::Any, ResourceID::Weak("var1".to_string()), ResourceKind::Entry(VarEntryType::Variable));
     let found = match pack.resolve(&loc) {
         Some(f) => f,
         None => panic!("locator was not able to find the resource")
@@ -301,21 +301,22 @@ fn test_package() {
 
     {
         if let Some(grabbed) = pack.get_mut(found) {
-            grabbed.set_data(MathVector::from(vec![1, 2, 3]).into());
+            assert!(grabbed.set_data(MathVector::from(vec![1, 2, 3]).into()).is_ok());
         }
         else {
             panic!("Could not get resource at {}", found);
         }   
     }
 
-    let loc = Locator::new(PackageID::Usr, ResourceID::Numeric(0), ResourceKind::Entry(EntryType::Variable));
+    let loc = Locator::new(PackageID::Usr, ResourceID::Numeric(0), ResourceKind::Entry(VarEntryType::Variable));
     let found = match pack.resolve(&loc) {
         Some(f) => f,
         None => panic!("Using the numerical entry ID, the resource could not be found")
     };
     
     if let Some(grabbed) = pack.get(found) {
-        assert!(matches!(grabbed.get_data(), VariableUnionRef::Vec(_)));
+
+        assert!(matches!(grabbed.get_data().access(), Some(&VariableUnion::Vec(_))));
     }
     else {
         panic!("Could not get resource at {}", found);
