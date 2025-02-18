@@ -191,10 +191,7 @@ impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Any, _) | (_, Self::Any) => true,
-            (Self::Usr, Self::Usr)  => true,
-            (Self::Usr, x) | (x, Self::Usr) if x.is_usr() => true,
-            (Self::Std, Self::Std) => true,
-            (Self::Std, x) | (x, Self::Std) if x.is_std() => true,
+            (x, y) if x.is_usr() == y.is_usr() || x.is_std() == y.is_std() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
             (Self::Weak(a), Self::Weak(b)) => a == b,
             (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
             (Self::Num(a), Self::Num(b)) => a == b,
