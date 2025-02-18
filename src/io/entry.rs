@@ -57,7 +57,7 @@ pub trait IOEntry: Serialize + for<'a> Deserialize<'a> + Clone + PartialEq + Dis
     fn accepts_locator(&self, id: &Locator) -> bool {
         if id.kind() != self.resource_kind() { return false; }
 
-        if id.parent().is_weak() && id.resource().is_weak() {
+        if id.resource().is_weak() {
             id.resource().name() == Some(self.name())
         }
         else {

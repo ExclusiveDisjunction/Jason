@@ -191,8 +191,10 @@ impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Any, _) | (_, Self::Any) => true,
-            (Self::Usr, Self::Usr) => true,
+            (Self::Usr, Self::Usr)  => true,
+            (Self::Usr, x) | (x, Self::Usr) if x.is_usr() => true,
             (Self::Std, Self::Std) => true,
+            (Self::Std, x) | (x, Self::Std) if x.is_std() => true,
             (Self::Weak(a), Self::Weak(b)) => a == b,
             (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
             (Self::Num(a), Self::Num(b)) => a == b,
@@ -205,7 +207,7 @@ impl PartialEq for PackageID {
 impl PartialEq<NumericalPackID> for PackageID {
     fn eq(&self, other: &NumericalPackID) -> bool {
         match self {
-            Self::Any => other.id == 0,
+            Self::Any => true, //Any matches any package
             Self::Std => other.id == 1,
             Self::Usr => other.id == 2,
             Self::Strong(_, a) | Self::Num(a) => a == other,
@@ -216,8 +218,20 @@ impl PartialEq<NumericalPackID> for PackageID {
 impl PackageID {
 
     pub fn is_any(&self) -> bool { matches!(self, Self::Any) }
-    pub fn is_std(&self) -> bool { matches!(self, Self::Std) }
-    pub fn is_usr(&self) -> bool { matches!(self, Self::Usr) }
+    pub fn is_std(&self) -> bool { 
+        match self {
+            Self::Std => true,
+            Self::Strong(_, x) | Self::Num(x) => x.is_std(),
+            _ => false
+        }
+    }
+    pub fn is_usr(&self) -> bool {
+        match self {
+            Self::Usr => true,
+            Self::Strong(_, x) | Self::Num(x) => x.is_usr(),
+            _ => false
+        }
+    }
     pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_) ) }
 
     /// Determines if the name stored internally is valid. If it returns None, then the variant has no name property.
@@ -548,7 +562,7 @@ impl TryFrom<&str> for ParsedLocator {
             Ok( 
                 Self {
                     loc: Locator::new(
-                        parent.into(),
+                        parent,
                         ResourceID::Weak(c.trim().to_string()),
                         EntryType::Variable.into()
                     ),
@@ -576,7 +590,7 @@ impl TryFrom<&str> for ParsedLocator {
                 Ok(
                     Self {
                         loc: Locator::new(
-                            parent.into(),
+                            parent,
                             ResourceID::Weak(name),
                             ResourceKind::Function
                         ),
@@ -596,7 +610,7 @@ impl TryFrom<&str> for ParsedLocator {
             Ok(
                 Self {
                     loc: Locator::new(
-                        parent.into(),
+                        parent,
                         ResourceID::Weak(raw_child.to_string()),
                         EntryType::Environment.into()
                     ),

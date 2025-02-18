@@ -186,8 +186,8 @@ impl RawExpr {
     pub fn new(data: String, left: Option<TotalNodes>, right: Option<TotalNodes>) -> Self {
         Self {
             data,
-            left: left.map(|x| Box::new(x)),
-            right: right.map(|x| Box::new(x))
+            left: left.map(Box::new),
+            right: right.map(Box::new)
         }
     }
     pub fn new_box(data: String, left: Option<Box<TotalNodes>>, right: Option<Box<TotalNodes>>) -> Self {

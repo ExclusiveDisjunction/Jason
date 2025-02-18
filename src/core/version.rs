@@ -76,7 +76,7 @@ impl TryFrom<String> for Version {
     }
 }
 impl Version {
-    const fn new(major: u16, minor: u16, build: u16) -> Self {
+    pub const fn new(major: u16, minor: u16, build: u16) -> Self {
         Self {
             major,
             minor,

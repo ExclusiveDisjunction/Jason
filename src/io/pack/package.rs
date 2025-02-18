@@ -24,6 +24,20 @@ pub struct Package {
     location: PathBuf
 }
 impl Package {
+    #[allow(dead_code)]
+    fn blank() -> Self {
+        use crate::core::Version;
+        Self {
+            pack_id: NumericalPackID::usr_id(),
+            current_id: 0,
+            name: "temporary".to_string(),
+            header: PackageHeader::new(Version::new(1, 0, 0), None),
+            entries: vec![],
+            func: vec![],
+            location: PathBuf::default()
+        }
+    }
+
     pub fn open_from_directory(path: &Path, id: NumericalPackID) -> Result<Self, Error> {
         /*
             In this path, we expect three files:
@@ -210,24 +224,12 @@ impl Package {
     pub fn get(&self, id: NumericalResourceID) -> Option<&VariableEntry> {
         id.contained_in_sc(&self.pack_id)?;
 
-        for entry in &self.entries {
-            if entry.accepts_id(id) {
-                return Some(entry);
-            }
-        }
-
-        None
+        self.entries.iter().find(|x| x.accepts_id(id))
     }
     pub fn get_mut(&mut self, id: NumericalResourceID) -> Option<&mut VariableEntry>{
         id.contained_in_sc(&self.pack_id)?;
 
-        for entry in &mut self.entries {
-            if entry.accepts_id(id) {
-                return Some(entry);
-            }
-        }
-
-        None
+        self.entries.iter_mut().find(|x| x.accepts_id(id))
     }
  
     pub fn remove(&mut self, id: NumericalResourceID) -> bool {
@@ -236,10 +238,7 @@ impl Package {
     pub fn release(&mut self, id: NumericalResourceID) -> Option<VariableEntry> {
         id.contained_in_sc(&self.pack_id)?;
 
-        let index = match self.entries.iter().position(|x| x.accepts_id(id)) {
-            Some(i) => i,
-            None => return None
-        };
+        let index = self.entries.iter().position(|x| x.accepts_id(id))?;
 
         Some(self.entries.remove(index))
     }
@@ -270,5 +269,55 @@ impl Package {
 
         self.entries.push(result);
         Ok(())
+    }
+}
+
+#[test]
+fn test_package() {
+    use crate::calc::MathVector;
+
+    let mut pack = Package::blank();
+
+    assert_eq!(pack.make_pack_id(), pack.id());
+    let author = "exdisj".to_string();
+    pack.header_mut().set_author(Some(author.clone()));
+    assert_eq!(pack.header().author(), Some(author.as_str()));
+
+    assert!(pack.add_entry("var1".to_string(), true, 5.5.into()).is_ok());
+    let loc = Locator::new(PackageID::Any, ResourceID::Weak("var1".to_string()), ResourceKind::Entry(EntryType::Variable));
+    let found = match pack.resolve(&loc) {
+        Some(f) => f,
+        None => panic!("locator was not able to find the resource")
+    };
+
+    {
+        if let Some(grabbed) = pack.get(found) {
+            println!("value grabbed: {}", grabbed.get_data());
+        }
+        else {
+            panic!("Could not get resource at {}", found);
+        }
+    }
+
+    {
+        if let Some(grabbed) = pack.get_mut(found) {
+            grabbed.set_data(MathVector::from(vec![1, 2, 3]).into());
+        }
+        else {
+            panic!("Could not get resource at {}", found);
+        }   
+    }
+
+    let loc = Locator::new(PackageID::Usr, ResourceID::Numeric(0), ResourceKind::Entry(EntryType::Variable));
+    let found = match pack.resolve(&loc) {
+        Some(f) => f,
+        None => panic!("Using the numerical entry ID, the resource could not be found")
+    };
+    
+    if let Some(grabbed) = pack.get(found) {
+        assert!(matches!(grabbed.get_data(), VariableUnionRef::Vec(_)));
+    }
+    else {
+        panic!("Could not get resource at {}", found);
     }
 }
