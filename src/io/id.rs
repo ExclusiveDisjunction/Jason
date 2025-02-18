@@ -190,8 +190,7 @@ impl Debug for PackageID {
 impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Any, _) | (_, Self::Any) => true,
-            (x, y) if x.is_usr() == y.is_usr() || x.is_std() == y.is_std() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
+            (x, y) if x.is_usr() == y.is_usr() || x.is_std() == y.is_std() || x.is_any() || y.is_any() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
             (Self::Weak(a), Self::Weak(b)) => a == b,
             (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
             (Self::Num(a), Self::Num(b)) => a == b,
@@ -214,18 +213,30 @@ impl PartialEq<NumericalPackID> for PackageID {
 }
 impl PackageID {
 
-    pub fn is_any(&self) -> bool { matches!(self, Self::Any) }
+    pub fn is_any(&self) -> bool { 
+        match self {
+            Self::Any => true,
+            Self::Strong(a, x) if a == "*" && x.is_any() => true,
+            Self::Weak(a) if a == "*" => true,
+            Self::Num(x) if x.is_any() => true,
+            _ => false
+        }
+     }
     pub fn is_std(&self) -> bool { 
         match self {
             Self::Std => true,
-            Self::Strong(_, x) | Self::Num(x) => x.is_std(),
+            Self::Strong(a, x) if a == "std" && x.is_std() => true,
+            Self::Weak(a) if a == "std" => true,
+            Self::Num(x) if x.is_std() => true,
             _ => false
         }
     }
     pub fn is_usr(&self) -> bool {
         match self {
             Self::Usr => true,
-            Self::Strong(_, x) | Self::Num(x) => x.is_usr(),
+            Self::Strong(a, x) if a == "usr" && x.is_usr() => true,
+            Self::Weak(a) if a == "usr" => true,
+            Self::Num(x) if x.is_usr() => true,
             _ => false
         }
     }
@@ -650,10 +661,22 @@ impl From<Locator> for ParsedLocator {
         }
     }
 }
+impl ParsedLocator {
+    pub fn new(loc: Locator, residual: Option<String>) -> Self {
+        Self {
+            loc,
+            residual
+        }
+    }
+}
 
-#[test]
-fn test_io_id() {
-    /*
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn locator_parsing() {
+        /*
         We have the following formats:
 
         Part 1:
@@ -681,6 +704,15 @@ fn test_io_id() {
     assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), EntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("$").is_err() );
     assert_eq!( ParsedLocator::try_from("%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( 
+        ParsedLocator::try_from("%aa(x, y)"), 
+        Ok(
+            ParsedLocator::new(
+                Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string())),
+                Some("x, y".to_string())
+            )
+        )
+    );
     assert!( ParsedLocator::try_from("%aa").is_err() );
     assert!( ParsedLocator::try_from("%").is_err() );
 
@@ -717,4 +749,91 @@ fn test_io_id() {
     assert!( ParsedLocator::try_from("foo::%").is_err() );
 
     assert!( ParsedLocator::try_from("::").is_err() );
+    }
+
+    #[test]
+    fn numerical_id() {
+        let a = NumericalPackID::std_id();
+        let b = NumericalPackID::usr_id();
+
+        let c = NumericalResourceID::new(a, 1);
+        let d = c.clone();
+        let e = NumericalResourceID::new(b, 1);
+
+        assert!( a < b );
+        assert_ne!( a, b );
+        assert_eq!(c, d);
+        assert!( c < e );
+        assert!( !(e < d) );
+
+        let f = NumericalPackID::new(1);
+        assert!(f.is_std());
+        assert_eq!(a, f)
+    }
+
+    #[test]
+    fn package_id() {
+        {
+            let a = PackageID::Usr;
+            let b = PackageID::Num(NumericalPackID::new(2));
+            let c = PackageID::Strong("usr".to_string(), NumericalPackID::new(2));
+            let d = PackageID::Weak("usr".to_string());
+
+            assert_eq!(a, b);
+            assert_eq!(b, c);
+            assert_eq!(c, d);
+            assert_eq!(a, d); //Since the weak is the 'std' string, it will detect that and mark it as the STD package.
+
+            assert_eq!(a, PackageID::Any);
+        }
+
+        {
+            let a = PackageID::Std;
+            let b = PackageID::Num(NumericalPackID::new(1));
+            let c = PackageID::Strong("std".to_string(), NumericalPackID::new(1));
+            let d = PackageID::Weak("std".to_string());
+
+            assert_eq!(a, b);
+            assert_eq!(b, c);
+            assert_eq!(c, d);
+            assert_eq!(a, d); //Since the weak is the 'std' string, it will detect that and mark it as the STD package.
+
+            assert_eq!(a, PackageID::Any);
+        }
+
+        {
+            let a = PackageID::Weak("hello".to_string());
+            let b = PackageID::Strong("hello".to_string(), NumericalPackID::new(4));
+            let c = PackageID::Num(NumericalPackID::new(4));
+
+            assert_eq!(a, b); //Weak to Strong
+            assert_eq!(b, a); //Any order
+            assert_eq!(b, c); //Strong to Numerical
+            assert_eq!(c, b); //Any order
+            assert_ne!(a, c); //Weak to Numerical, no connection
+        }
+
+        {
+            let a = PackageID::Weak("hello".to_string());
+            let b = PackageID::Weak("hello".to_string());
+            assert_eq!(a, b); //Weak to weak
+        }
+
+
+        {
+            let a = PackageID::Strong("hello".to_string(), NumericalPackID::any_id());
+            assert_eq!(a, a.clone());
+        }
+
+        {
+            let a = PackageID::Num(NumericalPackID::usr_id());
+            assert_eq!(a, a.clone());
+        }
+
+    }
+
+    #[test]
+    fn resource_id() {
+
+    }
 }
