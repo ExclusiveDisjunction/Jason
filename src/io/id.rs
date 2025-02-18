@@ -6,6 +6,8 @@ use std::fmt::{Display, Debug};
 use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
 
+const MAX_IO_NAME: usize = 25;
+
 /// Checks to see if the name provided meets the following criteria:
 /// 1. No starting with numerical values
 /// 2. No 0x or *b patterns (addresses)
@@ -16,6 +18,10 @@ use std::cmp::Ordering;
 /// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
 pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
     let name = name.trim();
+
+    if name.len() >= MAX_IO_NAME {
+        return Err(NamingError::TooLong);
+    }
     
     if name.is_empty() || is_string_whitespace(name) {
         return Err(NamingError::Empty);
@@ -162,7 +168,7 @@ impl NumericalResourceID {
     }
 }
 
-#[derive(Eq, Clone)]
+#[derive(Clone, Eq)]
 pub enum PackageID {
     Any,
     Usr,
@@ -170,6 +176,11 @@ pub enum PackageID {
     Weak(String),
     Strong(String, NumericalPackID),
     Num(NumericalPackID)
+}
+impl Default for PackageID {
+    fn default() -> Self {
+        Self::Any
+    }
 }
 impl Display for PackageID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -190,7 +201,7 @@ impl Debug for PackageID {
 impl PartialEq for PackageID {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (x, y) if x.is_usr() == y.is_usr() || x.is_std() == y.is_std() || x.is_any() || y.is_any() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
+            (x, y) if (x.is_usr() && y.is_usr()) || (x.is_std() && y.is_std()) || x.is_any() || y.is_any() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
             (Self::Weak(a), Self::Weak(b)) => a == b,
             (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
             (Self::Num(a), Self::Num(b)) => a == b,
@@ -216,27 +227,27 @@ impl PackageID {
     pub fn is_any(&self) -> bool { 
         match self {
             Self::Any => true,
-            Self::Strong(a, x) if a == "*" && x.is_any() => true,
-            Self::Weak(a) if a == "*" => true,
-            Self::Num(x) if x.is_any() => true,
+            Self::Strong(a, x) => a == "*" || x.is_any(),
+            Self::Weak(a) => a == "*",
+            Self::Num(x) => x.is_any(),
             _ => false
         }
      }
     pub fn is_std(&self) -> bool { 
         match self {
             Self::Std => true,
-            Self::Strong(a, x) if a == "std" && x.is_std() => true,
-            Self::Weak(a) if a == "std" => true,
-            Self::Num(x) if x.is_std() => true,
+            Self::Strong(a, x) => a == "std" || x.is_std(),
+            Self::Weak(a) => a == "std",
+            Self::Num(x) => x.is_std(),
             _ => false
         }
     }
     pub fn is_usr(&self) -> bool {
         match self {
             Self::Usr => true,
-            Self::Strong(a, x) if a == "usr" && x.is_usr() => true,
-            Self::Weak(a) if a == "usr" => true,
-            Self::Num(x) if x.is_usr() => true,
+            Self::Strong(a, x) => a == "usr" || x.is_usr(),
+            Self::Weak(a) => a == "usr",
+            Self::Num(x) => x.is_usr(),
             _ => false
         }
     }
@@ -372,7 +383,7 @@ impl Debug for ResourceKind {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Locator {
     parent: PackageID,
     resource: ResourceID,
@@ -446,7 +457,7 @@ impl Locator {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum LocatorParsingError {
     Name(NamingError),
     Format(FormattingError)
@@ -479,7 +490,7 @@ impl From<FormattingError> for LocatorParsingError {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ParsedLocator {
     loc: Locator,
     residual: Option<String>
@@ -675,6 +686,29 @@ mod test {
     use super::*;
 
     #[test]
+    fn name_validation() {
+        let tests = vec![
+            //Name, should it pass
+            ("hello".to_string(), true),
+            ("    hello".to_string(), true),
+            ("\t     \t".to_string(), false), //Just whitespace
+            ("h ello".to_string(), false), //Whitespace inside
+            ("!_hello".to_string(), false), //Non-allowed character
+            (String::new(), false), //Empty 
+            ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(), false), //Too long
+            ("he_llo".to_string(), true), 
+            ("he0xello".to_string(), false), //Hexadecimal pattern
+            ("1hello".to_string(), false), //Starts with number
+            ("Cześć".to_string(), true)
+        ];
+
+        for (i, (test, expected)) in tests.into_iter().enumerate() {
+            let result = is_name_valid(&test);
+            assert_eq!(result.is_ok(), expected, "failure at test {i}: '{test}'");
+        }
+    }
+
+    #[test]
     fn locator_parsing() {
         /*
         We have the following formats:
@@ -834,6 +868,27 @@ mod test {
 
     #[test]
     fn resource_id() {
+        let a = ResourceID::Numeric(4);
+        let b = ResourceID::Strong("hello".to_string(), 4);
+        let c = ResourceID::Weak("hello".to_string());
+        let d = ResourceID::Numeric(5);
+        let e = ResourceID::Strong("hello".to_string(), 5);
+        
+        assert!(a.name().is_none() && a.id().is_some());
+        assert!(b.name().is_some() && b.id().is_some());
+        assert!(c.name().is_some() && c.id().is_none());
 
+        assert!(c.is_weak());
+        assert!(!e.is_weak());
+        assert!(!a.is_weak());
+
+        assert_eq!(a, b); //By number
+        assert_eq!(b, c); //By name
+        assert_ne!(a, c); //No relation
+ 
+        assert_eq!(d, e); //by number
+        assert_eq!(c, e); //by name
+        assert_ne!(a, e); //by number, not equal
+        assert_ne!(b, e); //by name and number, not equal
     }
 }
