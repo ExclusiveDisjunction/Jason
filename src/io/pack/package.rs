@@ -111,20 +111,31 @@ impl Package {
             Ok(v) => v,
             Err(e) => return Err(e.into())
         };
-        let entries = match entries {
+        let mut entries = match entries {
             Ok(v) => v,
             Err(e) => return Err(e.into())
         };
-        let func = match func {
+        let mut func = match func {
             Ok(v) => v,
             Err(e) => return Err(e.into())
         };
+
+        // Since serialization results in default IDs, we must assign our own.
+        let mut key = NumericalResourceID::new(id, 0);
+        for entry in &mut entries {
+            *entry.id_mut() = key.clone();
+            key += 1;
+        }
+        for function in &mut func {
+            *function.id_mut() = key.clone();
+            key += 1;
+        }
 
         Ok(
             Self {
                 name,
                 pack_id: id,
-                current_id: 0,
+                current_id: key.resx(), //Sets it to the current 
                 header,
                 entries,
                 func,

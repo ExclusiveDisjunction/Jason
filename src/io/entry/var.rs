@@ -7,7 +7,7 @@ use super::base::*;
 use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
 use serde::ser::SerializeStruct;
-use serde::{ser, Deserialize, Serialize, Serializer, Deserializer};
+use serde::{ser, Deserialize, Serialize, Serializer, Deserializer, de::{self, Visitor, SeqAccess, MapAccess}};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VarEntryType {
@@ -45,6 +45,84 @@ impl VarEntryType {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "lowercase")]
+enum VariableEntryFields {
+    Data,
+    Name, 
+    Kind
+}
+
+struct VariableEntryVisitor;
+impl<'de> Visitor<'de> for VariableEntryVisitor {
+    type Value = VariableEntry;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("struct VariableEntry")
+    }
+
+    fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<VariableEntry, V::Error> {
+        //Data, name, kind
+
+        let data = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let name = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+        let kind = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+
+        VariableEntry::new_direct(
+            NumericalResourceID::default(), //A temporary key is given, the package must create keys themselves for this process
+            name,
+            kind,
+            data
+        ).map_err(de::Error::custom)
+    }
+    fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<VariableEntry, V::Error> {
+        let mut data = None;
+        let mut name = None;
+        let mut kind = None;
+
+        while let Some(key) = map.next_key()? {
+            match key {
+                VariableEntryFields::Data => {
+                    if data.is_some() {
+                        return Err(de::Error::duplicate_field("data"));
+                    }
+
+                    data = Some(map.next_value()?);
+                }
+                VariableEntryFields::Name => {
+                    if name.is_some() {
+                        return Err(de::Error::duplicate_field("name"));
+                    }
+
+                    name = Some(map.next_value()?);
+                }
+                VariableEntryFields::Kind => {
+                    if kind.is_some() {
+                        return Err(de::Error::duplicate_field("kind"));
+                    }
+
+                    kind = Some(map.next_value()?);
+                }
+            }
+        }
+
+        let data = data.ok_or_else(|| de::Error::missing_field("data"))?;
+        let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
+        let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
+
+        VariableEntry::new_direct(
+            NumericalResourceID::default(),
+            name,
+            kind,
+            data
+        ).map_err(de::Error::custom)
+
+    }
+}
+
 pub struct VariableEntry {
     key: NumericalResourceID,
     name: String,
@@ -55,7 +133,7 @@ impl Serialize for VariableEntry {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let guard = self.get_data();
         if let Some(inner) = guard.access() {
-            let mut s: <S as Serializer>::SerializeStruct = serializer.serialize_struct("VariableEntry", 3)?;
+            let mut s= serializer.serialize_struct("VariableEntry", 3)?;
             s.serialize_field("data", inner)?;
             s.serialize_field("name", &self.name)?;
             s.serialize_field("kind", &self.kind)?;
@@ -72,7 +150,8 @@ impl Serialize for VariableEntry {
 }
 impl<'de> Deserialize<'de> for VariableEntry {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        todo!()
+        const FIELDS: &[&str] = &["data", "name", "kind"];
+        deserializer.deserialize_struct("VariableEntry", FIELDS, VariableEntryVisitor)
     }
 }
 impl PartialEq for VariableEntry {
@@ -135,24 +214,48 @@ impl IOStorage for VariableEntry {
 }
 impl VariableEntry {
     pub fn new(key: NumericalResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, NamingError> {
-        let mut result = Self {
-            name: String::new(), //Temporary string, we will use the set_name function
+        Self::new_direct(
             key,
-            kind: if is_var {
+            name,
+            if is_var {
                 VarEntryType::Variable
             }
             else {
                 VarEntryType::Environment
             },
-            data: Arc::new(
-                RwLock::new(
-                    data.unwrap_or_else(|| 0.0f64.into())
-                )
-            )
+            data.unwrap_or(0.into())
+        )
+    }
+    pub fn new_direct(key: NumericalResourceID, name: String, kind: VarEntryType, data: VariableUnion) -> Result<Self, NamingError> {
+        let mut result = Self {
+            name: String::new(),
+            key,
+            kind,
+            data: Arc::new(RwLock::new(data))
         };
 
         result.set_name(name)?;
 
         Ok(result)
+    }
+}
+
+#[test]
+fn test_variable_serde() {
+    use crate::calc::*;
+    use serde_json::{from_str, json};
+
+    let entry = VariableEntry::new_direct(
+        NumericalResourceID::default(),
+        "hello".to_string(),
+        VarEntryType::Variable,
+        Matrix::identity(4).into()
+    ).unwrap();
+
+    let ser = json!(&entry).to_string();
+    let de_ser: Result<VariableEntry, _> = from_str(&ser);
+    match de_ser {
+        Ok(v) => assert_eq!(v, entry),
+        Err(e) => panic!("unable to deserialize due to '{e}'")
     }
 }

@@ -2,6 +2,7 @@ use crate::core::errors::{FormattingError, NamingError, Error as CoreError};
 use crate::core::is_string_whitespace;
 use super::entry::VarEntryType;
 
+use std::ops::AddAssign;
 use std::fmt::{Display, Debug};
 use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
@@ -85,6 +86,11 @@ impl Hash for NumericalPackID {
         self.id.hash(state);
     }
 }
+impl AddAssign<u32> for NumericalPackID {
+    fn add_assign(&mut self, rhs: u32) {
+        self.id.add_assign(rhs)
+    }
+}
 impl NumericalPackID {
     pub fn new(id: u32) -> Self {
         Self {
@@ -148,6 +154,11 @@ impl Hash for NumericalResourceID {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.package.hash(state);
         self.resx.hash(state);
+    }
+}
+impl AddAssign<u32> for NumericalResourceID {
+    fn add_assign(&mut self, rhs: u32) {
+        self.resx.add_assign(rhs)
     }
 }
 impl NumericalResourceID {

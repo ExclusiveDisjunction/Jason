@@ -201,6 +201,11 @@ pub enum NamingError {
     FormatSpecifier,
     Address
 }
+impl Display for NamingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self as &dyn Debug).fmt(f)
+    }
+}
 impl Debug for NamingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
