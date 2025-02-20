@@ -182,7 +182,7 @@ impl<'a, T> WriteGuard<'a, T> {
     }
 }
 
-pub trait IOEntry: Serialize + for<'a> Deserialize<'a> + PartialEq + Display + Debug {
+pub trait IOEntry: PartialEq + Display + Debug {
     fn name(&self) -> &str;
     fn set_name(&mut self, new: String) -> Result<(), NamingError>;
 
@@ -215,7 +215,7 @@ pub trait IOEntry: Serialize + for<'a> Deserialize<'a> + PartialEq + Display + D
     }
 }
 
-pub trait IOStorage: IOEntry {
+pub trait IOStorage: IOEntry + Serialize + for<'a> Deserialize<'a> {
     type Holding: Serialize + for<'a> Deserialize<'a>;
     
     fn get_arc(&self) -> &Arc<RwLock<Self::Holding>>;
