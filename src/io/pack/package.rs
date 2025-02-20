@@ -49,15 +49,9 @@ impl Package {
         let func_path = loc.join("func");
 
         // Create our files so that we can use them later for saving
-        if let Err(e) = File::create(header_path) {
-            return Err(e.into());
-        }
-        if let Err(e) = File::create(entry_path) {
-            return Err(e.into());
-        }
-        if let Err(e) = File::create(func_path) {
-            return Err(e.into());
-        }
+        File::create(header_path).map_err(Error::from)?;
+        File::create(entry_path).map_err(Error::from)?;
+        File::create(func_path).map_err(Error::from)?;
 
         Ok(
             Self {
@@ -89,36 +83,24 @@ impl Package {
             Some(n) => n.to_string(),
             None => return Err(CoreError::from(NamingError::InvalidCharacters).into())
         };
-        if let Err(e) = is_name_valid(&name) {
-            return Err(CoreError::from(e).into())
-        }
 
-        let mut header: File = match File::open(path.join("header")) {
-            Ok(f) => f,
-            Err(e) => return Err(e.into())
-        };
-        let mut entry: File = match File::open(path.join("entry")) {
-            Ok(f) => f,
-            Err(e) => return Err(e.into())
-        };
-        let mut func: File = match File::open(path.join("func")) {
-            Ok(f) => f,
-            Err(e) => return Err(e.into())
-        };
+        let name = validate_name(name).map_err(|x| Error::from(CoreError::from(x)))?;
+
+        let header_path = path.join("header");
+        let entry_path = path.join("entry");
+        let func_path = path.join("func");
+
+        let mut header = File::open(header_path).map_err(Error::from)?;
+        let mut entry = File::open(entry_path).map_err(Error::from)?;
+        let mut func = File::open(func_path).map_err(Error::from)?;
 
         let mut header_cont: String = String::new();
         let mut entry_cont: String = String::new();
         let mut func_cont: String = String::new();
 
-        if let Err(e) = header.read_to_string(&mut header_cont) {
-            return Err(e.into());
-        }
-        if let Err(e) = entry.read_to_string(&mut entry_cont) {
-            return Err(e.into());
-        }
-        if let Err(e) = func.read_to_string(&mut func_cont) {
-            return Err(e.into());
-        }
+        header.read_to_string(&mut header_cont).map_err(Error::from)?;
+        entry.read_to_string(&mut entry_cont).map_err(Error::from)?;
+        func.read_to_string(&mut func_cont).map_err(Error::from)?;
 
         let snap = PackageSnapshot::new(name, header_cont, entry_cont, func_cont);
 
@@ -128,30 +110,15 @@ impl Package {
         Self::open_from_snapshot(path, file.contents(), id)
     }
     pub fn open_from_snapshot(path: PathBuf, snap: &PackageSnapshot, id: NumericalPackID) -> Result<Self, Error> { 
-        let name: String;
-        if let Err(e) = is_name_valid(snap.name()) {
-            return Err(CoreError::from(e).into())
-        }
-        else {
-            name = snap.name().trim().to_lowercase();
-        }
+        let name: String = validate_name(snap.name().to_string())
+            .map_err(|x| Error::from(CoreError::from(x)))?;
 
-        let header: Result<PackageHeader, _> = from_str(snap.header());
-        let entries: Result<Vec<VariableEntry>, _> = from_str(snap.entries_raw());
-        let func: Result<Vec<FunctionEntry>, _> = from_str(snap.functions_raw());
-
-        let header: PackageHeader = match header {
-            Ok(v) => v,
-            Err(e) => return Err(e.into())
-        };
-        let mut entries = match entries {
-            Ok(v) => v,
-            Err(e) => return Err(e.into())
-        };
-        let mut func = match func {
-            Ok(v) => v,
-            Err(e) => return Err(e.into())
-        };
+        let header: PackageHeader = from_str(snap.header())
+            .map_err(Error::from)?;
+        let mut entries: Vec<VariableEntry> = from_str(snap.entries_raw())
+            .map_err(Error::from)?;
+        let mut func: Vec<FunctionEntry> = from_str(snap.functions_raw())
+            .map_err(Error::from)?;
 
         // Since serialization results in default IDs, we must assign our own.
         let mut key = NumericalResourceID::new(id, 0);
