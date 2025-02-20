@@ -1,8 +1,7 @@
-use crate::core::errors::{NamingError, Error as CoreError};
-use crate::core::errors::UnexpectedError;
+use crate::calc::func::ASTBasedFunction;
+use crate::core::errors::{NamingError, UnexpectedError, Error as CoreError};
 use crate::core::version::JASON_CURRENT_VERSION;
-use super::compress::CompressedPackage;
-use super::compress::PackageSnapshot;
+use super::compress::{PackageSnapshot, CompressedPackage};
 use super::header::PackageHeader;
 use super::super::entry::*;
 use super::super::id::*;
@@ -11,7 +10,7 @@ use super::super::core::Error;
 use serde_json::{from_str, json};
 
 use std::path::{Path, PathBuf};
-use std::fs::{File, copy, remove_file, create_dir_all};
+use std::fs::{File, create_dir_all};
 use std::io::{Write, Read, Error as IOError};
 
 pub struct Package {
@@ -178,14 +177,19 @@ impl Package {
         )
     }
     
-    fn get_next_id(&mut self) -> Option<u32> {
+    fn get_next_id(&mut self) -> Result<NumericalResourceID, UnexpectedError> {
         if self.current_id == u32::MAX {
-            None
+            Err(UnexpectedError::new("the max id for this package has already been taken"))
         }
         else {
             let result = self.current_id;
             self.current_id += 1;
-            Some(result)
+            Ok(
+                NumericalResourceID::new(
+                    self.pack_id, 
+                    result
+                )
+            )
         }
     }
 
@@ -227,26 +231,13 @@ impl Package {
             functions file ./func
          */
 
-        {
-            let mut header_file = File::create(self.location.join("header_new"))?;
-            let mut entries_file = File::create(self.location.join("entry_new"))?;
-            let mut functions_file = File::create(self.location.join("func_new"))?;
+        let mut header_file = File::create(self.location.join("header"))?;
+        let mut entries_file = File::create(self.location.join("entry"))?;
+        let mut functions_file = File::create(self.location.join("func"))?;
 
-            header_file.write_all(snapshot.header().as_bytes())?;
-            entries_file.write_all(snapshot.entries_raw().as_bytes())?;
-            functions_file.write_all(snapshot.functions_raw().as_bytes())?;
-        }
-
-        //Now that we wrote to temporary files, we can move these two the new ones.
-        {
-            copy(self.location.join("header_new"), self.location.join("header"))?;
-            copy(self.location.join("entry_new"), self.location.join("entry"))?;
-            copy(self.location.join("func_new"), self.location.join("func"))?;
-
-            remove_file(self.location.join("header_new"))?;
-            remove_file(self.location.join("entry_new"))?;
-            remove_file(self.location.join("entry_new"))?;
-        }
+        header_file.write_all(snapshot.header().as_bytes())?;
+        entries_file.write_all(snapshot.entries_raw().as_bytes())?;
+        functions_file.write_all(snapshot.functions_raw().as_bytes())?;
 
         Ok(())
     }
@@ -276,9 +267,19 @@ impl Package {
 
         self.entries.iter_mut().find(|x| x.accepts_id(id))
     }
+    pub fn get_func(&self, id: NumericalResourceID) -> Option<&FunctionEntry> {
+        id.contained_in_sc(&self.pack_id)?;
+
+        self.func.iter().find(|x| x.accepts_id(id))
+    }
+    pub fn get_func_mut(&mut self, id: NumericalResourceID) -> Option<&mut FunctionEntry>{
+        id.contained_in_sc(&self.pack_id)?;
+
+        self.func.iter_mut().find(|x| x.accepts_id(id))
+    }
  
     pub fn remove(&mut self, id: NumericalResourceID) -> bool {
-        self.release(id).is_some()
+        self.release_entry(id).is_some() || self.release_func(id).is_some()
     }
     pub fn release_entry(&mut self, id: NumericalResourceID) -> Option<VariableEntry> {
         id.contained_in_sc(&self.pack_id)?;
@@ -291,34 +292,45 @@ impl Package {
         id.contained_in_sc(&self.pack_id)?;
 
         let index = self.func.iter().position(|x| x.accepts_id(id))?;
+
+        Some(self.func.remove(index))
     }
     pub fn remove_all(&mut self) {
         self.entries.clear();
         self.func.clear();
     }
-    pub fn add_entry(&mut self, name: String, is_var: bool, data: VariableUnion) -> Result<(), CoreError> {
+    pub fn add_entry(&mut self, name: String, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
         if let Err(e) = is_name_valid(&name) {
             return Err( e.into() )
         }
 
-        let next_id = match self.get_next_id() {
-            Some(i) => i,
-            None => return Err(UnexpectedError::new("the max ID has been taken already for this package").into())
-        };
-        let new_id = NumericalResourceID::new(self.pack_id, next_id);
+        let key = self.get_next_id().map_err(CoreError::from)?;
 
-        let result = match VariableEntry::new(
-            new_id,
+        let result = VariableEntry::new(
+            key,
             name,
             is_var, 
             Some(data)
-        ) {
-            Ok(v) => v,
-            Err(e) => return Err(e.into())
-        };
+        ).map_err(CoreError::from)?;
 
         self.entries.push(result);
-        Ok(())
+        Ok(key)
+    }
+    pub fn add_func(&mut self, name: String, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
+        if let Err(e) = is_name_valid(&name) {
+            return Err( e.into() )
+        }
+
+        let key = self.get_next_id().map_err(CoreError::from)?;
+
+        let result = FunctionEntry::new(
+            key,
+            name,
+            data
+        ).map_err(CoreError::from)?;
+
+        self.func.push(result);
+        Ok(key)
     }
 }
 
@@ -382,11 +394,65 @@ mod test {
 
     }
 
+    #[test]
     fn package_saving() {
 
     }
 
+    #[test]
     fn package_functionality() {
+        use crate::expr::repr::ConstExpr;
+        use crate::calc::func::FunctionArgSignature;
 
+        //This tests the getting, removing, releasing, and adding.
+
+        let mut pack = Package::blank();
+        
+        {
+            let id = pack.add_entry("thing1".to_string(), true, 6.1.into()).expect("unable to add");
+            {
+                let got = pack.get(id).expect("unable to grab id");
+                assert_eq!(id, got.id());
+            }
+
+            {
+                let got = pack.get_mut(id).expect("unable to grab by id");
+                got.set_name("thing2".to_string()).unwrap();
+
+            }
+
+            assert!(pack.release_func(id).is_none());
+            
+            let released = pack.release_entry(id).expect("unable to release entry");
+            assert_eq!(released.name(), "thing2");
+            assert_eq!(released.id(), id);
+        }
+
+        {
+            let id = pack.add_func(
+                "thing1".to_string(), 
+                ASTBasedFunction::new(
+                    ConstExpr::new(1.0.into()).into(),
+                    FunctionArgSignature::default()
+                )
+            ).expect("unable to add");
+
+            {
+                let got = pack.get_func(id).expect("unable to grab id");
+                assert_eq!(id, got.id());
+            }
+
+            {
+                let got = pack.get_func_mut(id).expect("unable to grab by id");
+                got.set_name("thing2".to_string()).unwrap();
+
+            }
+
+            assert!(pack.release_entry(id).is_none());
+            
+            let released = pack.release_func(id).expect("unable to release entry");
+            assert_eq!(released.name(), "thing2");
+            assert_eq!(released.id(), id);
+        }
     }
 }
