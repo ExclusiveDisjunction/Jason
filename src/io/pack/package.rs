@@ -123,11 +123,11 @@ impl Package {
         // Since serialization results in default IDs, we must assign our own.
         let mut key = NumericalResourceID::new(id, 0);
         for entry in &mut entries {
-            *entry.id_mut() = key.clone();
+            *entry.id_mut() = key;
             key += 1;
         }
         for function in &mut func {
-            *function.id_mut() = key.clone();
+            *function.id_mut() = key;
             key += 1;
         }
 

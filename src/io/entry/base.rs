@@ -36,7 +36,7 @@ pub type PoisonResult<T> = Result<T, IOPoisonError>;
 pub struct ReadGuard<'a, T> {
     inner: Result<RwLockReadGuard<'a, T>, IOPoisonError>
 }
-impl<'a, T> Display for ReadGuard<'a, T> where T: Display {
+impl<T> Display for ReadGuard<'_, T> where T: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.access() {
             Some(v) => v.fmt(f),
@@ -44,7 +44,7 @@ impl<'a, T> Display for ReadGuard<'a, T> where T: Display {
         }
     }
 }
-impl<'a, T> Debug for ReadGuard<'a, T> where T: Debug {
+impl<T> Debug for ReadGuard<'_, T> where T: Debug {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner.as_ref() {
             Ok(t) => t.fmt(f),
@@ -52,7 +52,7 @@ impl<'a, T> Debug for ReadGuard<'a, T> where T: Debug {
         }
     }
 }
-impl<'a, T> PartialEq for ReadGuard<'a, T> where T: PartialEq {
+impl<T> PartialEq for ReadGuard<'_, T> where T: PartialEq {
     fn eq(&self, other: &Self) -> bool {
         match (self.access(), other.access()) {
             (Some(a), Some(b)) => a == b,
@@ -60,7 +60,7 @@ impl<'a, T> PartialEq for ReadGuard<'a, T> where T: PartialEq {
         }
     }
 }
-impl<'a, T> PartialEq<T> for ReadGuard<'a, T> where T: PartialEq {
+impl<T> PartialEq<T> for ReadGuard<'_, T> where T: PartialEq {
     fn eq(&self, other: &T) -> bool {
         self.access()
         .map(|x| x == other)
@@ -73,7 +73,7 @@ impl<'a, T> Deref for ReadGuard<'a, T> {
         &self.inner
     }
 }
-impl<'a, T> From<IOPoisonError> for ReadGuard<'a, T> {
+impl<T> From<IOPoisonError> for ReadGuard<'_, T> {
     fn from(value: IOPoisonError) -> Self {
         Self {
             inner: Err(value)
@@ -131,12 +131,12 @@ impl<'a, T> Deref for WriteGuard<'a, T> {
         &self.inner
     }
 }
-impl<'a, T> DerefMut for WriteGuard<'a, T> {
+impl<T> DerefMut for WriteGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner   
     }
 }
-impl<'a, T> From<IOPoisonError> for WriteGuard<'a, T> {
+impl<T> From<IOPoisonError> for WriteGuard<'_, T> {
     fn from(value: IOPoisonError) -> Self {
         Self {
             inner: Err(value)

@@ -21,9 +21,6 @@ impl PartialEq for ImplBasedFunction {
     fn eq(&self, _: &Self) -> bool {
         false
     }
-    fn ne(&self, _: &Self) -> bool {
-        true
-    }
 }
 impl FunctionBase for ImplBasedFunction {
     fn evaluate(&self, args: &[VariableUnion]) -> CalcResult<VariableUnion> {
