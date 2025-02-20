@@ -7,12 +7,11 @@ use std::fs::File;
 pub use crate::core::{Version, is_string_whitespace};
 use super::super::core::Error as MyError;
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub struct PackageHeader {
     version: Version,
     author: Option<String>
 }
-
 impl PackageHeader {
     pub fn new(version: Version, author: Option<String>) -> Self {
         Self {

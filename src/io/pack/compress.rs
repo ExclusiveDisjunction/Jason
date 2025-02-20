@@ -8,7 +8,7 @@ use std::io::Read;
 
 use serde_json::from_str;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct PackageSnapshot {
     name: String,
     header: String,

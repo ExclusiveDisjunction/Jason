@@ -28,7 +28,7 @@ impl Package {
     fn blank() -> Self {
         use crate::core::Version;
         Self {
-            pack_id: NumericalPackID::usr_id(),
+            pack_id: NumericalPackID::new(2),
             current_id: 0,
             name: "temporary".to_string(),
             header: PackageHeader::new(Version::new(1, 0, 0), None),
@@ -39,6 +39,10 @@ impl Package {
     }
 
     pub fn create_into_directory(path: &Path, name: String, id: NumericalPackID) -> Result<Self, Error> {
+        if !id.is_specific() {
+            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
+        }
+
         let loc = path.join(&name);
         if let Err(e) = create_dir_all(&loc) {
             return Err(e.into());
@@ -75,6 +79,10 @@ impl Package {
             The contents of these files should be read, and then the arguments will be passed into a PackageSnapshot. This will then be passed into Self::open_from_snapshot.
          */
 
+         if !id.is_specific() {
+            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
+        }
+
         if !path.is_dir() {
             return Err(IOError::new(std::io::ErrorKind::NotADirectory, "the path provided must be a directory").into());
         }
@@ -110,6 +118,10 @@ impl Package {
         Self::open_from_snapshot(path, file.contents(), id)
     }
     pub fn open_from_snapshot(path: PathBuf, snap: &PackageSnapshot, id: NumericalPackID) -> Result<Self, Error> { 
+        if !id.is_specific() {
+            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
+        }
+
         let name: String = validate_name(snap.name().to_string())
             .map_err(|x| Error::from(CoreError::from(x)))?;
 
@@ -197,6 +209,10 @@ impl Package {
             entries file ./entry
             functions file ./func
          */
+
+        if !self.location.exists() {
+            create_dir_all(&self.location)?;
+        }
 
         let mut header_file = File::create(self.location.join("header"))?;
         let mut entries_file = File::create(self.location.join("entry"))?;
@@ -291,8 +307,8 @@ impl Package {
         let key = self.get_next_id().map_err(CoreError::from)?;
 
         let result = FunctionEntry::new(
-            key,
             name,
+            key,
             data
         ).map_err(CoreError::from)?;
 
@@ -304,9 +320,10 @@ impl Package {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs::remove_dir;
 
     #[test]
-    fn test_package_locators() {
+    fn package_locators() {
         use crate::calc::MathVector;
 
         let mut pack = Package::blank();
@@ -358,12 +375,60 @@ mod test {
 
     #[test]
     fn package_loading() {
+        let path = PathBuf::from("test");
+        let _ = remove_dir(path.join("test_pack"));
+        let _ = remove_dir(path.join("test2"));
 
-    }
+        let target_snapshot: PackageSnapshot;
 
-    #[test]
-    fn package_saving() {
+        {
+            
+            let mut pack = match Package::create_into_directory(&path, "test_pack".to_string(), NumericalPackID::new(2)) {
+                Ok(p) => p,
+                Err(e) => panic!("Unable to create a new package at '{:?}' because of '{:?}'", &path, e)
+            };
 
+
+            let mut snapshot = pack.snapshot();
+
+            let mut pack2 = match Package::open_from_snapshot(path.join("test2"), &snapshot, NumericalPackID::new(3)) {
+                Ok(p) => p,
+                Err(e) => panic!("unable to openf rom snapshot due to '{:?}'", e)
+            };
+
+            assert_eq!(pack.header(), pack2.header());
+
+            pack.add_entry("hello".to_string(), true, 0.into()).expect("unable to add entry");
+
+            if let Err(e) = pack.save() {
+                panic!("unable to save '{e}'")
+            }
+            else {
+                println!("saving finished");
+            }
+
+            snapshot = pack.snapshot();
+            target_snapshot = snapshot.clone();
+            pack2 = match Package::open_from_snapshot(path.join("test2"), &snapshot, NumericalPackID::new(3)) {
+                Ok(p) => p,
+                Err(e) => panic!("unable to open package '{:?}'", e)
+            };
+
+            if let Err(e) = pack2.save() {
+                panic!("unable to save second pack '{:?}", e)
+            }
+
+            assert_eq!(pack.entries, pack2.entries);
+        }
+
+        {
+            let pack = Package::open_from_directory(&path.join("test_pack"), NumericalPackID::new(2)).expect("unable to re-open package");
+
+            assert!(pack.entries.len() == 1);
+
+            let our_snapshot = pack.snapshot();
+            assert_eq!(our_snapshot, target_snapshot);
+        }
     }
 
     #[test]

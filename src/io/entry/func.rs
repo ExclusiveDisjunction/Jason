@@ -1,5 +1,5 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
-use crate::calc::func::ASTBasedFunction;
+use crate::calc::func::{ASTBasedFunction, ImplBasedFunction, FunctionBase};
 use crate::log_error;
 use crate::core::errors::NamingError;
 use super::super::id::{validate_name, NumericalResourceID, ResourceKind};
@@ -9,6 +9,12 @@ use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer, Deserializer, de::{self, Visitor, SeqAccess, MapAccess}};
+
+pub trait FunctionEntryBase: IOEntry + Sized {
+    type Holding: FunctionBase;
+
+    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError>;
+}
 
 #[derive(Deserialize)]
 #[serde(field_identifier, rename_all = "lowercase")]
@@ -34,8 +40,8 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
             .ok_or_else(|| de::Error::invalid_length(1, &self))?;
 
         FunctionEntry::new(
-            NumericalResourceID::default(),
             name,
+            NumericalResourceID::default(),
             data
         ).map_err(de::Error::custom)
     }
@@ -66,8 +72,8 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
         let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
 
         FunctionEntry::new(
-            NumericalResourceID::default(),
             name,
+            NumericalResourceID::default(),
             data
         ).map_err(de::Error::custom)
     }
@@ -142,16 +148,81 @@ impl IOStorage for FunctionEntry {
         &self.data
     }
 }
-impl FunctionEntry {
-    pub fn new(key: NumericalResourceID, name: String, data: ASTBasedFunction) -> Result<Self, NamingError> {
+impl FunctionEntryBase for FunctionEntry {
+    type Holding = ASTBasedFunction;
+
+    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError> {
         let mut result = Self {
             data: Arc::new(RwLock::new(data)),
             name: String::new(),
-            key
+            key: id
         };
 
         result.set_name(name)?;
-        Ok(result)        
+        Ok(result)
+    }
+}
+
+pub struct ImplFunctionEntry {
+    name: String,
+    func: Arc<ImplBasedFunction>,
+    key: NumericalResourceID
+}
+impl PartialEq for ImplFunctionEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Debug for ImplFunctionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "impl-{}({})", &self.name, self.func.signature())
+    }
+}
+impl Display for ImplFunctionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", &self.name, self.func.signature())
+    }
+}
+impl IOEntry for ImplFunctionEntry {
+    fn id(&self) -> NumericalResourceID {
+        self.key
+    }
+    fn id_mut(&mut self) -> &mut NumericalResourceID {
+        &mut self.key
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
+        self.name = validate_name(new)?;
+
+        Ok(())
+    }
+    fn resource_kind(&self) -> ResourceKind {
+        ResourceKind::Function
+    }
+}
+impl FunctionEntryBase for ImplFunctionEntry {
+    type Holding = ImplBasedFunction;
+
+    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError> {
+        let mut result = Self {
+            key: id,
+            name: String::new(),
+            func: Arc::new(data)
+        };
+
+        result.set_name(name)?;
+        Ok(result)
+    }
+}
+impl ImplFunctionEntry {
+    pub fn get_arc(&self) -> Arc<ImplBasedFunction> {
+        Arc::clone(&self.func)
+    }
+    pub fn get(&self) -> &ImplBasedFunction {
+        &self.func
     }
 }
 
@@ -167,7 +238,7 @@ fn test_function_serde() {
         VariableExpr::new('x', 0).into()
     ).into();
 
-    let func = FunctionEntry::new(NumericalResourceID::default(), "hello".to_string(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x())).unwrap();
+    let func = FunctionEntry::new("hello".to_string(), NumericalResourceID::default(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x())).unwrap();
 
     let ser = json!(&func).to_string();
     let de_ser: Result<FunctionEntry, _> = from_str(&ser);

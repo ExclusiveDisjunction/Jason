@@ -92,32 +92,27 @@ impl AddAssign<u32> for NumericalPackID {
     }
 }
 impl NumericalPackID {
-    pub fn new(id: u32) -> Self {
+    pub const fn new(id: u32) -> Self {
         Self {
             id
         }
     }
-    pub fn any_id() -> Self {
-        Self {
-            id: 0
-        }
-    }
-    pub fn std_id() -> Self {
-        Self {
-            id: 1
-        }
-    }
-    pub fn usr_id() -> Self {
-        Self {
-            id: 2
-        }
-    }
+
+    pub const ANY_NUM: u32 = 0;
+    pub const STD_NUM: u32 = 1;
+    pub const USR_NUM: u32 = 2;
+    /// The minimum ID for the "specific" packages
+    pub const SPEC_NUM: u32 = 3;
     
-    pub fn is_any(&self) -> bool { self.id == 0 }
-    pub fn is_std(&self) -> bool { self.id == 1 }
-    pub fn is_usr(&self) -> bool { self.id == 2 }
-    pub fn is_specific(&self) -> bool { self.id > 2 }
+    pub fn is_any(&self) -> bool { self.id == Self::ANY_NUM }
+    pub fn is_std(&self) -> bool { self.id == Self::STD_NUM }
+    pub fn is_usr(&self) -> bool { self.id == Self::USR_NUM }
+    pub fn is_specific(&self) -> bool { self.id >= Self::SPEC_NUM }
 }
+
+pub const ANY_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::ANY_NUM);
+pub const STD_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::STD_NUM);
+pub const USR_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::USR_NUM);
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct NumericalResourceID {
@@ -297,10 +292,10 @@ impl PackageID {
     }
     pub fn id(&self) -> NumericalPackID {
         match self {
-            Self::Any => NumericalPackID::any_id(),
-            Self::Std => NumericalPackID::std_id(),
-            Self::Usr => NumericalPackID::usr_id(),
-            Self::Weak(_) => NumericalPackID::any_id(),
+            Self::Any => ANY_ID,
+            Self::Std => STD_ID,
+            Self::Usr => USR_ID,
+            Self::Weak(_) => ANY_ID,
             Self::Strong(_, id) | Self::Num(id) => *id
         }
     }
@@ -804,10 +799,10 @@ mod test {
 
     #[test]
     fn numerical_id() {
-        let a = NumericalPackID::std_id();
-        let b = NumericalPackID::usr_id();
+        let a = STD_ID;
+        let b = USR_ID;
 
-        let c = NumericalResourceID::new(a, 1);
+        let c = NumericalResourceID::new(a, 0);
         let d = c.clone();
         let e = NumericalResourceID::new(b, 1);
 
@@ -872,12 +867,12 @@ mod test {
 
 
         {
-            let a = PackageID::Strong("hello".to_string(), NumericalPackID::any_id());
+            let a = PackageID::Strong("hello".to_string(), ANY_ID);
             assert_eq!(a, a.clone());
         }
 
         {
-            let a = PackageID::Num(NumericalPackID::usr_id());
+            let a = PackageID::Num(USR_ID);
             assert_eq!(a, a.clone());
         }
 
