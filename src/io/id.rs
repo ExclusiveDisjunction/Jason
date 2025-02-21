@@ -1,61 +1,133 @@
-use crate::core::errors::{FormattingError, NamingError, Error as CoreError};
+use crate::core::errors::{Error as CoreError, FormattingError, NamingError, UnexpectedError};
 use crate::core::is_string_whitespace;
 use super::entry::VarEntryType;
 
-use std::ops::AddAssign;
+use std::ops::{Deref, AddAssign};
 use std::fmt::{Display, Debug};
 use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
 
-const MAX_IO_NAME: usize = 25;
-
-/// Checks to see if the name provided meets the following criteria:
-/// 1. No starting with numerical values
-/// 2. No 0x or *b patterns (addresses)
-/// 3. No symbols other than '_' or '-' (no format specifiers)
-/// 4. Only latin letters.
-/// 5. No whitespace inbetween 
-///
-/// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
-pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
-    let name = name.trim();
-
-    if name.len() >= MAX_IO_NAME {
-        return Err(NamingError::TooLong);
-    }
-    
-    if name.is_empty() || is_string_whitespace(name) {
-        return Err(NamingError::Empty);
-    }
-
-    if let Some(c) = name.chars().next() {
-        if c.is_numeric() {
-            return Err(NamingError::InvalidCharacters);
-        }
-    }
-
-    if name.contains("0x") {
-        return Err(NamingError::Address)
-    }
-
-    //From this point, no addresses, empty strings, or starting with numeric strings have been found. Now we have to just ensure that everything is alphabetic, and only the '_' and '-' sumbols are allowed. No whitespace.
-    for c in name.chars() {
-        match c {
-            '_' | '-' => continue,
-            x if x.is_alphabetic() || x.is_numeric() => continue,
-            x if x.is_whitespace() => return Err(NamingError::Whitespace),
-            _ => return Err(NamingError::InvalidCharacters)
-        }
-    }
-
-    Ok(())
+#[derive(PartialEq, Eq, Clone)]
+pub struct Name {
+    inner: String
 }
-pub fn validate_name(name: String) -> Result<String, NamingError> {
-    match is_name_valid(&name) {
-        Ok(_) => Ok(name.trim().to_lowercase()),
-        Err(e) => Err(e)
+impl Debug for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (&self.inner as &dyn Debug).fmt(f)
     }
 }
+impl Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (&self.inner as &dyn Display).fmt(f)
+    }
+}
+impl PartialEq<String> for Name {
+    fn eq(&self, other: &String) -> bool {
+        self.inner.eq(other)
+    }
+}
+impl PartialEq<str> for Name {
+    fn eq(&self, other: &str) -> bool {
+        self.inner.as_str().eq(other)
+    }
+}
+impl From<Name> for String {
+    fn from(value: Name) -> Self {
+        value.inner
+    }
+}
+impl Name {
+    pub const MAX_IO_NAME: usize = 25;
+
+    pub fn validate(name: String) -> Result<Self, NamingError> {
+        match Self::is_name_valid(&name) {
+            Ok(_) => Ok(Self { inner: name.trim().to_lowercase() }),
+            Err(e) => Err(e)
+        }
+    }
+    pub fn validate_path(path: &Path) -> Result<(Self, PathBuf), CoreError> {
+        let file_name_osstr = match path.file_name() {
+            Some(v) => v,
+            None => return Err(
+                CoreError::from(UnexpectedError::new("the path provided has no file name"))
+            )
+        };
+        let file_name = match file_name_osstr.to_str() {
+            Some(v) => v,
+            None => return Err(
+                CoreError::from(UnexpectedError::new("the path provided could not have a name represented in 'str'"))
+            )
+        };
+
+        let name = Self::validate(file_name.to_string()).map_err(|x| CoreError::from(x))?;
+
+        Ok((name, path.to_path_buf()))
+    }
+
+    pub fn any_name() -> Self {
+        Self { inner: "*".to_string() }
+    }
+    pub fn std_name() -> Self {
+        Self { inner: "any".to_string() }
+    }
+    pub fn usr_name() -> Self {
+        Self { inner: "usr".to_string() }
+    }
+
+    /// Checks to see if the name provided meets the following criteria:
+    /// 1. No starting with numerical values
+    /// 2. No 0x or *b patterns (addresses)
+    /// 3. No symbols other than '_' or '-' (no format specifiers)
+    /// 4. Only latin letters.
+    /// 5. No whitespace inbetween 
+    ///
+    /// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
+    pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
+        let name = name.trim();
+
+        if name == "*" { //this is the any name
+            return Ok(());
+        }
+
+        if name.len() >= Self::MAX_IO_NAME {
+            return Err(NamingError::TooLong);
+        }
+        
+        if name.is_empty() || is_string_whitespace(name) {
+            return Err(NamingError::Empty);
+        }
+
+        if let Some(c) = name.chars().next() {
+            if c.is_numeric() {
+                return Err(NamingError::InvalidCharacters);
+            }
+        }
+
+        if name.contains("0x") {
+            return Err(NamingError::Address)
+        }
+
+        //From this point, no addresses, empty strings, or starting with numeric strings have been found. Now we have to just ensure that everything is alphabetic, and only the '_' and '-' sumbols are allowed. No whitespace.
+        for c in name.chars() {
+            match c {
+                '_' | '-' => continue,
+                x if x.is_alphabetic() || x.is_numeric() => continue,
+                x if x.is_whitespace() => return Err(NamingError::Whitespace),
+                _ => return Err(NamingError::InvalidCharacters)
+            }
+        }
+
+        Ok(())
+    }
+}
+impl Deref for Name {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
+    }
+}
+
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct NumericalPackID {
@@ -178,6 +250,31 @@ impl NumericalResourceID {
             None
         }
     }
+
+    pub fn increment(&mut self) -> NumericalResourceID {
+        self.try_increment().unwrap()
+    }
+    /// Attempts to increment the current number, and return the previous value (pre-incremement). If the value is `u32::MAX`, this will fail.
+    /// ```
+    /// let mut key = NumericalResourceID::new(USR_ID, 0);
+    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 0)));
+    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 1)));
+    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 2)));
+    /// 
+    /// key = NumericalResourceID::new(USR_ID, u32::MAX);
+    /// assert!(key.try_increment().is_err());
+    /// ```
+    pub fn try_increment(&mut self) -> Result<NumericalResourceID, UnexpectedError> {
+        if self.resx == u32::MAX {
+            Err(UnexpectedError::new("unable to increment because the maximum resource id has been taken"))
+        }
+        else {
+            let result = self.clone();
+            self.resx += 1;
+            Ok(result)
+        }
+
+    }
 }
 
 #[derive(Clone, Eq)]
@@ -185,8 +282,8 @@ pub enum PackageID {
     Any,
     Usr,
     Std,
-    Weak(String),
-    Strong(String, NumericalPackID),
+    Weak(Name),
+    Strong(Name, NumericalPackID),
     Num(NumericalPackID)
 }
 impl Default for PackageID {
@@ -265,37 +362,20 @@ impl PackageID {
     }
     pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_) ) }
 
-    /// Determines if the name stored internally is valid. If it returns None, then the variant has no name property.
-    /// ```
-    ///     assert_eq!(PackageID::Std.is_name_valid(), Some(true));
-    ///     assert_eq!(PackageID::Usr.is_name_valid(), Some(true));
-    ///     assert_eq!(PackageID::Num(NumericalPackID::new_std()), None); //No name is provided
-    ///     assert_eq!(PackageID::Weak("hello".to_string()).is_name_valid(), Some(true)); //The name is valid
-    ///     assert_eq!(PackageID::Weak("0x444".to_string()).is_name_valid(), Some(false)); //The name is flagged as an address, or the first character is interpreted as a number and rejected.
-    /// ```
-    pub fn is_name_valid(&self) -> Option<bool> {
-        match self {
-            Self::Any | Self::Usr | Self::Std => Some(true),
-            Self::Num(_) => None,
-            Self::Strong(s, _) | Self::Weak(s) => Some(is_name_valid(s).is_ok())
-        }
-    }
-
     pub fn name(&self) -> Option<&str> {
         match self {
             Self::Any => Some("any"),
             Self::Std => Some("std"),
             Self::Usr => Some("usr"),
-            Self::Weak(w) | Self::Strong(w, _) => Some(w.as_str()),
+            Self::Weak(w) | Self::Strong(w, _) => Some(w),
             Self::Num(_) => None
         }
     }
     pub fn id(&self) -> NumericalPackID {
         match self {
-            Self::Any => ANY_ID,
+            Self::Any | Self::Weak(_) => ANY_ID,
             Self::Std => STD_ID,
             Self::Usr => USR_ID,
-            Self::Weak(_) => ANY_ID,
             Self::Strong(_, id) | Self::Num(id) => *id
         }
     }
@@ -304,8 +384,8 @@ impl PackageID {
 #[derive(Clone, Eq)]
 pub enum ResourceID {
     Numeric(u32),
-    Strong(String, u32),
-    Weak(String)
+    Strong(Name, u32),
+    Weak(Name)
 }
 impl Display for ResourceID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -353,19 +433,12 @@ impl ResourceID {
     }
     pub fn name(&self) -> Option<&str> {
         match self {
-            Self::Strong(a, _) | Self::Weak(a) => Some(a.as_str()),
+            Self::Strong(a, _) | Self::Weak(a) => Some(a),
             _ => None
         }
     }
 
     pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_)) }
-
-    pub fn is_name_valid(&self) -> Option<bool> {
-        match self {
-            Self::Numeric(_) => None,
-            Self::Strong(s, _) | Self::Weak(s) => Some(is_name_valid(s).is_ok())
-        }
-    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -438,7 +511,7 @@ impl Locator {
             kind: ResourceKind::Function
         }
     }
-    pub fn new_weak(parent: String, resource: String, kind: ResourceKind) -> Self {
+    pub fn new_weak(parent: Name, resource: Name, kind: ResourceKind) -> Self {
         Self{
             parent: PackageID::Weak(parent),
             resource: ResourceID::Weak(resource),
@@ -568,11 +641,8 @@ impl TryFrom<&str> for ParsedLocator {
                     "*" => parent = PackageID::Any,
                     a if a.is_empty() || is_string_whitespace(a) => return Err(NamingError::Empty.into()),
                     a => {
-                        if let Err(e) = is_name_valid(a) {
-                            return Err(e.into())
-                        }
-
-                        parent = PackageID::Weak(a.trim().to_lowercase())
+                        parent = PackageID::Weak(Name::validate(a.to_string()).map_err(LocatorParsingError::from)?);
+                        
                     }
                 }
                 raw_child = splits[1];
@@ -586,15 +656,13 @@ impl TryFrom<&str> for ParsedLocator {
         }
 
         if let Some(c) = raw_child.strip_prefix("$") {
-            if let Err(e) = is_name_valid(c) {
-                return Err(e.into())
-            }
-
             Ok( 
                 Self {
                     loc: Locator::new(
                         parent,
-                        ResourceID::Weak(c.trim().to_string()),
+                        ResourceID::Weak(
+                            Name::validate(c.to_string()).map_err(LocatorParsingError::from)?
+                        ),
                         VarEntryType::Variable.into()
                     ),
                     residual: None
@@ -611,13 +679,8 @@ impl TryFrom<&str> for ParsedLocator {
                     return Err(FormattingError::new(&value, "functions must have a name followed by a '(', and then the arguments (if specified)").into());
                 }
 
-                let name = splits[0].trim().to_string();
+                let name = Name::validate(splits[0].to_string()).map_err(LocatorParsingError::from)?;
                 let args = splits[1].trim();
-
-                if let Err(e) = is_name_valid(&name) {
-                    return Err(e.into())
-                }
-
                 Ok(
                     Self {
                         loc: Locator::new(
@@ -625,7 +688,12 @@ impl TryFrom<&str> for ParsedLocator {
                             ResourceID::Weak(name),
                             ResourceKind::Function
                         ),
-                        residual: if args.is_empty() || is_string_whitespace(args) { None } else { Some(args.to_string()) },
+                        residual: if args.is_empty() || is_string_whitespace(args) { 
+                            None 
+                        } 
+                        else { 
+                            Some(args.to_string()) 
+                        },
                     }
                 )
             }
@@ -634,15 +702,13 @@ impl TryFrom<&str> for ParsedLocator {
             }
         }
         else {
-            if let Err(e) = is_name_valid(raw_child) {
-                return Err(e.into())
-            }
+            let name = Name::validate(raw_child.to_string()).map_err(LocatorParsingError::from)?;
 
             Ok(
                 Self {
                     loc: Locator::new(
                         parent,
-                        ResourceID::Weak(raw_child.to_string()),
+                        ResourceID::Weak(name),
                         VarEntryType::Environment.into()
                     ),
                     residual: None
@@ -715,7 +781,7 @@ mod test {
         ];
 
         for (i, (test, expected)) in tests.into_iter().enumerate() {
-            let result = is_name_valid(&test);
+            let result = Name::is_name_valid(&test);
             assert_eq!(result.is_ok(), expected, "failure at test {i}: '{test}'");
         }
     }
@@ -745,16 +811,18 @@ mod test {
         2: If a function is called, the parenthesis are required, no matter what
     */
 
-    assert_eq!( ParsedLocator::try_from("aa"), Ok(ParsedLocator::from(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()).into(), VarEntryType::Environment))) );
+    let name = Name::validate("aa".to_string()).unwrap();
+
+    assert_eq!( ParsedLocator::try_from("aa"), Ok(ParsedLocator::from(Locator::new_entry(PackageID::Usr, ResourceID::Weak(name.clone()).into(), VarEntryType::Environment))) );
     assert!( ParsedLocator::try_from("").is_err() );
-    assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak(name.clone()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("$").is_err() );
-    assert_eq!( ParsedLocator::try_from("%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( ParsedLocator::try_from("%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak(name.clone()) ).into()) ) ;
     assert_eq!( 
         ParsedLocator::try_from("%aa(x, y)"), 
         Ok(
             ParsedLocator::new(
-                Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string())),
+                Locator::new_func(PackageID::Usr, ResourceID::Weak(name.clone())),
                 Some("x, y".to_string())
             )
         )
@@ -762,35 +830,36 @@ mod test {
     assert!( ParsedLocator::try_from("%aa").is_err() );
     assert!( ParsedLocator::try_from("%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("usr::aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into() ) );
+    assert_eq!( ParsedLocator::try_from("usr::aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak(name.clone()), VarEntryType::Environment.into()).into() ) );
     assert!( ParsedLocator::try_from("usr::").is_err() );
-    assert_eq!( ParsedLocator::try_from("usr::$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into() ) );
+    assert_eq!( ParsedLocator::try_from("usr::$aa"), Ok(Locator::new_entry(PackageID::Usr, ResourceID::Weak(name.clone()), VarEntryType::Variable.into() ).into() ) );
     assert!( ParsedLocator::try_from("usr::$").is_err() );
-    assert_eq!( ParsedLocator::try_from("usr::%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( ParsedLocator::try_from("usr::%aa()"), Ok(Locator::new_func(PackageID::Usr, ResourceID::Weak(name.clone()) ).into()) ) ;
     assert!( ParsedLocator::try_from("usr::%aa").is_err() );
     assert!( ParsedLocator::try_from("usr::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("std::aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
+    assert_eq!( ParsedLocator::try_from("std::aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak(name.clone()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("std::").is_err() );
-    assert_eq!( ParsedLocator::try_from("std::$aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("std::$aa"), Ok(Locator::new_entry(PackageID::Std, ResourceID::Weak(name.clone()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("std::$").is_err() );
-    assert_eq!( ParsedLocator::try_from("std::%aa()"), Ok(Locator::new_func(PackageID::Std, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( ParsedLocator::try_from("std::%aa()"), Ok(Locator::new_func(PackageID::Std, ResourceID::Weak(name.clone()) ).into()) ) ;
     assert!( ParsedLocator::try_from("std::%aa").is_err() );
     assert!( ParsedLocator::try_from("std::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("*::aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
+    assert_eq!( ParsedLocator::try_from("*::aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak(name.clone()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("*::").is_err() );
-    assert_eq!( ParsedLocator::try_from("*::$aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("*::$aa"), Ok(Locator::new_entry(PackageID::Any, ResourceID::Weak(name.clone()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("**::$").is_err() );
-    assert_eq!( ParsedLocator::try_from("*::%aa()"), Ok(Locator::new_func(PackageID::Any, ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( ParsedLocator::try_from("*::%aa()"), Ok(Locator::new_func(PackageID::Any, ResourceID::Weak(name.clone()) ).into()) ) ;
     assert!( ParsedLocator::try_from("*::%aa").is_err() );
     assert!( ParsedLocator::try_from("*::%").is_err() );
 
-    assert_eq!( ParsedLocator::try_from("foo::aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), VarEntryType::Environment.into()).into()) );
+    let foo = Name::validate("foo".to_string()).unwrap();
+    assert_eq!( ParsedLocator::try_from("foo::aa"), Ok(Locator::new_entry(PackageID::Weak(foo.clone()), ResourceID::Weak(name.clone()), VarEntryType::Environment.into()).into()) );
     assert!( ParsedLocator::try_from("foo::").is_err() );
-    assert_eq!( ParsedLocator::try_from("foo::$aa"), Ok(Locator::new_entry(PackageID::Weak("foo".into()), ResourceID::Weak("aa".into()), VarEntryType::Variable.into() ).into()) );
+    assert_eq!( ParsedLocator::try_from("foo::$aa"), Ok(Locator::new_entry(PackageID::Weak(foo.clone()), ResourceID::Weak(name.clone()), VarEntryType::Variable.into() ).into()) );
     assert!( ParsedLocator::try_from("foo::$").is_err() );
-    assert_eq!( ParsedLocator::try_from("foo::%aa()"), Ok(Locator::new_func(PackageID::Weak("foo".into()), ResourceID::Weak("aa".to_string()) ).into()) ) ;
+    assert_eq!( ParsedLocator::try_from("foo::%aa()"), Ok(Locator::new_func(PackageID::Weak(foo.clone()), ResourceID::Weak(name.clone()) ).into()) ) ;
     assert!( ParsedLocator::try_from("foo::%aa").is_err() );
     assert!( ParsedLocator::try_from("foo::%").is_err() );
 
@@ -822,8 +891,8 @@ mod test {
         {
             let a = PackageID::Usr;
             let b = PackageID::Num(NumericalPackID::new(2));
-            let c = PackageID::Strong("usr".to_string(), NumericalPackID::new(2));
-            let d = PackageID::Weak("usr".to_string());
+            let c = PackageID::Strong(Name::usr_name(), NumericalPackID::new(2));
+            let d = PackageID::Weak(Name::usr_name());
 
             assert_eq!(a, b);
             assert_eq!(b, c);
@@ -836,8 +905,8 @@ mod test {
         {
             let a = PackageID::Std;
             let b = PackageID::Num(NumericalPackID::new(1));
-            let c = PackageID::Strong("std".to_string(), NumericalPackID::new(1));
-            let d = PackageID::Weak("std".to_string());
+            let c = PackageID::Strong(Name::std_name(), NumericalPackID::new(1));
+            let d = PackageID::Weak(Name::std_name());
 
             assert_eq!(a, b);
             assert_eq!(b, c);
@@ -848,8 +917,9 @@ mod test {
         }
 
         {
-            let a = PackageID::Weak("hello".to_string());
-            let b = PackageID::Strong("hello".to_string(), NumericalPackID::new(4));
+            let name = Name::validate("hello".to_string()).unwrap();
+            let a = PackageID::Weak(name.clone());
+            let b = PackageID::Strong(name.clone(), NumericalPackID::new(4));
             let c = PackageID::Num(NumericalPackID::new(4));
 
             assert_eq!(a, b); //Weak to Strong
@@ -860,14 +930,16 @@ mod test {
         }
 
         {
-            let a = PackageID::Weak("hello".to_string());
-            let b = PackageID::Weak("hello".to_string());
+            let name = Name::validate("hello".to_string()).unwrap();
+            let a = PackageID::Weak(name.clone());
+            let b = PackageID::Weak(name.clone());
             assert_eq!(a, b); //Weak to weak
         }
 
 
         {
-            let a = PackageID::Strong("hello".to_string(), ANY_ID);
+            let name = Name::validate("hello".to_string()).unwrap();
+            let a = PackageID::Strong(name.clone(), ANY_ID);
             assert_eq!(a, a.clone());
         }
 
@@ -880,11 +952,13 @@ mod test {
 
     #[test]
     fn resource_id() {
+        let name = Name::validate("hello".to_string()).unwrap();
+
         let a = ResourceID::Numeric(4);
-        let b = ResourceID::Strong("hello".to_string(), 4);
-        let c = ResourceID::Weak("hello".to_string());
+        let b = ResourceID::Strong(name.clone(), 4);
+        let c = ResourceID::Weak(name.clone());
         let d = ResourceID::Numeric(5);
-        let e = ResourceID::Strong("hello".to_string(), 5);
+        let e = ResourceID::Strong(name.clone(), 5);
         
         assert!(a.name().is_none() && a.id().is_some());
         assert!(b.name().is_some() && b.id().is_some());

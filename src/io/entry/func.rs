@@ -2,7 +2,7 @@ pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, Vari
 use crate::calc::func::{ASTBasedFunction, ImplBasedFunction, FunctionBase};
 use crate::log_error;
 use crate::core::errors::NamingError;
-use super::super::id::{validate_name, NumericalResourceID, ResourceKind};
+use super::super::id::{Name, NumericalResourceID, ResourceKind};
 use super::base::*;
 
 use std::fmt::{Display, Debug};

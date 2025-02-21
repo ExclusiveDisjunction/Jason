@@ -3,6 +3,7 @@ use crate::core::errors::{NamingError, UnexpectedError, Error as CoreError};
 use crate::core::version::JASON_CURRENT_VERSION;
 use super::compress::{PackageSnapshot, CompressedPackage};
 use super::header::PackageHeader;
+use super::base::{ReadPackage, WritePackage, WriteProvider, SaveablePackage};
 use super::super::entry::*;
 use super::super::id::*;
 use super::super::core::Error;
@@ -11,11 +12,11 @@ use serde_json::{from_str, json};
 
 use std::path::{Path, PathBuf};
 use std::fs::{File, create_dir_all};
-use std::io::{Write, Read, Error as IOError};
+use std::io::{Read, Error as IOError};
 
 pub struct Package {
     pack_id: NumericalPackID,
-    current_id: u32,
+    current_id: NumericalResourceID,
     name: String,
     header: PackageHeader,
     entries: Vec<VariableEntry>,
@@ -38,6 +39,7 @@ impl Package {
         }
     }
 
+    /*
     pub fn create_into_directory(path: &Path, name: String, id: NumericalPackID) -> Result<Self, Error> {
         if !id.is_specific() {
             return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
@@ -114,16 +116,49 @@ impl Package {
 
         Self::open_from_snapshot(path.to_path_buf(), &snap, id)
     }
-    pub fn open_from_compressed(path: PathBuf, file: &CompressedPackage, id: NumericalPackID) -> Result<Self, Error> {
-        Self::open_from_snapshot(path, file.contents(), id)
+     */
+}
+impl ReadPackage<FunctionEntry> for Package {
+    fn id(&self) -> NumericalPackID {
+        self.pack_id
     }
-    pub fn open_from_snapshot(path: PathBuf, snap: &PackageSnapshot, id: NumericalPackID) -> Result<Self, Error> { 
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn entries(&self) -> &Vec<VariableEntry> {
+        &self.entries
+    }
+    fn functions(&self) -> &Vec<FunctionEntry> {
+        &self.func
+    }
+}
+impl WritePackage for Package {
+    fn get_provider<'a>(&'a mut self) -> WriteProvider<'a> {
+        WriteProvider::new(&mut self.entries, &mut self.func, &mut self.current_id, self.pack_id)
+    }
+}
+impl SaveablePackage for Package {
+    fn header(&self) -> &PackageHeader {
+        &self.header
+    }
+    fn header_mut(&mut self) -> &mut PackageHeader {
+        &mut self.header
+    }
+    fn location(&self) -> &Path {
+        &self.location
+    }
+
+    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: &Path) -> Result<Self, Error> {
         if !id.is_specific() {
             return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
         }
 
-        let name: String = validate_name(snap.name().to_string())
-            .map_err(|x| Error::from(CoreError::from(x)))?;
+        if !from.is_dir() {
+            return Err(IOError::new(std::io::ErrorKind::NotADirectory, "the package must be opened in a directory").into());
+        }
+
+        
 
         let header: PackageHeader = from_str(snap.header())
             .map_err(Error::from)?;
@@ -147,173 +182,13 @@ impl Package {
             Self {
                 name,
                 pack_id: id,
-                current_id: key.resx(), //Sets it to the current 
+                current_id: NumericalResourceID::new(id, 0), //Sets it to the current 
                 header,
                 entries,
                 func,
-                location: path
+                location: from.to_path_buf()
             }
         )
-    }
-    
-    fn get_next_id(&mut self) -> Result<NumericalResourceID, UnexpectedError> {
-        if self.current_id == u32::MAX {
-            Err(UnexpectedError::new("the max id for this package has already been taken"))
-        }
-        else {
-            let result = self.current_id;
-            self.current_id += 1;
-            Ok(
-                NumericalResourceID::new(
-                    self.pack_id, 
-                    result
-                )
-            )
-        }
-    }
-
-    pub fn id(&self) -> NumericalPackID {
-        self.pack_id
-    }
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-    pub fn make_pack_id(&self) -> PackageID {
-        PackageID::Strong(self.name.clone(), self.pack_id)
-    }
-
-    pub fn header(&self) -> &PackageHeader {
-        &self.header
-    }
-    pub fn header_mut(&mut self) -> &mut PackageHeader {
-        &mut self.header
-    }
-
-    pub fn snapshot(&self) -> PackageSnapshot {
-        let header = json!(self.header).to_string();
-        let name = self.name.clone();
-        let entries = json!(&self.entries).to_string();
-        let functions = json!(&self.func).to_string();
-        
-        PackageSnapshot::new(name, header, entries, functions)
-    }
-    pub fn make_compressed(&self) -> CompressedPackage {
-        self.snapshot().into()
-    }
-    pub fn save(&self) -> std::io::Result<()> {
-        let snapshot = self.snapshot();
-
-        /*
-            We have several files:
-            header file -> ./header
-            entries file ./entry
-            functions file ./func
-         */
-
-        if !self.location.exists() {
-            create_dir_all(&self.location)?;
-        }
-
-        let mut header_file = File::create(self.location.join("header"))?;
-        let mut entries_file = File::create(self.location.join("entry"))?;
-        let mut functions_file = File::create(self.location.join("func"))?;
-
-        header_file.write_all(snapshot.header().as_bytes())?;
-        entries_file.write_all(snapshot.entries_raw().as_bytes())?;
-        functions_file.write_all(snapshot.functions_raw().as_bytes())?;
-
-        Ok(())
-    }
-
-    pub fn resolve(&self, loc: &Locator) -> Option<NumericalResourceID> {
-        loc.contained_in_sc(&self.make_pack_id())?;
-
-        match loc.kind() {
-            ResourceKind::Entry(_) => {
-                let found = self.entries.iter().find(|x| x.accepts_locator(loc));
-
-                found.map(|x| x.id() )
-            }
-            ResourceKind::Function => {
-                None
-            }
-        }
-    }
-
-    pub fn get(&self, id: NumericalResourceID) -> Option<&VariableEntry> {
-        id.contained_in_sc(&self.pack_id)?;
-
-        self.entries.iter().find(|x| x.accepts_id(id))
-    }
-    pub fn get_mut(&mut self, id: NumericalResourceID) -> Option<&mut VariableEntry>{
-        id.contained_in_sc(&self.pack_id)?;
-
-        self.entries.iter_mut().find(|x| x.accepts_id(id))
-    }
-    pub fn get_func(&self, id: NumericalResourceID) -> Option<&FunctionEntry> {
-        id.contained_in_sc(&self.pack_id)?;
-
-        self.func.iter().find(|x| x.accepts_id(id))
-    }
-    pub fn get_func_mut(&mut self, id: NumericalResourceID) -> Option<&mut FunctionEntry>{
-        id.contained_in_sc(&self.pack_id)?;
-
-        self.func.iter_mut().find(|x| x.accepts_id(id))
-    }
- 
-    pub fn remove(&mut self, id: NumericalResourceID) -> bool {
-        self.release_entry(id).is_some() || self.release_func(id).is_some()
-    }
-    pub fn release_entry(&mut self, id: NumericalResourceID) -> Option<VariableEntry> {
-        id.contained_in_sc(&self.pack_id)?;
-
-        let index = self.entries.iter().position(|x| x.accepts_id(id))?;
-
-        Some(self.entries.remove(index))
-    }
-    pub fn release_func(&mut self, id: NumericalResourceID) -> Option<FunctionEntry> {
-        id.contained_in_sc(&self.pack_id)?;
-
-        let index = self.func.iter().position(|x| x.accepts_id(id))?;
-
-        Some(self.func.remove(index))
-    }
-    pub fn remove_all(&mut self) {
-        self.entries.clear();
-        self.func.clear();
-    }
-    pub fn add_entry(&mut self, name: String, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
-        if let Err(e) = is_name_valid(&name) {
-            return Err( e.into() )
-        }
-
-        let key = self.get_next_id().map_err(CoreError::from)?;
-
-        let result = VariableEntry::new(
-            key,
-            name,
-            is_var, 
-            Some(data)
-        ).map_err(CoreError::from)?;
-
-        self.entries.push(result);
-        Ok(key)
-    }
-    pub fn add_func(&mut self, name: String, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
-        if let Err(e) = is_name_valid(&name) {
-            return Err( e.into() )
-        }
-
-        let key = self.get_next_id().map_err(CoreError::from)?;
-
-        let result = FunctionEntry::new(
-            name,
-            key,
-            data
-        ).map_err(CoreError::from)?;
-
-        self.func.push(result);
-        Ok(key)
     }
 }
 

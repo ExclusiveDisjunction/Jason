@@ -6,28 +6,24 @@ use std::fs::File;
 use std::path::Path;
 use std::io::Read;
 
-use serde_json::from_str;
+//use serde_json::from_str;
 
+/// Represents a working image of what the package, at the time of creation, looks like. This is used to write to a directory, in the form of three files, or can be read from a directory. Additionally, this structure can be serialized and deserialized directly, and is used to create `CompressedPackage`. 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct PackageSnapshot {
-    name: String,
     header: String,
     entries_data: String,
     functions_data: String
 }
 impl PackageSnapshot {
-    pub fn new(name: String, header: String, entries_data: String, functions_data: String) -> Self {
+    pub fn new(header: String, entries_data: String, functions_data: String) -> Self {
         Self {
-            name,
             header,
             entries_data,
             functions_data
         }
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
-    }
     pub fn header(&self) -> &str {
         &self.header
     }
@@ -42,16 +38,17 @@ impl BlockParsable for PackageSnapshot {}
 
 /// Represents a singular file for a package. 
 pub struct CompressedPackage {
-    cont: PackageSnapshot
-}
-impl From<PackageSnapshot> for CompressedPackage {
-    fn from(value: PackageSnapshot) -> Self {
-        Self {
-            cont: value
-        }
-    }
+    cont: PackageSnapshot,
+    name: String
 }
 impl CompressedPackage {
+    pub fn new(inner: PackageSnapshot, name: String) -> Self {
+        Self{
+            cont: inner,
+            name
+        }
+    }
+
     pub fn read(path: &Path) -> Result<Self, Error> {
         //Attempt to open a file for reading at that path
         let mut file = File::open(path)?;
@@ -65,11 +62,15 @@ impl CompressedPackage {
             return Err(e.into())
         }
 
-        let contents: Result<PackageSnapshot, _> = from_str(&contents);
+        todo!()
+
+        /*
+        let contents: Result<Self, _> = from_str(&contents);
         match contents {
             Ok(c) => Ok(Self { cont: c }),
             Err(e) => Err(e.into())
         }
+        */
     }
 
     pub fn write(&self, file: &mut File) -> std::io::Result<()> {
@@ -78,5 +79,8 @@ impl CompressedPackage {
 
     pub fn contents(&self) -> &PackageSnapshot {
         &self.cont
+    }
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
