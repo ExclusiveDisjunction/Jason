@@ -65,7 +65,14 @@ impl Name {
         }
     }
     pub fn validate_path(path: &Path) -> Result<(Self, PathBuf), CoreError> {
-        let file_name_osstr = match path.file_name() {
+        let target_name: Option<&std::ffi::OsStr>;
+        if path.is_file() {
+            target_name = path.file_stem();
+        }
+        else {
+            target_name = path.file_name();
+        }
+        let file_name_osstr = match target_name {
             Some(v) => v,
             None => return Err(
                 CoreError::from(UnexpectedError::new("the path provided has no file name"))
