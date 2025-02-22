@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::core::errors::{Error as CoreError, FormattingError, NamingError, UnexpectedError};
 use crate::core::is_string_whitespace;
 use super::entry::VarEntryType;
@@ -37,6 +39,22 @@ impl From<Name> for String {
         value.inner
     }
 }
+impl Serialize for Name {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        self.inner.serialize(serializer)
+    }
+}
+impl<'a> Deserialize<'a> for Name {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'a> {
+        let inner = String::deserialize(deserializer)?;
+
+        Self::validate(inner).map_err(serde::de::Error::custom)
+    }
+}
 impl Name {
     pub const MAX_IO_NAME: usize = 25;
 
@@ -60,7 +78,7 @@ impl Name {
             )
         };
 
-        let name = Self::validate(file_name.to_string()).map_err(|x| CoreError::from(x))?;
+        let name = Self::validate(file_name.to_string()).map_err(CoreError::from)?;
 
         Ok((name, path.to_path_buf()))
     }
@@ -128,6 +146,45 @@ impl Deref for Name {
     }
 }
 
+#[derive(PartialEq, Clone, Debug)]
+pub struct VerifiedPath {
+    name: Name,
+    path: PathBuf
+}
+impl Display for VerifiedPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (&self.name as &dyn Display).fmt(f)
+    }
+}
+impl VerifiedPath {
+    pub fn verify(path: &Path) -> Result<Self, CoreError> {
+        let result = Name::validate_path(path).map_err(CoreError::from)?;
+
+        Ok(
+            Self {
+                name: result.0,
+                path: result.1
+            }
+        )
+    }
+    pub fn new(name: Name, path: PathBuf) -> Self {
+        Self {
+            name,
+            path
+        }
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn pop(self) -> (Name, PathBuf) {
+        (self.name, self.path)
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct NumericalPackID {
@@ -269,7 +326,7 @@ impl NumericalResourceID {
             Err(UnexpectedError::new("unable to increment because the maximum resource id has been taken"))
         }
         else {
-            let result = self.clone();
+            let result = *self;
             self.resx += 1;
             Ok(result)
         }

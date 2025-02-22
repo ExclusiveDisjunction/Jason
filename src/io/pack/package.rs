@@ -1,23 +1,22 @@
-use crate::calc::func::ASTBasedFunction;
-use crate::core::errors::{NamingError, UnexpectedError, Error as CoreError};
+use crate::core::errors::{UnexpectedError, Error as CoreError};
 use crate::core::version::JASON_CURRENT_VERSION;
-use super::compress::{PackageSnapshot, CompressedPackage};
+use super::compress::PackageSnapshot;
 use super::header::PackageHeader;
-use super::base::{ReadPackage, WritePackage, WriteProvider, SaveablePackage};
+use super::base::{OpenablePackage, ReadPackage, SaveablePackage, WritePackage, WriteProvider};
 use super::super::entry::*;
 use super::super::id::*;
 use super::super::core::Error;
 
-use serde_json::{from_str, json};
+use serde_json::from_str;
 
 use std::path::{Path, PathBuf};
-use std::fs::{File, create_dir_all};
-use std::io::{Read, Error as IOError};
+use std::fs::create_dir_all;
+use std::io::Error as IOError;
 
 pub struct Package {
     pack_id: NumericalPackID,
     current_id: NumericalResourceID,
-    name: String,
+    name: Name,
     header: PackageHeader,
     entries: Vec<VariableEntry>,
     func: Vec<FunctionEntry>,
@@ -29,9 +28,9 @@ impl Package {
     fn blank() -> Self {
         use crate::core::Version;
         Self {
-            pack_id: NumericalPackID::new(2),
-            current_id: 0,
-            name: "temporary".to_string(),
+            pack_id: NumericalPackID::new(3),
+            current_id: NumericalResourceID::new(NumericalPackID::new(3), 0),
+            name: Name::validate("temporary".to_string()).unwrap(),
             header: PackageHeader::new(Version::new(1, 0, 0), None),
             entries: vec![],
             func: vec![],
@@ -122,7 +121,7 @@ impl ReadPackage<FunctionEntry> for Package {
     fn id(&self) -> NumericalPackID {
         self.pack_id
     }
-    fn name(&self) -> &str {
+    fn name(&self) -> &Name {
         &self.name
     }
 
@@ -134,7 +133,7 @@ impl ReadPackage<FunctionEntry> for Package {
     }
 }
 impl WritePackage for Package {
-    fn get_provider<'a>(&'a mut self) -> WriteProvider<'a> {
+    fn get_provider(&mut self) -> WriteProvider<'_> {
         WriteProvider::new(&mut self.entries, &mut self.func, &mut self.current_id, self.pack_id)
     }
 }
@@ -148,18 +147,20 @@ impl SaveablePackage for Package {
     fn location(&self) -> &Path {
         &self.location
     }
+}
 
-    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: &Path) -> Result<Self, Error> {
+impl OpenablePackage for Package {
+    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: VerifiedPath) -> Result<Self, Error> {
         if !id.is_specific() {
             return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
         }
 
+        let (name, from) = from.pop();
+
         if !from.is_dir() {
             return Err(IOError::new(std::io::ErrorKind::NotADirectory, "the package must be opened in a directory").into());
         }
-
         
-
         let header: PackageHeader = from_str(snap.header())
             .map_err(Error::from)?;
         let mut entries: Vec<VariableEntry> = from_str(snap.entries_raw())
@@ -190,12 +191,35 @@ impl SaveablePackage for Package {
             }
         )
     }
+    fn create_into_directory(name: Name, id: NumericalPackID, path: &Path) -> Result<Self, Error> where Self: Sized {
+        if !id.is_specific() {
+            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
+        }
+
+
+        if !path.exists() {
+            create_dir_all(path).map_err(|x| Error::from(CoreError::from(x)))?;
+        }
+
+        Ok(
+            Self {
+                name,
+                pack_id: id,
+                current_id: NumericalResourceID::new(id, 0),
+                header: PackageHeader::new(JASON_CURRENT_VERSION, None),
+                entries: vec![],
+                func: vec![],
+                location: path.to_path_buf()
+            }
+        )
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use std::fs::remove_dir;
+    use crate::calc::{VariableUnion, func::ASTBasedFunction};
 
     #[test]
     fn package_locators() {
@@ -208,8 +232,9 @@ mod test {
         pack.header_mut().set_author(Some(author.clone()));
         assert_eq!(pack.header().author(), Some(author.as_str()));
 
-        assert!(pack.add_entry("var1".to_string(), true, 5.5.into()).is_ok());
-        let loc = Locator::new(PackageID::Any, ResourceID::Weak("var1".to_string()), ResourceKind::Entry(VarEntryType::Variable));
+        let name = Name::validate("var1".to_string()).unwrap();
+        assert!(pack.add_entry(name.clone(), true, 5.5.into()).is_ok());
+        let loc = Locator::new(PackageID::Any, ResourceID::Weak(name), ResourceKind::Entry(VarEntryType::Variable));
         let found = match pack.resolve(&loc) {
             Some(f) => f,
             None => panic!("locator was not able to find the resource")
@@ -257,8 +282,7 @@ mod test {
         let target_snapshot: PackageSnapshot;
 
         {
-            
-            let mut pack = match Package::create_into_directory(&path, "test_pack".to_string(), NumericalPackID::new(2)) {
+            let mut pack = match Package::create_into_directory(Name::validate("test_pack".to_string()).unwrap(), NumericalPackID::new(3), &path)  {
                 Ok(p) => p,
                 Err(e) => panic!("Unable to create a new package at '{:?}' because of '{:?}'", &path, e)
             };
@@ -266,14 +290,17 @@ mod test {
 
             let mut snapshot = pack.snapshot();
 
-            let mut pack2 = match Package::open_from_snapshot(path.join("test2"), &snapshot, NumericalPackID::new(3)) {
+            let mut pack2 = match Package::open(
+                &snapshot, 
+                NumericalPackID::new(4), 
+                VerifiedPath::verify(&path.join("test2")).expect("unable to verify path")) {
                 Ok(p) => p,
                 Err(e) => panic!("unable to openf rom snapshot due to '{:?}'", e)
             };
 
             assert_eq!(pack.header(), pack2.header());
 
-            pack.add_entry("hello".to_string(), true, 0.into()).expect("unable to add entry");
+            pack.add_entry(Name::validate("hello".to_string()).unwrap(), true, 0.into()).expect("unable to add entry");
 
             if let Err(e) = pack.save() {
                 panic!("unable to save '{e}'")
@@ -284,7 +311,10 @@ mod test {
 
             snapshot = pack.snapshot();
             target_snapshot = snapshot.clone();
-            pack2 = match Package::open_from_snapshot(path.join("test2"), &snapshot, NumericalPackID::new(3)) {
+            pack2 = match Package::open(
+                &snapshot, 
+                NumericalPackID::new(4), 
+                VerifiedPath::verify(&path.join("test2")).expect("unable to verify path")) {
                 Ok(p) => p,
                 Err(e) => panic!("unable to open package '{:?}'", e)
             };
@@ -297,7 +327,9 @@ mod test {
         }
 
         {
-            let pack = Package::open_from_directory(&path.join("test_pack"), NumericalPackID::new(2)).expect("unable to re-open package");
+            let (snap, path) = PackageSnapshot::open(&path.join("test_path")).expect("unable to open snapshot");
+
+            let pack = Package::open(&snap, NumericalPackID::new(3), path).expect("unable to re-open package");
 
             assert!(pack.entries.len() == 1);
 
@@ -314,9 +346,11 @@ mod test {
         //This tests the getting, removing, releasing, and adding.
 
         let mut pack = Package::blank();
+        let thing1 = Name::validate("thing1".to_string()).unwrap();
+        let thing2 = Name::validate("thing2".to_string()).unwrap();
         
         {
-            let id = pack.add_entry("thing1".to_string(), true, 6.1.into()).expect("unable to add");
+            let id = pack.add_entry(thing1.clone(), true, 6.1.into()).expect("unable to add");
             {
                 let got = pack.get(id).expect("unable to grab id");
                 assert_eq!(id, got.id());
@@ -324,7 +358,7 @@ mod test {
 
             {
                 let got = pack.get_mut(id).expect("unable to grab by id");
-                got.set_name("thing2".to_string()).unwrap();
+                got.set_name(thing2.clone());
 
             }
 
@@ -337,7 +371,7 @@ mod test {
 
         {
             let id = pack.add_func(
-                "thing1".to_string(), 
+                thing1.clone(), 
                 ASTBasedFunction::new(
                     ConstExpr::new(1.0.into()).into(),
                     FunctionArgSignature::default()
@@ -350,8 +384,8 @@ mod test {
             }
 
             {
-                let got = pack.get_func_mut(id).expect("unable to grab by id");
-                got.set_name("thing2".to_string()).unwrap();
+                let got = pack.get_mut_func(id).expect("unable to grab by id");
+                got.set_name(thing2.clone());
 
             }
 

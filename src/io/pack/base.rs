@@ -1,13 +1,17 @@
 use crate::calc::func::ASTBasedFunction;
-use crate::io::entry::{IOEntry, VariableEntry, FunctionEntry, func::FunctionEntryBase};
-use crate::io::id::{Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceKind, validate_name};
-use crate::io::core::Error;
-use super::compress::{CompressedPackage, PackageSnapshot};
-use super::header::PackageHeader;
+use crate::io::{
+    entry::{IOEntry, VariableEntry, FunctionEntry, FunctionEntryBase},
+    id::{Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceKind, VerifiedPath, Name},
+    core::Error
+};
+use super::{
+    compress::{CompressedPackage, PackageSnapshot},
+    header::PackageHeader
+};
 use crate::calc::VariableUnion;
 use crate::core::errors::{Error as CoreError, UnexpectedError};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 
@@ -15,9 +19,9 @@ use serde_json::json;
 
 pub trait ReadPackage<FuncT> where FuncT: FunctionEntryBase {
     fn id(&self) -> NumericalPackID;
-    fn name(&self) -> &str;
+    fn name(&self) -> &Name;
     fn make_pack_id(&self) -> PackageID {
-        PackageID::Strong(self.name().to_string(), self.id())
+        PackageID::Strong(self.name().clone(), self.id())
     }
 
     fn entries(&self) -> &Vec<VariableEntry>;
@@ -37,7 +41,7 @@ pub trait ReadPackage<FuncT> where FuncT: FunctionEntryBase {
     }
 
     fn get(&self, id: NumericalResourceID) -> Option<&VariableEntry> {
-        id.contained_in_sc(&&self.id())?;
+        id.contained_in_sc(&self.id())?;
 
         self.entries().iter().find(|x| x.accepts_id(id))
     }
@@ -49,7 +53,7 @@ pub trait ReadPackage<FuncT> where FuncT: FunctionEntryBase {
 }
 
 pub trait WritePackage: ReadPackage<FunctionEntry> {
-    fn get_provider<'a>(&'a mut self) -> WriteProvider<'a>;
+    fn get_provider(&mut self) -> WriteProvider<'_>;
 
     fn get_mut<'a>(&'a mut self, id: NumericalResourceID) -> Option<&'a mut VariableEntry> where FunctionEntry: 'a {
         let provider = self.get_provider();
@@ -74,10 +78,10 @@ pub trait WritePackage: ReadPackage<FunctionEntry> {
         self.get_provider().remove_all()
     }
 
-    fn add_entry(&mut self, name: String, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
+    fn add_entry(&mut self, name: Name, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
         self.get_provider().add_entry(name, is_var, data)
     }
-    fn add_func(&mut self, name: String, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
+    fn add_func(&mut self, name: Name, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
         self.get_provider().add_func(name, data)
     }
 
@@ -139,8 +143,7 @@ impl<'a> WriteProvider<'a> {
         *self.id = NumericalResourceID::new(self.pack_id, 0);
     }
 
-    fn add_entry(&mut self, name: String, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
-        let name = validate_name(name).map_err(CoreError::from)?;
+    fn add_entry(&mut self, name: Name, is_var: bool, data: VariableUnion) -> Result<NumericalResourceID, CoreError> {
         let key = self.id.try_increment().map_err(CoreError::from)?;
 
         self.entry.push(
@@ -149,17 +152,16 @@ impl<'a> WriteProvider<'a> {
                 name,
                 is_var, 
                 Some(data)
-            ).map_err(CoreError::from)?
+            )
         );
 
         Ok(key)
     }
-    fn add_func(&mut self, name: String, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
-        let name = validate_name(name).map_err(CoreError::from)?;
+    fn add_func(&mut self, name: Name, data: ASTBasedFunction) -> Result<NumericalResourceID, CoreError> {
         let key = self.id.try_increment().map_err(CoreError::from)?;
 
         self.func.push(
-            FunctionEntry::new(name, key, data).map_err(CoreError::from)?
+            FunctionEntry::new(name, key, data)
         );
 
         Ok(key)
@@ -186,11 +188,6 @@ pub trait SaveablePackage: ReadPackage<FunctionEntry> {
 
     fn location(&self) -> &Path;
 
-    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: &Path) -> Result<Self, Error> where Self: Sized;
-    fn open_compressed(compressed: &CompressedPackage, id: NumericalPackID, from: &Path) -> Result<Self, Error> where Self: Sized{
-        Self::open(compressed.contents(), compressed.name().to_string(), id)
-    }
-
     fn snapshot(&self) -> PackageSnapshot {
         let header = json!(self.header()).to_string();
         let entries = json!(&self.entries()).to_string();
@@ -200,7 +197,7 @@ pub trait SaveablePackage: ReadPackage<FunctionEntry> {
     }
     fn make_compressed(&self) -> CompressedPackage {
         let snap = self.snapshot();
-        let name = self.name().to_string();
+        let name = self.name().clone();
 
         CompressedPackage::new(snap, name)
     }
@@ -223,4 +220,12 @@ pub trait SaveablePackage: ReadPackage<FunctionEntry> {
 
         Ok(())
     }
+}
+pub trait OpenablePackage: SaveablePackage {
+    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: VerifiedPath) -> Result<Self, Error> where Self: Sized;
+    fn open_compressed(compressed: &CompressedPackage, id: NumericalPackID, from: PathBuf) -> Result<Self, Error> where Self: Sized {
+        Self::open(compressed.contents(), id, VerifiedPath::new(compressed.name().clone(), from))
+    }
+
+    fn create_into_directory(name: Name, id: NumericalPackID, path: &Path) -> Result<Self, Error> where Self: Sized;
 }

@@ -1,7 +1,7 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
 use crate::log_error;
-use crate::core::errors::{FormattingError, NamingError};
-use super::super::id::{validate_name, NumericalResourceID, ResourceKind};
+use crate::core::errors::FormattingError;
+use super::super::id::{Name, NumericalResourceID, ResourceKind};
 use super::base::*;
 
 use std::fmt::{Display, Debug};
@@ -71,12 +71,14 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
         let kind = seq.next_element()?
             .ok_or_else(|| de::Error::invalid_length(2, &self))?;
 
-        VariableEntry::new_direct(
-            NumericalResourceID::default(), //A temporary key is given, the package must create keys themselves for this process
-            name,
-            kind,
-            data
-        ).map_err(de::Error::custom)
+        Ok(
+            VariableEntry::new_direct(
+                NumericalResourceID::default(), //A temporary key is given, the package must create keys themselves for this process
+                name,
+                kind,
+                data
+            )
+        )
     }
     fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<VariableEntry, V::Error> {
         let mut data = None;
@@ -113,19 +115,21 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
         let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
         let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
 
-        VariableEntry::new_direct(
-            NumericalResourceID::default(),
-            name,
-            kind,
-            data
-        ).map_err(de::Error::custom)
+        Ok(
+            VariableEntry::new_direct(
+                NumericalResourceID::default(),
+                name,
+                kind,
+                data
+            )
+        )
 
     }
 }
 
 pub struct VariableEntry {
     key: NumericalResourceID,
-    name: String,
+    name: Name,
     kind: VarEntryType,
     data: Arc<RwLock<VariableUnion>>
 }
@@ -188,12 +192,11 @@ impl Display for VariableEntry {
     }
 }
 impl IOEntry for VariableEntry {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Name {
         &self.name
     }
-    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
-        self.name = validate_name(new)?;
-        Ok(())
+    fn set_name(&mut self, new: Name) {
+        self.name = new;
     }
 
     fn resource_kind(&self) -> ResourceKind {
@@ -213,7 +216,7 @@ impl IOStorage for VariableEntry {
     }
 }
 impl VariableEntry {
-    pub fn new(key: NumericalResourceID, name: String, is_var: bool, data: Option<VariableUnion>) -> Result<Self, NamingError> {
+    pub fn new(key: NumericalResourceID, name: Name, is_var: bool, data: Option<VariableUnion>) -> Self {
         Self::new_direct(
             key,
             name,
@@ -226,17 +229,13 @@ impl VariableEntry {
             data.unwrap_or(0.into())
         )
     }
-    pub fn new_direct(key: NumericalResourceID, name: String, kind: VarEntryType, data: VariableUnion) -> Result<Self, NamingError> {
-        let mut result = Self {
-            name: String::new(),
+    pub fn new_direct(key: NumericalResourceID, name: Name, kind: VarEntryType, data: VariableUnion) -> Self {
+        Self {
+            name,
             key,
             kind,
             data: Arc::new(RwLock::new(data))
-        };
-
-        result.set_name(name)?;
-
-        Ok(result)
+        }
     }
 }
 
@@ -247,10 +246,10 @@ fn test_variable_serde() {
 
     let entry = VariableEntry::new_direct(
         NumericalResourceID::default(),
-        "hello".to_string(),
+        Name::validate("hello".to_string()).unwrap(),
         VarEntryType::Variable,
         Matrix::identity(4).into()
-    ).unwrap();
+    );
 
     let ser = json!(&entry).to_string();
     let de_ser: Result<VariableEntry, _> = from_str(&ser);

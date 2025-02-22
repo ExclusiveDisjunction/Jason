@@ -1,6 +1,4 @@
-pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
-use crate::core::errors::NamingError;
-use super::super::id::{Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceID, ResourceKind};
+use crate::io::id::{Name, Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceID, ResourceKind};
 
 use std::fmt::{Display, Debug};
 use std::ops::{Deref, DerefMut};
@@ -183,8 +181,8 @@ impl<'a, T> WriteGuard<'a, T> {
 }
 
 pub trait IOEntry: PartialEq + Display + Debug {
-    fn name(&self) -> &str;
-    fn set_name(&mut self, new: String) -> Result<(), NamingError>;
+    fn name(&self) -> &Name;
+    fn set_name(&mut self, new: Name);
 
     fn accepts_id(&self, id: NumericalResourceID) -> bool {
         self.id() == id
@@ -209,7 +207,7 @@ pub trait IOEntry: PartialEq + Display + Debug {
     fn strong_locator(&self) -> Locator {
         Locator::new(
             PackageID::Num(self.package_id()),
-            ResourceID::Strong(self.name().to_string(), self.id().resx()),
+            ResourceID::Strong(self.name().clone(), self.id().resx()),
             self.resource_kind()
         )
     }

@@ -1,19 +1,16 @@
-pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
 use crate::calc::func::{ASTBasedFunction, ImplBasedFunction, FunctionBase};
-use crate::log_error;
-use crate::core::errors::NamingError;
-use super::super::id::{Name, NumericalResourceID, ResourceKind};
+use crate::io::id::{Name, ResourceKind, NumericalResourceID};
 use super::base::*;
+use crate::log_error;
 
 use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
-use serde::ser::SerializeStruct;
-use serde::{ser, Deserialize, Serialize, Serializer, Deserializer, de::{self, Visitor, SeqAccess, MapAccess}};
+use serde::{ser::{self, SerializeStruct}, Serialize, Deserialize, Serializer, Deserializer, de::{self, Visitor, SeqAccess, MapAccess}};
 
 pub trait FunctionEntryBase: IOEntry + Sized {
     type Holding: FunctionBase;
 
-    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError>;
+    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self;
 }
 
 #[derive(Deserialize)]
@@ -39,11 +36,13 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
         let name = seq.next_element()?
             .ok_or_else(|| de::Error::invalid_length(1, &self))?;
 
-        FunctionEntry::new(
-            name,
-            NumericalResourceID::default(),
-            data
-        ).map_err(de::Error::custom)
+        Ok(
+            FunctionEntry::new(
+                name,
+                NumericalResourceID::default(),
+                data
+            )
+        )
     }
     fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<FunctionEntry, V::Error> {
         let mut data = None;
@@ -71,16 +70,18 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
         let data = data.ok_or_else(|| de::Error::missing_field("data"))?;
         let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
 
-        FunctionEntry::new(
-            name,
-            NumericalResourceID::default(),
-            data
-        ).map_err(de::Error::custom)
+        Ok( 
+            FunctionEntry::new(
+                name,
+                NumericalResourceID::default(),
+                data
+            )
+        )
     }
 }
 
 pub struct FunctionEntry {
-    name: String,
+    name: Name,
     data: Arc<RwLock<ASTBasedFunction>>,
     key: NumericalResourceID
 }
@@ -124,12 +125,11 @@ impl Display for FunctionEntry {
     }
 }
 impl IOEntry for FunctionEntry {
-    fn name(&self) -> &str  {
+    fn name(&self) -> &Name  {
         &self.name
     }
-    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
-        self.name = validate_name(new)?;
-        Ok(())
+    fn set_name(&mut self, new: Name) {
+        self.name = new;
     }
 
     fn id(&self) -> NumericalResourceID {
@@ -151,20 +151,17 @@ impl IOStorage for FunctionEntry {
 impl FunctionEntryBase for FunctionEntry {
     type Holding = ASTBasedFunction;
 
-    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError> {
-        let mut result = Self {
+    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self {
+        Self {
             data: Arc::new(RwLock::new(data)),
-            name: String::new(),
+            name,
             key: id
-        };
-
-        result.set_name(name)?;
-        Ok(result)
+        }
     }
 }
 
 pub struct ImplFunctionEntry {
-    name: String,
+    name: Name,
     func: Arc<ImplBasedFunction>,
     key: NumericalResourceID
 }
@@ -191,13 +188,11 @@ impl IOEntry for ImplFunctionEntry {
         &mut self.key
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &Name {
         &self.name
     }
-    fn set_name(&mut self, new: String) -> Result<(), NamingError> {
-        self.name = validate_name(new)?;
-
-        Ok(())
+    fn set_name(&mut self, new: Name) {
+        self.name = new;
     }
     fn resource_kind(&self) -> ResourceKind {
         ResourceKind::Function
@@ -206,15 +201,12 @@ impl IOEntry for ImplFunctionEntry {
 impl FunctionEntryBase for ImplFunctionEntry {
     type Holding = ImplBasedFunction;
 
-    fn new(name: String, id: NumericalResourceID, data: Self::Holding) -> Result<Self, NamingError> {
-        let mut result = Self {
+    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self{
+        Self {
             key: id,
-            name: String::new(),
+            name,
             func: Arc::new(data)
-        };
-
-        result.set_name(name)?;
-        Ok(result)
+        }
     }
 }
 impl ImplFunctionEntry {
@@ -238,7 +230,7 @@ fn test_function_serde() {
         VariableExpr::new('x', 0).into()
     ).into();
 
-    let func = FunctionEntry::new("hello".to_string(), NumericalResourceID::default(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x())).unwrap();
+    let func = FunctionEntry::new(Name::validate("hello".to_string()).unwrap(), NumericalResourceID::default(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x()));
 
     let ser = json!(&func).to_string();
     let de_ser: Result<FunctionEntry, _> = from_str(&ser);

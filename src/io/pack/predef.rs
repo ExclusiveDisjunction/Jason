@@ -1,19 +1,20 @@
-use crate::calc::func::ASTBasedFunction;
-use crate::io::id::{Locator, NumericalPackID, NumericalResourceID, PackageID, ResourceKind, STD_ID, USR_ID};
-use crate::core::errors::Error as CoreError;
+use crate::io::id::{NumericalPackID, NumericalResourceID, PackageID, STD_ID, USR_ID, Name};
+use crate::io::core::Error;
 
-use super::base::{ReadPackage, WritePackage, WriteProvider};
+use super::base::{ReadPackage, SaveablePackage, WritePackage, WriteProvider};
+use super::header::PackageHeader;
 use super::super::entry::{func::*, var::*};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Represents the `std` package. This is a read only (no adding, removing or modifying) package. It stores all of the `ImplBasedFunction` instances, and all constants used by the program. 
 pub struct StdPack {
     func: Vec<ImplFunctionEntry>,
-    constants: Vec<VariableEntry>
+    constants: Vec<VariableEntry>,
+    name: Name
 }
-impl StdPack {
-    pub fn new() -> Self {
+impl Default for  StdPack {
+    fn default() -> Self {
         todo!()
     }
 }
@@ -21,8 +22,8 @@ impl ReadPackage<ImplFunctionEntry> for StdPack {
     fn id(&self) -> NumericalPackID {
         STD_ID
     }
-    fn name(&self) -> &str {
-        "std"
+    fn name(&self) -> &Name {
+        &self.name
     }
     fn make_pack_id(&self) -> PackageID {
         PackageID::Std
@@ -40,14 +41,16 @@ pub struct UsrPack {
     entry: Vec<VariableEntry>,
     func: Vec<FunctionEntry>,
     id: NumericalResourceID,
-    loc: PathBuf
+    loc: PathBuf,
+    name: Name,
+    header: PackageHeader
 }
 impl ReadPackage<FunctionEntry> for UsrPack {
     fn id(&self) -> NumericalPackID {
         USR_ID
     }
-    fn name(&self) -> &str {
-        "usr"
+    fn name(&self) -> &Name {
+        &self.name
     }
     fn make_pack_id(&self) -> PackageID {
         PackageID::Usr
@@ -63,7 +66,27 @@ impl ReadPackage<FunctionEntry> for UsrPack {
 
 }
 impl WritePackage for UsrPack {
-    fn get_provider<'a>(&'a mut self) -> WriteProvider<'a> {
+    fn get_provider(&mut self) -> WriteProvider<'_> {
         WriteProvider::new(&mut self.entry, &mut self.func, &mut self.id, USR_ID)
+    }
+}
+impl SaveablePackage for UsrPack {
+    fn header(&self) -> &PackageHeader {
+        &self.header
+    }
+    fn header_mut(&mut self) -> &mut PackageHeader {
+        &mut self.header
+    }
+
+    fn location(&self) -> &Path {
+        &self.loc
+    }
+}
+impl UsrPack {
+    pub fn new(path: &Path) -> Result<Self, Error> {
+        todo!()
+    }
+    pub fn create(path: &Path) -> Result<Self, std::io::Error> {
+        todo!()
     }
 }

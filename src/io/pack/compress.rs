@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 use super::super::core::{BlockParsable, Error};
+use super::super::id::{VerifiedPath, Name};
 
 use std::fs::File;
 use std::path::Path;
@@ -23,6 +24,9 @@ impl PackageSnapshot {
             functions_data
         }
     }
+    pub fn open(path: &Path) -> Result<(Self, VerifiedPath), Error> {
+        todo!()
+    }
 
     pub fn header(&self) -> &str {
         &self.header
@@ -39,10 +43,10 @@ impl BlockParsable for PackageSnapshot {}
 /// Represents a singular file for a package. 
 pub struct CompressedPackage {
     cont: PackageSnapshot,
-    name: String
+    name: Name
 }
 impl CompressedPackage {
-    pub fn new(inner: PackageSnapshot, name: String) -> Self {
+    pub fn new(inner: PackageSnapshot, name: Name) -> Self {
         Self{
             cont: inner,
             name
@@ -80,7 +84,7 @@ impl CompressedPackage {
     pub fn contents(&self) -> &PackageSnapshot {
         &self.cont
     }
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &Name {
         &self.name
     }
 }
