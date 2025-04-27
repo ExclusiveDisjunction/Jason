@@ -16,12 +16,11 @@ use std::io::Error as IOError;
 pub struct Package {
     pack_id: NumericalPackID,
     current_id: NumericalResourceID,
-    name: Name,
     header: PackageHeader,
     entries: Vec<VariableEntry>,
     func: Vec<FunctionEntry>,
 
-    location: PathBuf
+    location: VerifiedPath
 }
 impl Package {
     #[allow(dead_code)]
@@ -30,99 +29,22 @@ impl Package {
         Self {
             pack_id: NumericalPackID::new(3),
             current_id: NumericalResourceID::new(NumericalPackID::new(3), 0),
-            name: Name::validate("temporary".to_string()).unwrap(),
             header: PackageHeader::new(Version::new(1, 0, 0), None),
             entries: vec![],
             func: vec![],
-            location: PathBuf::default()
+            location: VerifiedPath::new(
+                Name::validate("temporary".to_string()).unwrap(),
+                PathBuf::default()
+            )
         }
     }
-
-    /*
-    pub fn create_into_directory(path: &Path, name: String, id: NumericalPackID) -> Result<Self, Error> {
-        if !id.is_specific() {
-            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
-        }
-
-        let loc = path.join(&name);
-        if let Err(e) = create_dir_all(&loc) {
-            return Err(e.into());
-        }
-
-        let header_path = loc.join("header");
-        let entry_path = loc.join("entry");
-        let func_path = loc.join("func");
-
-        // Create our files so that we can use them later for saving
-        File::create(header_path).map_err(Error::from)?;
-        File::create(entry_path).map_err(Error::from)?;
-        File::create(func_path).map_err(Error::from)?;
-
-        Ok(
-            Self {
-                pack_id: id,
-                current_id: 0,
-                name,
-                header: PackageHeader::new(JASON_CURRENT_VERSION, None),
-                entries: vec![],
-                func: vec![],
-                location: loc
-            }
-        )
-    }
-    pub fn open_from_directory(path: &Path, id: NumericalPackID) -> Result<Self, Error> {
-        /*
-            In this path, we expect three files:
-            1. header
-            2. entry
-            3. func
-
-            The contents of these files should be read, and then the arguments will be passed into a PackageSnapshot. This will then be passed into Self::open_from_snapshot.
-         */
-
-         if !id.is_specific() {
-            return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
-        }
-
-        if !path.is_dir() {
-            return Err(IOError::new(std::io::ErrorKind::NotADirectory, "the path provided must be a directory").into());
-        }
-
-        let name = match path.file_name().and_then(|x| x.to_str()) {
-            Some(n) => n.to_string(),
-            None => return Err(CoreError::from(NamingError::InvalidCharacters).into())
-        };
-
-        let name = validate_name(name).map_err(|x| Error::from(CoreError::from(x)))?;
-
-        let header_path = path.join("header");
-        let entry_path = path.join("entry");
-        let func_path = path.join("func");
-
-        let mut header = File::open(header_path).map_err(Error::from)?;
-        let mut entry = File::open(entry_path).map_err(Error::from)?;
-        let mut func = File::open(func_path).map_err(Error::from)?;
-
-        let mut header_cont: String = String::new();
-        let mut entry_cont: String = String::new();
-        let mut func_cont: String = String::new();
-
-        header.read_to_string(&mut header_cont).map_err(Error::from)?;
-        entry.read_to_string(&mut entry_cont).map_err(Error::from)?;
-        func.read_to_string(&mut func_cont).map_err(Error::from)?;
-
-        let snap = PackageSnapshot::new(name, header_cont, entry_cont, func_cont);
-
-        Self::open_from_snapshot(path.to_path_buf(), &snap, id)
-    }
-     */
 }
 impl ReadPackage<FunctionEntry> for Package {
     fn id(&self) -> NumericalPackID {
         self.pack_id
     }
     fn name(&self) -> &Name {
-        &self.name
+        self.location.name()
     }
 
     fn entries(&self) -> &Vec<VariableEntry> {
@@ -144,18 +66,19 @@ impl SaveablePackage for Package {
     fn header_mut(&mut self) -> &mut PackageHeader {
         &mut self.header
     }
-    fn location(&self) -> &Path {
+    fn location(&self) -> &VerifiedPath {
         &self.location
     }
 }
 
 impl OpenablePackage for Package {
-    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: VerifiedPath) -> Result<Self, Error> {
+    fn open(snap: &PackageSnapshot, id: NumericalPackID) -> Result<Self, Error> {
         if !id.is_specific() {
             return Err(CoreError::from(UnexpectedError::new(format!("unable create using id: {id}, it is reserved"))).into());
         }
 
-        let (name, from) = from.pop();
+        let (name, from) = snap.path().pop_ref();
+        let name = name.clone();
 
         if !from.is_dir() {
             return Err(IOError::new(std::io::ErrorKind::NotADirectory, "the package must be opened in a directory").into());
@@ -327,9 +250,9 @@ mod test {
         }
 
         {
-            let (snap, path) = PackageSnapshot::open(&path.join("test_path")).expect("unable to open snapshot");
+            let snap = PackageSnapshot::open(&path.join("test_path")).expect("unable to open snapshot");
 
-            let pack = Package::open(&snap, NumericalPackID::new(3), path).expect("unable to re-open package");
+            let pack = Package::open(&snap, NumericalPackID::new(3)).expect("unable to re-open package");
 
             assert!(pack.entries.len() == 1);
 

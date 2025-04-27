@@ -191,6 +191,9 @@ impl VerifiedPath {
     pub fn pop(self) -> (Name, PathBuf) {
         (self.name, self.path)
     }
+    pub fn pop_ref(&self) -> (&Name, &Path) {
+        (&self.name, &self.path)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]

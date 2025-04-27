@@ -1,15 +1,15 @@
 use serde::{Serialize, Deserialize};
-use serde_json::{from_str, json};
+use serde_json::from_str;
 
 use crate::io::{
     core::{BlockParsable, Error},
-    id::{VerifiedPath, Name}
+    id::VerifiedPath
 };
 use crate::core::errors::Error as CoreError;
 
-use std::fs::File;
+use std::{fs::File, io::ErrorKind};
 use std::path::Path;
-use std::io::{Read, Error as IOError};
+use std::io::{Read, Write, Error as IOError};
 
 //use serde_json::from_str;
 
@@ -95,19 +95,53 @@ impl PackageSnapshot {
             Self::open_file(path)
         }
         else {
-            Err(Error::from(IOError::new(std::io::ErrorKind::Unsupported, "the path provided either does not exist, or is not a file nor directory")))
+            Err(
+                Error::from(
+                    IOError::new(
+                        std::io::ErrorKind::Unsupported,
+                        "the path provided either does not exist, or is not a file nor directory"
+                    )
+                )
+            )
         }
     }
 
     pub fn save(&self) -> Result<(), IOError> {
         if self.is_dir {
-
+            self.save_to_dir()
         }
         else {
-            let ser = json!(&self).to_string();
-
-            let mut file = File::create(self.loc.as_ref().unwrap().path())?;
+            self.save_to_file()
         }
+    }
+    pub fn save_to_dir(&self) -> Result<(), IOError> {
+        let path = self.path().path();
+        let header_p = path.join("header");
+        let entry_p = path.join("entry");
+        let func_p = path.join("func");
+
+        let mut header_file = File::open(&header_p)?;
+        let mut entry_file = File::open(&entry_p)?;
+        let mut func_file = File::open(&func_p)?;
+
+        header_file.write_all(self.header.as_bytes())?;
+        entry_file.write_all(self.entries_data.as_bytes())?;
+        func_file.write_all(self.functions_data.as_bytes())?;
+
+        Ok(())
+    }
+    pub fn save_to_file(&self) -> Result<(), IOError> {
+        let serialized = match serde_json::to_string(self) {
+            Ok(v) => v,
+            Err(e) => return Err(
+                IOError::new(ErrorKind::Interrupted, e)
+            )
+        };
+
+        let mut file = File::create(self.loc.as_ref().unwrap().path())?;
+        file.write_all(serialized.as_bytes())?;
+
+        Ok(())
     }
 
     pub fn header(&self) -> &str {
@@ -124,52 +158,3 @@ impl PackageSnapshot {
     }
 }
 impl BlockParsable for PackageSnapshot {}
-
-/// Represents a singular file for a package. 
-pub struct CompressedPackage {
-    cont: PackageSnapshot,
-    name: Name
-}
-impl CompressedPackage {
-    pub fn new(inner: PackageSnapshot, name: Name) -> Self {
-        Self{
-            cont: inner,
-            name
-        }
-    }
-
-    pub fn read(path: &Path) -> Result<Self, Error> {
-        //Attempt to open a file for reading at that path
-        let mut file = File::open(path)?;
-        
-        Self::read_file(&mut file)
-    }
-    pub fn read_file(file: &mut File) -> Result<Self, Error> {
-        //Extract the contents and parse a PackageSnapshot from it
-        let mut contents = String::new();
-        if let Err(e) = file.read_to_string(&mut contents) {
-            return Err(e.into())
-        }
-
-        todo!()
-
-        /*
-        let contents: Result<Self, _> = from_str(&contents);
-        match contents {
-            Ok(c) => Ok(Self { cont: c }),
-            Err(e) => Err(e.into())
-        }
-        */
-    }
-
-    pub fn write(&self, file: &mut File) -> std::io::Result<()> {
-        self.cont.write(file)
-    }
-
-    pub fn contents(&self) -> &PackageSnapshot {
-        &self.cont
-    }
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-}

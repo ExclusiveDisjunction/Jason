@@ -5,17 +5,15 @@ use crate::io::{
     core::Error
 };
 use super::{
-    compress::{CompressedPackage, PackageSnapshot},
+    compress::PackageSnapshot,
     header::PackageHeader
 };
 use crate::calc::VariableUnion;
 use crate::core::errors::{Error as CoreError, UnexpectedError};
 
-use std::path::{Path, PathBuf};
-use std::fs::{create_dir_all, File};
-use std::io::Write;
+use std::path::Path;
 
-use serde_json::json;
+use serde_json::to_string;
 
 pub trait ReadPackage<FuncT> where FuncT: FunctionEntryBase {
     fn id(&self) -> NumericalPackID;
@@ -186,46 +184,27 @@ pub trait SaveablePackage: ReadPackage<FunctionEntry> {
     fn header(&self) -> &PackageHeader;
     fn header_mut(&mut self) -> &mut PackageHeader;
 
-    fn location(&self) -> &Path;
+    fn location(&self) -> &VerifiedPath;
 
-    fn snapshot(&self) -> PackageSnapshot {
-        let header = json!(self.header()).to_string();
-        let entries = json!(&self.entries()).to_string();
-        let functions = json!(&self.functions()).to_string();
+    fn snapshot(&self) -> Result<PackageSnapshot, serde_json::Error> {
+        let header = to_string(self.header())?;
+        let entries = to_string(&self.entries())?;
+        let functions = to_string(&self.functions())?;
 
-        PackageSnapshot::new(header, entries, functions)
-    }
-    fn make_compressed(&self) -> CompressedPackage {
-        let snap = self.snapshot();
-        let name = self.name().clone();
-
-        CompressedPackage::new(snap, name)
-    }
-    fn save(&self) -> std::io::Result<()> {
-        let snapshot = self.snapshot();
-
-        let location = self.location();
-
-        if !location.exists() {
-            create_dir_all(self.location())?;
-        }
-
-        let mut header_file = File::create(location.join("header"))?;
-        let mut entries_file = File::create(location.join("entry"))?;
-        let mut functions_file = File::create(location.join("func"))?;
-
-        header_file.write_all(snapshot.header().as_bytes())?;
-        entries_file.write_all(snapshot.entries_raw().as_bytes())?;
-        functions_file.write_all(snapshot.functions_raw().as_bytes())?;
-
-        Ok(())
+        Ok( 
+            PackageSnapshot::new(
+                header,
+                entries, 
+                functions, 
+                self.location().clone()
+            )
+        )
     }
 }
-pub trait OpenablePackage: SaveablePackage {
-    fn open(snap: &PackageSnapshot, id: NumericalPackID, from: VerifiedPath) -> Result<Self, Error> where Self: Sized;
-    fn open_compressed(compressed: &CompressedPackage, id: NumericalPackID, from: PathBuf) -> Result<Self, Error> where Self: Sized {
-        Self::open(compressed.contents(), id, VerifiedPath::new(compressed.name().clone(), from))
-    }
+pub trait OpenablePackage: SaveablePackage + Sized {
+    fn open(snap: &PackageSnapshot, id: NumericalPackID) -> Result<Self, Error>;
 
-    fn create_into_directory(name: Name, id: NumericalPackID, path: &Path) -> Result<Self, Error> where Self: Sized;
+    fn create_into_directory(path: VerifiedPath, id: NumericalPackID) -> Result<Self, Error> {
+        todo!()
+    }
 }
