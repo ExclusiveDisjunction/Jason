@@ -1,6 +1,6 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
-use crate::log_error;
-use crate::core::errors::FormattingError;
+use exdisj::log_error;
+use exdisj::error::FormattingError;
 use super::super::id::{Name, NumericalResourceID, ResourceKind};
 use super::base::*;
 

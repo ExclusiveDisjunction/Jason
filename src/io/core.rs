@@ -2,6 +2,8 @@ use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::fs::File;
 
+use exdisj::error::Error as CoreError;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value, from_value};
 
@@ -36,7 +38,7 @@ pub trait BlockParsable: Serialize + for<'a> Deserialize<'a> {
 pub enum Error {
     IO(std::io::Error),
     Serde(serde_json::Error),
-    Core(crate::core::errors::Error)
+    Core(CoreError)
 }
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,8 +60,8 @@ impl From<serde_json::Error> for Error {
         Self::Serde(value)
     }
 }
-impl From<crate::core::errors::Error> for Error {
-    fn from(value: crate::core::errors::Error) -> Self {
+impl From<CoreError> for Error {
+    fn from(value: CoreError) -> Self {
         Self::Core(value)
     }
 }

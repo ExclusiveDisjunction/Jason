@@ -1,611 +1,157 @@
-use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Debug};
 
-use crate::core::errors::{Error as CoreError, FormattingError, NamingError, UnexpectedError};
-use crate::core::is_string_whitespace;
+use super::name::{Name, NameRef};
+
+use exdisj::error::NamingError;
 use super::entry::VarEntryType;
 
-use std::ops::{Deref, AddAssign};
-use std::fmt::{Display, Debug};
-use std::hash::{Hash, Hasher};
-use std::cmp::Ordering;
-use std::path::{Path, PathBuf};
-
-#[derive(PartialEq, Eq, Clone)]
-pub struct Name {
-    inner: String
-}
-impl Debug for Name {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (&self.inner as &dyn Debug).fmt(f)
-    }
-}
-impl Display for Name {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (&self.inner as &dyn Display).fmt(f)
-    }
-}
-impl PartialEq<String> for Name {
-    fn eq(&self, other: &String) -> bool {
-        self.inner.eq(other)
-    }
-}
-impl PartialEq<str> for Name {
-    fn eq(&self, other: &str) -> bool {
-        self.inner.as_str().eq(other)
-    }
-}
-impl From<Name> for String {
-    fn from(value: Name) -> Self {
-        value.inner
-    }
-}
-impl Serialize for Name {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
-        self.inner.serialize(serializer)
-    }
-}
-impl<'a> Deserialize<'a> for Name {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'a> {
-        let inner = String::deserialize(deserializer)?;
-
-        Self::validate(inner).map_err(serde::de::Error::custom)
-    }
-}
-impl Name {
-    pub const MAX_IO_NAME: usize = 25;
-
-    pub fn validate(name: String) -> Result<Self, NamingError> {
-        match Self::is_name_valid(&name) {
-            Ok(_) => Ok(Self { inner: name.trim().to_lowercase() }),
-            Err(e) => Err(e)
-        }
-    }
-    pub fn validate_path(path: &Path) -> Result<(Self, PathBuf), CoreError> {
-        let target_name: Option<&std::ffi::OsStr>;
-        if path.is_file() {
-            target_name = path.file_stem();
-        }
-        else {
-            target_name = path.file_name();
-        }
-        let file_name_osstr = match target_name {
-            Some(v) => v,
-            None => return Err(
-                CoreError::from(UnexpectedError::new("the path provided has no file name"))
-            )
-        };
-        let file_name = match file_name_osstr.to_str() {
-            Some(v) => v,
-            None => return Err(
-                CoreError::from(UnexpectedError::new("the path provided could not have a name represented in 'str'"))
-            )
-        };
-
-        let name = Self::validate(file_name.to_string()).map_err(CoreError::from)?;
-
-        Ok((name, path.to_path_buf()))
-    }
-
-    pub fn any_name() -> Self {
-        Self { inner: "*".to_string() }
-    }
-    pub fn std_name() -> Self {
-        Self { inner: "any".to_string() }
-    }
-    pub fn usr_name() -> Self {
-        Self { inner: "usr".to_string() }
-    }
-
-    /// Checks to see if the name provided meets the following criteria:
-    /// 1. No starting with numerical values
-    /// 2. No 0x or *b patterns (addresses)
-    /// 3. No symbols other than '_' or '-' (no format specifiers)
-    /// 4. Only latin letters.
-    /// 5. No whitespace inbetween 
-    ///
-    /// If the string is valid, it will convert it into a String, such that it is trimmed and does not contain invalid characters.
-    pub fn is_name_valid(name: &str) -> Result<(), NamingError> {
-        let name = name.trim();
-
-        if name == "*" { //this is the any name
-            return Ok(());
-        }
-
-        if name.len() >= Self::MAX_IO_NAME {
-            return Err(NamingError::TooLong);
-        }
-        
-        if name.is_empty() || is_string_whitespace(name) {
-            return Err(NamingError::Empty);
-        }
-
-        if let Some(c) = name.chars().next() {
-            if c.is_numeric() {
-                return Err(NamingError::InvalidCharacters);
-            }
-        }
-
-        if name.contains("0x") {
-            return Err(NamingError::Address)
-        }
-
-        //From this point, no addresses, empty strings, or starting with numeric strings have been found. Now we have to just ensure that everything is alphabetic, and only the '_' and '-' sumbols are allowed. No whitespace.
-        for c in name.chars() {
-            match c {
-                '_' | '-' => continue,
-                x if x.is_alphabetic() || x.is_numeric() => continue,
-                x if x.is_whitespace() => return Err(NamingError::Whitespace),
-                _ => return Err(NamingError::InvalidCharacters)
-            }
-        }
-
-        Ok(())
-    }
-}
-impl Deref for Name {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.inner.as_ref()
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct VerifiedPath {
-    name: Name,
-    path: PathBuf
-}
-impl Display for VerifiedPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (&self.name as &dyn Display).fmt(f)
-    }
-}
-impl VerifiedPath {
-    pub fn verify(path: &Path) -> Result<Self, CoreError> {
-        let result = Name::validate_path(path).map_err(CoreError::from)?;
-
-        Ok(
-            Self {
-                name: result.0,
-                path: result.1
-            }
-        )
-    }
-    pub fn new(name: Name, path: PathBuf) -> Self {
-        Self {
-            name,
-            path
-        }
-    }
-
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn pop(self) -> (Name, PathBuf) {
-        (self.name, self.path)
-    }
-    pub fn pop_ref(&self) -> (&Name, &Path) {
-        (&self.name, &self.path)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub struct NumericalPackID {
-    id: u32
-}
-impl Debug for NumericalPackID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
-impl Display for NumericalPackID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
-impl PartialOrd for NumericalPackID {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for NumericalPackID {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-impl Hash for NumericalPackID {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-impl AddAssign<u32> for NumericalPackID {
-    fn add_assign(&mut self, rhs: u32) {
-        self.id.add_assign(rhs)
-    }
-}
-impl NumericalPackID {
-    pub const fn new(id: u32) -> Self {
-        Self {
-            id
-        }
-    }
-
-    pub const ANY_NUM: u32 = 0;
-    pub const STD_NUM: u32 = 1;
-    pub const USR_NUM: u32 = 2;
-    /// The minimum ID for the "specific" packages
-    pub const SPEC_NUM: u32 = 3;
-    
-    pub fn is_any(&self) -> bool { self.id == Self::ANY_NUM }
-    pub fn is_std(&self) -> bool { self.id == Self::STD_NUM }
-    pub fn is_usr(&self) -> bool { self.id == Self::USR_NUM }
-    pub fn is_specific(&self) -> bool { self.id >= Self::SPEC_NUM }
-}
-
-pub const ANY_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::ANY_NUM);
-pub const STD_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::STD_NUM);
-pub const USR_ID: NumericalPackID = NumericalPackID::new(NumericalPackID::USR_NUM);
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub struct NumericalResourceID {
-    package: NumericalPackID,
-    resx: u32
-}
-impl Display for NumericalResourceID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", &self.package, &self.resx)
-    }
-}
-impl Debug for NumericalResourceID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}.{}", &self.package, &self.resx)
-    }
-}
-impl PartialOrd for NumericalResourceID {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for NumericalResourceID {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let parent = self.package.cmp(&other.package);
-        if parent == Ordering::Equal {
-            self.resx.cmp(&other.resx)
-        }
-        else {
-            parent
-        }
-    }
-}
-impl Hash for NumericalResourceID {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.package.hash(state);
-        self.resx.hash(state);
-    }
-}
-impl AddAssign<u32> for NumericalResourceID {
-    fn add_assign(&mut self, rhs: u32) {
-        self.resx.add_assign(rhs)
-    }
-}
-impl NumericalResourceID {
-    pub fn new(package: NumericalPackID, resx: u32) -> Self {
-        Self {
-            package,
-            resx
-        }
-    }
-
-    pub fn package(&self) -> NumericalPackID { self.package }
-    pub fn resx(&self) -> u32 { self.resx }
-
-    pub fn contained_in(&self, parent: &NumericalPackID) -> bool {
-        &self.package == parent
-    }
-    pub fn contained_in_sc(&self, parent: &NumericalPackID) -> Option<()> {
-        if self.contained_in(parent) {
-            Some(())
-        }
-        else {
-            None
-        }
-    }
-
-    pub fn increment(&mut self) -> NumericalResourceID {
-        self.try_increment().unwrap()
-    }
-    /// Attempts to increment the current number, and return the previous value (pre-incremement). If the value is `u32::MAX`, this will fail.
-    /// ```
-    /// let mut key = NumericalResourceID::new(USR_ID, 0);
-    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 0)));
-    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 1)));
-    /// assert_eq!(key.try_increment(), Ok(NumericalResourceID::new(USR_ID, 2)));
-    /// 
-    /// key = NumericalResourceID::new(USR_ID, u32::MAX);
-    /// assert!(key.try_increment().is_err());
-    /// ```
-    pub fn try_increment(&mut self) -> Result<NumericalResourceID, UnexpectedError> {
-        if self.resx == u32::MAX {
-            Err(UnexpectedError::new("unable to increment because the maximum resource id has been taken"))
-        }
-        else {
-            let result = *self;
-            self.resx += 1;
-            Ok(result)
-        }
-
-    }
-}
-
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum PackageID {
-    Any,
+    Scope,
     Usr,
     Std,
-    Weak(Name),
-    Strong(Name, NumericalPackID),
-    Num(NumericalPackID)
-}
-impl Default for PackageID {
-    fn default() -> Self {
-        Self::Any
-    }
+    Named(Name)
 }
 impl Display for PackageID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Any => write!(f, "*"),
-            Self::Usr => write!(f, "usr"),
-            Self::Std => write!(f, "std"),
-            Self::Strong(s, _) | Self::Weak(s) => write!(f, "{}", s),
-            Self::Num(a) => write!(f, "(id: {})", a)
-        }
-    }
-}
-impl Debug for PackageID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
-    }
-}
-impl PartialEq for PackageID {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (x, y) if (x.is_usr() && y.is_usr()) || (x.is_std() && y.is_std()) || x.is_any() || y.is_any() => true, //The usr and std cases are handled here, but if the IDs are provided numerically, this will allow that. 
-            (Self::Weak(a), Self::Weak(b)) => a == b,
-            (Self::Strong(a, _), Self::Strong(b, _)) => a == b,
-            (Self::Num(a), Self::Num(b)) => a == b,
-            (Self::Weak(a), Self::Strong(b, _)) | (Self::Strong(b, _), Self::Weak(a)) => a == b,
-            (Self::Num(a), Self::Strong(_, b)) | (Self::Strong(_, b), Self::Num(a)) => a == b,
-            _ => false
-        }
-    }
-}
-impl PartialEq<NumericalPackID> for PackageID {
-    fn eq(&self, other: &NumericalPackID) -> bool {
-        match self {
-            Self::Any => true, //Any matches any package
-            Self::Std => other.id == 1,
-            Self::Usr => other.id == 2,
-            Self::Strong(_, a) | Self::Num(a) => a == other,
-            Self::Weak(_) => false
-        }
+        write!(f, "{}", self.name())
     }
 }
 impl PackageID {
+    pub fn parse(input: &str) -> Result<Self, NamingError> {
+        PackageIDRef::parse(input).map(|x| x.to_package_id())
+    }
 
-    pub fn is_any(&self) -> bool { 
-        match self {
-            Self::Any => true,
-            Self::Strong(a, x) => a == "*" || x.is_any(),
-            Self::Weak(a) => a == "*",
-            Self::Num(x) => x.is_any(),
-            _ => false
-        }
+    pub fn is_scope(&self) -> bool { 
+        matches!(self, Self::Scope)
      }
     pub fn is_std(&self) -> bool { 
-        match self {
-            Self::Std => true,
-            Self::Strong(a, x) => a == "std" || x.is_std(),
-            Self::Weak(a) => a == "std",
-            Self::Num(x) => x.is_std(),
-            _ => false
-        }
+        matches!(self, Self::Std)
     }
     pub fn is_usr(&self) -> bool {
-        match self {
-            Self::Usr => true,
-            Self::Strong(a, x) => a == "usr" || x.is_usr(),
-            Self::Weak(a) => a == "usr",
-            Self::Num(x) => x.is_usr(),
-            _ => false
-        }
+        matches!(self, Self::Usr)
     }
-    pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_) ) }
 
-    pub fn name(&self) -> Option<&str> {
+    pub fn name<'a>(&'a self) -> NameRef<'a> {
         match self {
-            Self::Any => Some("any"),
-            Self::Std => Some("std"),
-            Self::Usr => Some("usr"),
-            Self::Weak(w) | Self::Strong(w, _) => Some(w),
-            Self::Num(_) => None
-        }
-    }
-    pub fn id(&self) -> NumericalPackID {
-        match self {
-            Self::Any | Self::Weak(_) => ANY_ID,
-            Self::Std => STD_ID,
-            Self::Usr => USR_ID,
-            Self::Strong(_, id) | Self::Num(id) => *id
+            Self::Scope => NameRef::this_pack_name(),
+            Self::Std => NameRef::std_name(),
+            Self::Usr => NameRef::usr_name(),
+            Self::Named(n) => n.as_name_ref()
         }
     }
 }
 
-#[derive(Clone, Eq)]
-pub enum ResourceID {
-    Numeric(u32),
-    Strong(Name, u32),
-    Weak(Name)
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub enum PackageIDRef<'a> {
+    Scope,
+    Usr,
+    Std,
+    Named(NameRef<'a>)
 }
-impl Display for ResourceID {
+impl Display for PackageIDRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Strong(a, _) | Self::Weak(a) => write!(f, "{a}"),
-            Self::Numeric(a) => write!(f, "(id:{a})")
-        }
+        write!(f, "{}", self.name())
     }
 }
-impl Debug for ResourceID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Numeric(a) => write!(f, "resx-id: {a}"),
-            Self::Strong(a, b) => write!(f, "resx: '{a}' id: {b}"),
-            Self::Weak(a) => write!(f, "weak-id: '{a}'")
-        }
+impl<'a> PackageIDRef<'a> {
+    pub fn parse(input: &'a str) -> Result<Self, NamingError> {
+        let name = NameRef::validate(input)?;
+
+        Ok (
+            if name == NameRef::this_pack_name() {
+                Self::Scope
+            }
+            else if name == NameRef::std_name() {
+                Self::Std
+            }
+            else if name == NameRef::usr_name() {
+                Self::Usr
+            }
+            else {
+                Self::Named(name)
+            }
+        )
     }
-}
-impl PartialEq for ResourceID {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Numeric(a), Self::Numeric(b)) => a == b,
-            (Self::Strong(a, b), Self::Strong(c, d)) => a == c && b == d,
-            (Self::Strong(_, a), Self::Numeric(b)) | (Self::Numeric(b), Self::Strong(_, a)) => a == b,
-            (Self::Weak(a), Self::Weak(b)) => a == b,
-            (Self::Weak(a), Self::Strong(b, _)) | (Self::Strong(b, _), Self::Weak(a)) => a == b,
-            _ => false
-        }
+
+    pub const fn is_scope(&self) -> bool { 
+        matches!(self, Self::Scope)
+     }
+    pub const fn is_std(&self) -> bool { 
+        matches!(self, Self::Std)
     }
-}
-impl PartialEq<u32> for ResourceID {
-    fn eq(&self, other: &u32) -> bool {
-        match self {
-            Self::Numeric(a) | Self::Strong(_, a) => a == other,
-            Self::Weak(_) => false
-        }
+    pub const fn is_usr(&self) -> bool {
+        matches!(self, Self::Usr)
     }
-}
-impl ResourceID {
-    pub fn id(&self) -> Option<u32> {
+
+    pub fn name(&self) -> NameRef<'a> {
         match self {
-            Self::Numeric(a) | Self::Strong(_, a) => Some(*a),
-            _ => None
-        }
-    }
-    pub fn name(&self) -> Option<&str> {
-        match self {
-            Self::Strong(a, _) | Self::Weak(a) => Some(a),
-            _ => None
+            Self::Scope => NameRef::this_pack_name(),
+            Self::Std => NameRef::std_name(),
+            Self::Usr => NameRef::usr_name(),
+            Self::Named(n) => n.clone()
         }
     }
 
-    pub fn is_weak(&self) -> bool { matches!(self, Self::Weak(_)) }
+    pub fn to_package_id(self) -> PackageID {
+        match self {
+            Self::Scope => PackageID::Scope,
+            Self::Std => PackageID::Std,
+            Self::Usr => PackageID::Usr,
+            Self::Named(n) => PackageID::Named(n.to_name())
+        }
+    }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum ResourceKind {
     Function,
-    Entry(VarEntryType)
+    Variable,
+    EnvVariable
 }
-impl From<VarEntryType> for ResourceKind {
-    fn from(value: VarEntryType) -> Self {
-        Self::Entry(value)
-    }
-}
-impl Display for ResourceKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ResourceKind {
+    pub fn format(&self, name: &NameRef<'_>) -> String {
         match self {
-            Self::Function => write!(f, "%"),
-            Self::Entry(e) => (e as &dyn Display).fmt(f)
-        }
-    }
-}
-impl Debug for ResourceKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Function => write!(f, "%"),
-            Self::Entry(e) => (e as &dyn Debug).fmt(f)
+            Self::Function => format!("${name}()"),
+            Self::EnvVariable => format!("!{name}"),
+            Self::Variable => format!("${name}")
         }
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub struct Locator {
-    parent: PackageID,
-    resource: ResourceID,
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub struct Identifier<'a> {
+    parent: Option<PackageIDRef<'a>>,
+    resource: NameRef<'a>,
     kind: ResourceKind
 }
-impl Debug for Locator {
+impl Display for Identifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}::{:?} kind: {:?}", &self.parent, &self.resource, &self.kind)
+        if let Some(parent) = self.parent.as_ref() {
+            write!(f, "{}::{}", parent, self.kind.format(&self.resource))
+        }
+        else {
+            write!(f, "_::{}", self.kind.format(&self.resource))
+        }
     }
 }
-impl Display for Locator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", &self.parent, &self.resource)
-    }
-}
-impl PartialEq<NumericalResourceID> for Locator {
-    fn eq(&self, other: &NumericalResourceID) -> bool {
-        self.parent == other.package && self.resource == other.resx
-    }
-}
-impl Locator {
-    pub fn new(parent: PackageID, resource: ResourceID, kind: ResourceKind) -> Self {
+impl<'a> Identifier<'a> {
+    pub fn new(parent: Option<PackageIDRef<'a>>, resource: NameRef<'a>, kind: ResourceKind) -> Self {
         Self {
             parent,
             resource,
-            kind
-        }
-    }
-    pub fn new_entry(parent: PackageID, resource: ResourceID, kind: VarEntryType) -> Self {
-        Self {
-            parent,
-            resource,
-            kind: kind.into()
-        }
-    }
-    pub fn new_func(parent: PackageID, resource: ResourceID) -> Self {
-        Self {
-            parent,
-            resource,
-            kind: ResourceKind::Function
-        }
-    }
-    pub fn new_weak(parent: Name, resource: Name, kind: ResourceKind) -> Self {
-        Self{
-            parent: PackageID::Weak(parent),
-            resource: ResourceID::Weak(resource),
             kind
         }
     }
 
-    pub fn parent(&self) -> &PackageID {
-        &self.parent
+    pub fn parent(&self) -> Option<PackageIDRef<'a>> {
+        self.parent
     }
-    pub fn resource(&self) -> &ResourceID {
-        &self.resource
+    pub fn resource(&self) -> NameRef<'a> {
+        self.resource
     }
     pub fn kind(&self) -> ResourceKind {
         self.kind
-    }
-
-    pub fn contained_in(&self, parent: &PackageID) -> bool {
-        &self.parent == parent
-    }
-    pub fn contained_in_sc(&self, parent: &PackageID) -> Option<()> {
-        if self.contained_in(parent) {
-            Some(())
-        }
-        else {
-            None
-        }
     }
 }
 

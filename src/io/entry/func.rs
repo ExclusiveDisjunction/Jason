@@ -1,7 +1,7 @@
 use crate::calc::func::{ASTBasedFunction, ImplBasedFunction, FunctionBase};
 use crate::io::id::{Name, ResourceKind, NumericalResourceID};
 use super::base::*;
-use crate::log_error;
+use exdisj::log_error;
 
 use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
