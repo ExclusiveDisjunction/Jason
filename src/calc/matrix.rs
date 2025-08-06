@@ -1,7 +1,7 @@
 use super::base::*;
 use super::scalar::{Scalar, ScalarLike};
 use super::vector::MathVector;
-use super::calc_error::{DimensionError, DimensionKind, IndexOutOfRangeError, OperationError, FeatureError, FeatureErrKind, FeatureReason, CalcError};
+use super::calc_error::{DimensionError, DimensionKind, OutOfRangeError, OperationError, FeatureError, FeatureErrKind, FeatureReason, CalcError};
 use std::ops::{Add, Sub, Mul, Div, Index, IndexMut, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
@@ -395,17 +395,17 @@ impl Matrix {
         }
     }
 
-    fn rows_oob(&self, a: usize, b: usize) -> Result<(), IndexOutOfRangeError<usize>> {
+    fn rows_oob(&self, a: usize, b: usize) -> Result<(), OutOfRangeError<usize>> {
         if a >= self.rows() {
-            return Err(IndexOutOfRangeError::new(a))
+            return Err(OutOfRangeError::new(a))
         }
         else if b >= self.rows() {
-            return Err(IndexOutOfRangeError::new(b))
+            return Err(OutOfRangeError::new(b))
         }
 
         Ok(())
     }
-    pub fn row_swap(&mut self, orig: usize, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> {
+    pub fn row_swap(&mut self, orig: usize, dest: usize) -> Result<(), OutOfRangeError<usize>> {
         self.rows_oob(orig, dest)?;
 
         if orig != dest {
@@ -414,7 +414,7 @@ impl Matrix {
 
         Ok(())
     }
-    pub fn row_add<T>(&mut self, orig: usize, fac: T, dest: usize) -> Result<(), IndexOutOfRangeError<usize>> where T: ScalarLike{
+    pub fn row_add<T>(&mut self, orig: usize, fac: T, dest: usize) -> Result<(), OutOfRangeError<usize>> where T: ScalarLike{
         self.rows_oob(orig, dest)?;
 
         let fac = fac.as_scalar();
@@ -424,7 +424,7 @@ impl Matrix {
 
         Ok(())
     }
-    pub fn row_echelon_form(&mut self) -> Result<(), IndexOutOfRangeError<usize>> {
+    pub fn row_echelon_form(&mut self) -> Result<(), OutOfRangeError<usize>> {
         if !self.is_valid() {
             return Ok(());
         }
@@ -511,7 +511,7 @@ impl Matrix {
 
         Ok(())
     }
-    pub fn reduced_row_echelon_form(&mut self) -> Result<(), IndexOutOfRangeError<usize>>{
+    pub fn reduced_row_echelon_form(&mut self) -> Result<(), OutOfRangeError<usize>>{
         if !self.is_valid() {
             return Ok(());
         }

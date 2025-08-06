@@ -11,7 +11,7 @@ use crate::core::JASON_CURRENT_VERSION;
 fn main() -> Result<(), String> {
     println!(" Welcome to Jason ");
     println!("------------------");
-    println!("  Version: {}\n", JASON_CURRENT_VERSION);
+    println!("  Version: {JASON_CURRENT_VERSION}\n");
 
     Ok(())
 }

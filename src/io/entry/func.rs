@@ -1,5 +1,5 @@
 use crate::calc::func::{ASTBasedFunction, ImplBasedFunction, FunctionBase};
-use crate::io::id::{Name, ResourceKind, NumericalResourceID};
+use crate::expr::raw::{Name, NameRef, ResourceKind};
 use super::base::*;
 use exdisj::log_error;
 
@@ -10,7 +10,7 @@ use serde::{ser::{self, SerializeStruct}, Serialize, Deserialize, Serializer, De
 pub trait FunctionEntryBase: IOEntry + Sized {
     type Holding: FunctionBase;
 
-    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self;
+    fn new(name: Name, data: Self::Holding) -> Self;
 }
 
 #[derive(Deserialize)]
@@ -39,7 +39,6 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
         Ok(
             FunctionEntry::new(
                 name,
-                NumericalResourceID::default(),
                 data
             )
         )
@@ -73,21 +72,21 @@ impl<'de> Visitor<'de> for FunctionEntryVisitor {
         Ok( 
             FunctionEntry::new(
                 name,
-                NumericalResourceID::default(),
                 data
             )
         )
     }
 }
 
+#[derive(Debug)]
 pub struct FunctionEntry {
     name: Name,
-    data: Arc<RwLock<ASTBasedFunction>>,
-    key: NumericalResourceID
+    data: Arc<RwLock<ASTBasedFunction>>
 }
 impl Serialize for FunctionEntry {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let guard = self.get_data();
+        let access = self.access();
+        let guard = access.read();
         if let Some(r) = guard.access() {
             let mut s: <S as Serializer>::SerializeStruct = serializer.serialize_struct("FunctionEntry", 2)?;
             s.serialize_field("data", r)?;
@@ -96,7 +95,7 @@ impl Serialize for FunctionEntry {
             s.end()
         }
         else {
-            let e = guard.get_err().unwrap();
+            let e = guard.take_err().unwrap();
             log_error!("Access failed for serialization: {}", &e);
 
             Err(ser::Error::custom(e))
@@ -111,99 +110,73 @@ impl<'de> Deserialize<'de> for FunctionEntry {
 }
 impl PartialEq for FunctionEntry {
     fn eq(&self, other: &Self) -> bool {
-        self.get_data() == other.get_data()
-    }
-}
-impl Debug for FunctionEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.get_data())
+        self.access().read() == other.access().read()
     }
 }
 impl Display for FunctionEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_data())
+        write!(f, "${}()", &self.name) 
     }
 }
 impl IOEntry for FunctionEntry {
-    fn name(&self) -> &Name  {
-        &self.name
+    fn name(&self) -> NameRef<'_> {
+        self.name.as_name_ref()
     }
     fn set_name(&mut self, new: Name) {
         self.name = new;
     }
-
-    fn id(&self) -> NumericalResourceID {
-        self.key
-    }
-    fn id_mut(&mut self) -> &mut NumericalResourceID {
-        &mut self.key
-    }
-    fn resource_kind(&self) -> ResourceKind {
+    fn kind(&self) -> ResourceKind {
         ResourceKind::Function   
     }
 }
 impl IOStorage for FunctionEntry {
     type Holding = ASTBasedFunction;
-    fn get_arc(&self) -> &Arc<RwLock<Self::Holding>> {
-        &self.data
+    fn access(&self) -> EntryHandle<Self::Holding> {
+        EntryHandle::new(Arc::clone(&self.data))
     }
 }
 impl FunctionEntryBase for FunctionEntry {
     type Holding = ASTBasedFunction;
 
-    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self {
+    fn new(name: Name, data: Self::Holding) -> Self {
         Self {
             data: Arc::new(RwLock::new(data)),
             name,
-            key: id
         }
     }
 }
 
+#[derive(Debug)]
 pub struct ImplFunctionEntry {
     name: Name,
-    func: Arc<ImplBasedFunction>,
-    key: NumericalResourceID
+    func: Arc<ImplBasedFunction>
 }
 impl PartialEq for ImplFunctionEntry {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
 }
-impl Debug for ImplFunctionEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "impl-{}({})", &self.name, self.func.signature())
-    }
-}
 impl Display for ImplFunctionEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", &self.name, self.func.signature())
+        write!(f, "${}()", &self.name)
     }
 }
 impl IOEntry for ImplFunctionEntry {
-    fn id(&self) -> NumericalResourceID {
-        self.key
-    }
-    fn id_mut(&mut self) -> &mut NumericalResourceID {
-        &mut self.key
-    }
-
-    fn name(&self) -> &Name {
-        &self.name
+    fn name(&self) -> NameRef<'_> {
+        self.name.as_name_ref()
     }
     fn set_name(&mut self, new: Name) {
         self.name = new;
     }
-    fn resource_kind(&self) -> ResourceKind {
+    fn kind(&self) -> ResourceKind {
         ResourceKind::Function
     }
 }
 impl FunctionEntryBase for ImplFunctionEntry {
     type Holding = ImplBasedFunction;
 
-    fn new(name: Name, id: NumericalResourceID, data: Self::Holding) -> Self{
+    fn new(name: Name, data: Self::Holding) -> Self{
         Self {
-            key: id,
             name,
             func: Arc::new(data)
         }
@@ -230,7 +203,7 @@ fn test_function_serde() {
         VariableExpr::new('x', 0).into()
     ).into();
 
-    let func = FunctionEntry::new(Name::validate("hello".to_string()).unwrap(), NumericalResourceID::default(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x()));
+    let func = FunctionEntry::new(Name::try_from("hello").unwrap(), ASTBasedFunction::new(ast, FunctionArgSignature::just_x()));
 
     let ser = json!(&func).to_string();
     let de_ser: Result<FunctionEntry, _> = from_str(&ser);

@@ -1,55 +1,19 @@
 pub use crate::calc::{VariableUnion, VariableUnionRef, VariableUnionRefMut, VariableData};
-use exdisj::log_error;
-use exdisj::error::FormattingError;
-use super::super::id::{Name, NumericalResourceID, ResourceKind};
+use crate::expr::raw::{Name, NameRef, ResourceKind};
 use super::base::*;
+
+use exdisj::log_error;
 
 use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer, Deserializer, de::{self, Visitor, SeqAccess, MapAccess}};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VarEntryType {
-    Variable,
-    Environment
-}
-impl Display for VarEntryType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Variable => "Variable",
-                Self::Environment => "Environment"
-            }
-        )
-    }
-}
-impl TryFrom<String> for VarEntryType {
-    type Error = FormattingError;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "Variable" => Ok(Self::Variable),
-            "Environment" => Ok(Self::Environment),
-            a => Err(FormattingError::new(&a, "cannot parse value"))
-        }
-    }
-}
-impl VarEntryType {
-    pub fn symbol(&self) -> String {
-        match self {
-            Self::Environment => String::new(),
-            Self::Variable => "$".to_string()
-        }
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(field_identifier, rename_all = "lowercase")]
 enum VariableEntryFields {
+    Name,
     Data,
-    Name, 
     Kind
 }
 
@@ -64,16 +28,15 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
     fn visit_seq<V: SeqAccess<'de>>(self, mut seq: V) -> Result<VariableEntry, V::Error> {
         //Data, name, kind
 
-        let data = seq.next_element()?
-            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
         let name = seq.next_element()?
             .ok_or_else(|| de::Error::invalid_length(1, &self))?;
         let kind = seq.next_element()?
             .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+        let data = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
 
         Ok(
-            VariableEntry::new_direct(
-                NumericalResourceID::default(), //A temporary key is given, the package must create keys themselves for this process
+            VariableEntry::new(
                 name,
                 kind,
                 data
@@ -81,9 +44,9 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
         )
     }
     fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<VariableEntry, V::Error> {
-        let mut data = None;
         let mut name = None;
         let mut kind = None;
+        let mut data = None;
 
         while let Some(key) = map.next_key()? {
             match key {
@@ -111,13 +74,12 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
             }
         }
 
-        let data = data.ok_or_else(|| de::Error::missing_field("data"))?;
         let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
         let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
+        let data = data.ok_or_else(|| de::Error::missing_field("data"))?;
 
         Ok(
-            VariableEntry::new_direct(
-                NumericalResourceID::default(),
+            VariableEntry::new(
                 name,
                 kind,
                 data
@@ -127,25 +89,49 @@ impl<'de> Visitor<'de> for VariableEntryVisitor {
     }
 }
 
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum VariableEntryType {
+    Variable,
+    EnvVariable,
+}
+impl From<VariableEntryType> for ResourceKind {
+    fn from(value: VariableEntryType) -> Self {
+        match value {
+            VariableEntryType::Variable => Self::Variable,
+            VariableEntryType::EnvVariable => Self::EnvVariable
+        }
+    }
+}
+impl VariableEntryType {
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Variable => "$",
+            Self::EnvVariable => "!"
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct VariableEntry {
-    key: NumericalResourceID,
     name: Name,
-    kind: VarEntryType,
+    kind: VariableEntryType,
     data: Arc<RwLock<VariableUnion>>
 }
 impl Serialize for VariableEntry {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let guard = self.get_data();
+        let access = self.access();
+        let guard = access.read();
+
         if let Some(inner) = guard.access() {
             let mut s= serializer.serialize_struct("VariableEntry", 3)?;
-            s.serialize_field("data", inner)?;
             s.serialize_field("name", &self.name)?;
             s.serialize_field("kind", &self.kind)?;
+            s.serialize_field("data", inner)?;
 
             s.end()
         }
         else {
-            let e = guard.get_err().unwrap();
+            let e = guard.take_err().unwrap();
 
             log_error!("Access failed for serilization: {}", &e);
             Err(ser::Error::custom(e))
@@ -160,81 +146,43 @@ impl<'de> Deserialize<'de> for VariableEntry {
 }
 impl PartialEq for VariableEntry {
     fn eq(&self, other: &Self) -> bool {
-        self.get_data() == other.get_data()
+        self.access().read() == other.access().read()
     }   
-}
-impl Debug for VariableEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}:{:?}", 
-            match self.kind {
-                VarEntryType::Environment => "",
-                VarEntryType::Variable => "$"
-            },
-            &self.name,
-            self.get_data()
-        )
-    }
 }
 impl Display for VariableEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}:{}", 
-            match self.kind {
-                VarEntryType::Environment => "",
-                VarEntryType::Variable => "$"
-            },
-            &self.name,
-            self.get_data()
+            "{}{}", 
+            self.kind.prefix(),
+            &self.name
         )
     }
 }
 impl IOEntry for VariableEntry {
-    fn name(&self) -> &Name {
-        &self.name
+    fn name(&self) -> NameRef {
+        self.name.as_name_ref()
     }
     fn set_name(&mut self, new: Name) {
         self.name = new;
     }
-
-    fn resource_kind(&self) -> ResourceKind {
-        ResourceKind::Entry(self.kind)
-    }
-    fn id(&self) -> NumericalResourceID {
-        self.key
-    }
-    fn id_mut(&mut self) -> &mut NumericalResourceID {
-        &mut self.key
+    fn kind(&self) -> ResourceKind {
+        self.kind.into()
     }
 }
 impl IOStorage for VariableEntry {
     type Holding = VariableUnion;
-    fn get_arc(&self) -> &Arc<RwLock<Self::Holding>> {
-        &self.data
+
+    fn access(&self) -> EntryHandle<Self::Holding> {
+        EntryHandle::new(Arc::clone(&self.data))
     }
 }
 impl VariableEntry {
-    pub fn new(key: NumericalResourceID, name: Name, is_var: bool, data: Option<VariableUnion>) -> Self {
-        Self::new_direct(
-            key,
-            name,
-            if is_var {
-                VarEntryType::Variable
-            }
-            else {
-                VarEntryType::Environment
-            },
-            data.unwrap_or(0.into())
-        )
-    }
-    pub fn new_direct(key: NumericalResourceID, name: Name, kind: VarEntryType, data: VariableUnion) -> Self {
+    pub fn new(name: Name, kind: VariableEntryType, data: VariableUnion) -> Self {
         Self {
             name,
-            key,
             kind,
-            data: Arc::new(RwLock::new(data))
+            data: Arc::new( RwLock::new( data ) )
         }
     }
 }
@@ -242,16 +190,19 @@ impl VariableEntry {
 #[test]
 fn test_variable_serde() {
     use crate::calc::*;
-    use serde_json::{from_str, json};
+    use serde_json::{from_str, to_string_pretty};
 
-    let entry = VariableEntry::new_direct(
-        NumericalResourceID::default(),
-        Name::validate("hello".to_string()).unwrap(),
-        VarEntryType::Variable,
+    let entry = VariableEntry::new(
+        Name::try_from("hello").unwrap(),
+        VariableEntryType::Variable,
         Matrix::identity(4).into()
     );
 
-    let ser = json!(&entry).to_string();
+    let ser = match to_string_pretty(&entry) {
+        Ok(v) => v,
+        Err(e) => panic!("{}", e)
+    };
+
     let de_ser: Result<VariableEntry, _> = from_str(&ser);
     match de_ser {
         Ok(v) => assert_eq!(v, entry),

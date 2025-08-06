@@ -1,5 +1,5 @@
 use super::base::{ASTNode, TreeOrderTraversal};
-use crate::calc::{VariableData, VariableUnion, CalcResult, CalcError, calc_error::IndexOutOfRangeError};
+use crate::calc::{VariableData, VariableUnion, CalcResult, CalcError, calc_error::OutOfRangeError};
 
 use serde::{Serialize, Deserialize};
 use std::fmt::{Display, Debug};
@@ -62,7 +62,7 @@ impl Display for VariableExpr {
 impl ASTNode for VariableExpr {
     fn evaluate(&self, on: &[VariableUnion]) -> CalcResult<VariableUnion> {
         if self.along >= on.len() {
-            Err(CalcError::Index(IndexOutOfRangeError::new(self.along)))
+            Err(CalcError::Index(OutOfRangeError::new(self.along)))
         }
         else {
             Ok(on[self.along].clone())

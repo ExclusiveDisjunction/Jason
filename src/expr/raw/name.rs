@@ -13,11 +13,19 @@ impl Display for Name {
         (&self.0 as &dyn Display).fmt(f)
     }
 }
-impl Name {
-    pub fn validate(name: String) -> Result<Self, NamingError> {
-        NameRef::validate(&name).map(|x| x.to_name())
+impl TryFrom<&str> for Name {
+    type Error = NamingError;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        NameRef::try_from(value).map(|x| x.to_name())
     }
-
+}
+impl TryFrom<String> for Name {
+    type Error = NamingError;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+impl Name {
     pub fn this_pack_name() -> Self {
         NameRef::this_pack_name().to_name()
     }
@@ -43,23 +51,30 @@ impl Display for NameRef<'_> {
         (&self.0 as &dyn Display).fmt(f)
     }
 }
-impl<'a> NameRef<'a> {
-    pub fn validate(name: &'a str) -> Result<Self, NamingError> {
-        let _ = Self::is_name_valid(name)?;
+impl<'a> TryFrom<&'a str> for NameRef<'a> {
+    type Error = NamingError;
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Self::is_name_valid(value)?;
 
-        Ok( Self( name.trim() ) )
+        Ok( Self( value.trim() ) )
     }
+}
+impl NameRef<'static> {
+    const SCOPE_PACK_NAME: &'static str = "_";
+    const STD_PACK_NAME: &'static str = "std";
+    const USR_PACK_NAME: &'static str = "usr";
 
     pub const fn this_pack_name() -> Self {
-        Self ( "_" )
+        Self ( Self::SCOPE_PACK_NAME )
     }
     pub const fn std_name() -> Self {
-        Self ( "std" )
+        Self ( Self::STD_PACK_NAME )
     }
     pub const fn usr_name() -> Self {
-        Self ( "usr" )
+        Self ( Self::USR_PACK_NAME )
     }
-
+}
+impl NameRef<'_> {
     /// Checks to see if the name provided meets the following criteria:
     /// 1. No starting with numerical values
     /// 2. No 0x or *b patterns (addresses)
@@ -132,13 +147,14 @@ pub struct VerifiedPathRef<'a> {
     name: NameRef<'a>,
     path: &'a Path
 }
-impl<'a> VerifiedPathRef<'a> {
-    pub fn verify(path: &'a Path) -> Result<Self, PathValidationError> {
-        let target_name: Option<&OsStr> = if path.is_file() {
-            path.file_stem()
+impl<'a> TryFrom<&'a Path> for VerifiedPathRef<'a> {
+    type Error = PathValidationError;
+    fn try_from(value: &'a Path) -> Result<Self, Self::Error> {
+        let target_name: Option<&OsStr> = if value.is_file() {
+            value.file_stem()
         }
         else {
-            path.file_name()
+            value.file_name()
         };
 
         let file_name_osstr = match target_name {
@@ -151,14 +167,16 @@ impl<'a> VerifiedPathRef<'a> {
             None => return Err(PathValidationError::NoFeasibleName)
         };
 
-        let name = NameRef::validate(file_name).map_err(PathValidationError::from)?.to_owned();
+        let name: NameRef<'a> = file_name.try_into().map_err(PathValidationError::from)?;
 
         Ok(
             Self {
-                name, path
+                name, path: value
             }
         )
     }
+}
+impl<'a> VerifiedPathRef<'a> {
     pub fn new(name: NameRef<'a>, path: &'a Path) -> Self {
         Self {
             name,
@@ -167,7 +185,7 @@ impl<'a> VerifiedPathRef<'a> {
     }
 
     pub fn name(&self) -> NameRef<'a> {
-        self.name.clone()
+        self.name
     }
     pub fn path(&self) -> &'a Path {
         self.path
@@ -186,10 +204,19 @@ pub struct VerifiedPath {
     name: Name,
     path: PathBuf
 }
-impl VerifiedPath {
-    pub fn verify(path: &Path) -> Result<Self, PathValidationError> {
-        VerifiedPathRef::verify(path).map(|x| x.to_verified_path())
+impl TryFrom<&Path> for VerifiedPath {
+    type Error = PathValidationError;
+    fn try_from(value: &Path) -> Result<Self, Self::Error> {
+        VerifiedPathRef::try_from(value).map(|x| x.to_verified_path())
     }
+}
+impl TryFrom<PathBuf> for VerifiedPath {
+    type Error = PathValidationError;
+    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_path())
+    }
+}
+impl VerifiedPath {
     pub fn new(name: Name, path: PathBuf) -> Self {
         Self {
             name,
@@ -209,5 +236,30 @@ impl VerifiedPath {
     }
     pub fn pop_ref(&self) -> (&Name, &Path) {
         (&self.name, &self.path)
+    }
+}
+
+
+#[test]
+fn name_validation() {
+    use NamingError::*;
+    let tests = vec![
+        //Name, should it pass
+        ("hello",                          None                   ),
+        ("    hello",                      None                   ),
+        ("\t     \t",                      Some(Empty)            ), //Just whitespace
+        ("h ello",                         Some(Whitespace)       ), //Whitespace inside
+        ("!_hello",                        Some(InvalidCharacters)), //Non-allowed character
+        ("",                               Some(Empty)            ), //Empty 
+        ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", None                   ),
+        ("he_llo",                         None                   ), 
+        ("he0xello",                       Some(Address)          ), //Hexadecimal pattern
+        ("1hello",                         Some(InvalidCharacters)), //Starts with number
+        ("Cześć",                          None                   )
+    ];
+
+    for (i, (test, expected)) in tests.into_iter().enumerate() {
+        let result = NameRef::is_name_valid(&test);
+        assert_eq!(result.err(), expected, "failure at test {i}: {test}");
     }
 }

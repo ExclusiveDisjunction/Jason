@@ -1,4 +1,5 @@
 use std::fmt::{Display, Debug, Formatter};
+use std::error::Error as StdError;
 
 use super::{matrix::MatrixDimension, VariableType};
 
@@ -9,34 +10,25 @@ impl DimensionKind for i64 {}
 impl DimensionKind for u32 {}
 impl DimensionKind for u64 {}
 
-#[derive(Clone, Eq)]
-pub struct IndexOutOfRangeError<T> where T: DimensionKind {
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct OutOfRangeError<T> where T: DimensionKind {
     index: T
 }
-impl<T> IndexOutOfRangeError<T> where T: DimensionKind {
+impl<T> OutOfRangeError<T> where T: DimensionKind {
     pub fn new(index: T) -> Self {
         Self {
             index
         }
     }
 }
-impl<T> PartialEq for IndexOutOfRangeError<T> where T: DimensionKind + PartialEq {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-    }
-}
-impl<T> Display for IndexOutOfRangeError<T> where T: DimensionKind + Display {
+impl<T> Display for OutOfRangeError<T> where T: DimensionKind + Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "the index {} is out of range", self.index)
     }
 }
-impl<T> Debug for IndexOutOfRangeError<T> where T: DimensionKind + Debug {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the index {:?} is out of range", self.index)
-    }
-}
+impl<T> StdError for OutOfRangeError<T> where T: DimensionKind + Display + Debug { }
 
-#[derive(Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct DimensionError<T> where T: DimensionKind {
     a: T,
     b: T
@@ -49,60 +41,17 @@ impl<T> DimensionError<T> where T: DimensionKind {
         }
     }
 }
-impl<T> PartialEq for DimensionError<T> where T: DimensionKind + PartialEq {
-    fn eq(&self, other: &Self) -> bool {
-        self.a == other.a && self.b == other.b
-    }
-}
-impl<T> Eq for DimensionError<T> where T: DimensionKind + PartialEq + Eq { }
 impl<T> Display for DimensionError<T> where T: DimensionKind + Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "dimension mismatch between {} and {} (they must be equal)", self.a, self.b)
     }
 }
-impl<T> Debug for DimensionError<T> where T: DimensionKind + Debug {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "dimension mismatch between {:?} and {:?} (they must be equal)", self.a, self.b)
-    }
-}
+impl<T> StdError for DimensionError<T> where T: DimensionKind + Display + Debug { }
 
-#[derive(PartialEq, Eq, Clone)]
-pub struct OperationError {
-    operation: String,
-    on: (String, String),
-    reason: Option<String>
-}
-impl OperationError {
-    pub fn new<S>(operation: S, a: String, b: String, reason: Option<&str>) -> Self where S: ToString {
-        Self {
-            operation: operation.to_string(),
-            on: (a, b),
-            reason: reason.map(|r| r.to_string())
-        }
-    }
-    pub fn new_fmt<S, T1, T2>(operation: S, a: &T1, b: &T2, reason: Option<&str>) -> Self where S: ToString, T1: Debug, T2: Debug {
-        Self {
-            operation: operation.to_string(),
-            on: (format!("{:?}", a), format!("{:?}", b)),
-            reason: reason.map(|r| r.to_string())
-        }
-    }
-}
-impl Display for OperationError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(reason) = self.reason.as_deref() {
-            write!(f, "the operation {} is not defined for {} and {} because of '{}'", &self.operation, &self.on.0, &self.on.1, reason)
-        }
-        else {
-            write!(f, "the operation {} is not defined for {} and {}", &self.operation, &self.on.0, &self.on.1)
-        }
-    }
-}
-impl Debug for OperationError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
-    }
-}
+/*
+These errors will be better adapted to math functions, and will be corrected later on. 
+I want the format to be "function _ expected arguments (_, ...), but got (_, ...) instead"
+"function _ expected argument 'x' to be of type '_', but got type '_'"
 
 /// Describes a specific amount of arguments, and how many were supplied.
 #[derive(Clone, PartialEq, Eq)]
@@ -154,6 +103,7 @@ impl ArgTypeError {
         }
     }
 }
+ */
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct UndefinedError {
@@ -238,7 +188,7 @@ impl FeatureError {
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum CalcError {
-    Index(IndexOutOfRangeError<usize>),
+    Index(OutOfRangeError<usize>),
     MatDim(DimensionError<MatrixDimension>),
     Dim(DimensionError<usize>),
     Oper(OperationError),
@@ -248,8 +198,8 @@ pub enum CalcError {
     Feature(FeatureError)
 }
 
-impl From<IndexOutOfRangeError<usize>> for CalcError {
-    fn from(value: IndexOutOfRangeError<usize>) -> Self {
+impl From<OutOfRangeError<usize>> for CalcError {
+    fn from(value: OutOfRangeError<usize>) -> Self {
         Self::Index(value)
     }
 }

@@ -4,7 +4,7 @@ use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Serialize, Deserialize, Default)]
 pub struct Complex {
     a: f64,
     b: f64
@@ -75,54 +75,22 @@ impl Sub for Complex {
 impl Mul for Complex {
     type Output = Complex;
     fn mul(self, rhs: Self) -> Self::Output {
-        (&self).mul(&rhs)
-    }
-}
-impl Div for Complex {
-    type Output = Complex;
-    fn div(self, rhs: Self) -> Self::Output {
-        (&self).div(&rhs)
-    }
-}
-
-// REFERENCE
-impl Neg for &Complex {
-    type Output = Complex;
-    fn neg(self) -> Complex {
-        Complex { a: -self.a, b: -self.b }
-    }
-}
-impl<'a> Add<&'a Complex> for &Complex {
-    type Output = Complex;
-    fn add(self, rhs: &'a Complex) -> Self::Output {
-        Complex { a: self.a + rhs.a, b: self.b + rhs.b }
-    }
-}
-impl<'a> Sub<&'a Complex> for &Complex {
-    type Output = Complex;
-    fn sub(self, rhs: &'a Complex) -> Self::Output {
-        Complex{ a: self.a - rhs.a, b: self.b - rhs.b }
-    }
-}
-impl<'a> Mul<&'a Complex> for &Complex {
-    type Output = Complex;
-    fn mul(self, rhs: &'a Complex) -> Self::Output {
         Complex::new(
             self.a * rhs.a - self.b * rhs.b,
             self.a * rhs.b + self.b * rhs.a
         )
     }
 }
-impl<'a> Div<&'a Complex> for &Complex {
+impl Div for Complex {
     type Output = Complex;
-    fn div(self, rhs: &'a Complex) -> Self::Output {
+    fn div(self, rhs: Self) -> Self::Output {
         /*
           (a + bi) / (c + di)
           (a + bi) * (c - di) / (c + di)(c - di)
           lhs * conj / mul_conj
          */
 
-        let starting = self * &rhs.conjugate();
+        let starting = self * rhs.conjugate();
         let fac = rhs.mul_conjugate().as_scalar();
 
         Complex { a: starting.a / fac, b: starting.b / fac }
@@ -142,10 +110,10 @@ impl Complex {
         }
     }
 
-    pub fn conjugate(&self) -> Complex {
+    pub fn conjugate(self) -> Complex {
         Complex::new(self.a, -self.b)
     }
-    pub fn mul_conjugate(&self) -> Scalar {
+    pub fn mul_conjugate(self) -> Scalar {
         Scalar::new(self.a.powi(2) + self.b.powi(2))
     }
     pub fn argument(&self) -> f64 {
@@ -155,14 +123,14 @@ impl Complex {
         (self.a.powi(2) + self.b.powi(2)).sqrt()
     }
 
-    pub fn complex_ln(&self) -> Self {
+    pub fn complex_ln(self) -> Self {
         Self {
             a: self.magnitude().ln(),
             b: self.argument()
         }
     }
 
-    pub fn pow_sca<T>(&self, b: T) -> Self where T: ScalarLike {
+    pub fn pow_sca<T>(self, b: T) -> Self where T: ScalarLike {
         let b = b.as_scalar();
         let r = self.magnitude().powf(b);
         let theta = self.argument() * b;
@@ -176,8 +144,8 @@ impl Complex {
         }
     }
     /// Returns the priciple value for the complex number 
-    pub fn pow(&self, b: &Self) -> Self {
-        let top = b * &self.complex_ln();
+    pub fn pow(self, b: Self) -> Self {
+        let top = b * self.complex_ln();
 
         //This will take the product of e^(z ln b)
         let a = top.a;
@@ -208,11 +176,4 @@ fn complex_test() {
     //These two are technically correct, but due to floating point errors these may fail.
     //assert_eq!(d.clone() / b.clone(), Complex::new_with(577.0/548.0, 297.0/548.0));
     //assert_eq!(b.clone() * d.clone(), Complex::new_with(2.86, 12.66));
-
-    //Assert that operators with references are equal to non-references
-    //Pure
-    assert_eq!(&a + &b, a.clone() + b.clone());
-    assert_eq!(&a - &b, a.clone() - b.clone());
-    assert_eq!(&a * &b, a.clone() * b.clone());
-    assert_eq!(&a / &b, a.clone() / b.clone());
 }
