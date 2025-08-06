@@ -1,73 +1,80 @@
 use std::fmt::Display;
 use std::ops::{Neg, Add, Sub, Mul, Div};
 
+use crate::calc::err::{BiOperationError, PowError, UndefinedUniOperation};
+use crate::calc::ScalarLike;
+use crate::prelude::FlatType;
 use super::union::VariableUnion;
-use super::super::scalar::{Scalar, ScalarLike};
+use super::super::scalar::Scalar;
 use super::super::complex::Complex;
 use super::super::bool::Boolean;
-use super::super::vector::MathVector;
-use super::super::matrix::Matrix;
+use super::super::vector::FloatVector;
+use super::super::matrix::FloatMatrix;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VariableUnionRef<'a> {
     Sca(Scalar),
     Cmp(Complex),
-    Boo(Boolean),
-    Vec(&'a MathVector),
-    Mat(&'a Matrix)
+    Bool(Boolean),
+    Vec(&'a FloatVector),
+    Mat(&'a FloatMatrix)
 }
 
-impl<T> From<T> for VariableUnionRef<'_> where T: ScalarLike {
-    fn from(value: T) -> Self {
-        Self::Sca(Scalar::new(value))
+impl From<Scalar> for VariableUnionRef<'_> {
+    fn from(value: Scalar) -> Self {
+        Self::Sca(value)
     }
 }
-impl<'a> From<&'a Scalar> for VariableUnionRef<'a> {
-    fn from(value: &'a Scalar) -> Self {
-        Self::Sca(*value)
-    }
-}
-impl<'a> From<&'a Complex> for VariableUnionRef<'a> {
-    fn from(value: &'a Complex) -> Self {
+impl<'a> From<Complex> for VariableUnionRef<'a> {
+    fn from(value: Complex) -> Self {
         Self::Cmp(value)
     }
 }
-impl<'a> From<&'a MathVector> for VariableUnionRef<'a> {
-    fn from(value: &'a MathVector) -> Self {
+impl From<Boolean> for VariableUnionRef<'_> {
+    fn from(value: Boolean) -> Self {
+        Self::Bool(value)
+    }
+}
+impl<'a> From<&'a FloatVector> for VariableUnionRef<'a> {
+    fn from(value: &'a FloatVector) -> Self {
         Self::Vec(value)
     }
 }
-impl<'a> From<&'a Matrix> for VariableUnionRef<'a> {
-    fn from(value: &'a Matrix) -> Self {
+impl<'a> From<&'a FloatMatrix> for VariableUnionRef<'a> {
+    fn from(value: &'a FloatMatrix) -> Self {
         Self::Mat(value)
     }
 }
 
 impl Display for VariableUnionRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Sca(s) => (s as &dyn Display).fmt(f), 
-            Self::Cmp(s) => (s as &dyn Display).fmt(f), 
-            Self::Vec(s) => (s as &dyn Display).fmt(f), 
-            Self::Mat(s) => (s as &dyn Display).fmt(f), 
-        }
+        let x: &dyn Display = match self {
+            Self::Sca(s) => s,
+            Self::Cmp(s) => s,
+            Self::Vec(s) => s,
+            Self::Mat(s) => s,
+            Self::Bool(s) => s
+        };
+
+        x.fmt(f)
     }
 }
 
 impl Neg for VariableUnionRef<'_> {
-    type Output = VariableUnion;
+    type Output = Result<VariableUnion, UndefinedUniOperation>;
     fn neg(self) -> Self::Output {
         match self {
-            Self::Sca(s) => VariableUnion::Sca(-s),
-            Self::Cmp(s) => VariableUnion::Cmp(-s),
-            Self::Vec(s) => VariableUnion::Vec(-s),
-            Self::Mat(s) => VariableUnion::Mat(-s),
+            Self::Sca(s) => Ok( VariableUnion::Sca(-s) ),
+            Self::Cmp(s) => Ok( VariableUnion::Cmp(-s) ),
+            Self::Bool(b) => Err( UndefinedUniOperation::new("-", FlatType::Boolean)),
+            Self::Vec(s) => Ok( VariableUnion::Vec(-s) ),
+            Self::Mat(s) => Ok( VariableUnion::Mat(-s) )
         }
     }
 }
 impl Add for VariableUnionRef<'_> {
-    type Output = CalcResult<VariableUnion>;
-    fn add(self, rhs: Self) -> CalcResult<VariableUnion> {
+    type Output = Result<VariableUnion, BiOperationError>;
+    fn add(self, rhs: Self) -> Self::Output {
         /* Add is defined for all types upon themselves, and the following ones:
             Sca + Sca
             (Sca as Cmp) + Cmp
@@ -81,22 +88,17 @@ impl Add for VariableUnionRef<'_> {
             (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a + b)),
             (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
                 let a: Complex = a.into();
-                Ok(VariableUnion::Cmp(&a + b))
+                Ok( (a + b).into() )
             },
             (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a + b)),
             (Self::Vec(a), Self::Vec(b)) => Ok(VariableUnion::Vec(a + b)),
-            (Self::Mat(a), Self::Mat(b)) => {
-                match a + b {
-                    Ok(m) => Ok(VariableUnion::Mat(m)),
-                    Err(e) => Err(CalcError::MatDim(e))
-                }
-            },
-            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("+", &a, &b, Some("operator not defined"))))
+            (Self::Mat(a), Self::Mat(b)) => (a + b).map(VariableUnion::from).map_err(BiOperationError::from),
+            (a, b) => Err(BiOperationError::new_undef("+", a.flat_type(), b.flat_type()))
         }
     }
 }
 impl Sub for VariableUnionRef<'_> {
-    type Output = CalcResult<VariableUnion>;
+    type Output = Result<VariableUnion, BiOperationError>;
     fn sub(self, rhs: Self) -> Self::Output {
         /* Sub is defined for all types upon themselves, and the following ones:
             Sca - Sca
@@ -111,22 +113,17 @@ impl Sub for VariableUnionRef<'_> {
             (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a - b)),
             (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
                 let a: Complex = a.into();
-                Ok(VariableUnion::Cmp(&a - b))
+                Ok(VariableUnion::Cmp(a - b))
             },
             (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a - b)),
             (Self::Vec(a), Self::Vec(b)) => Ok(VariableUnion::Vec(a - b)),
-            (Self::Mat(a), Self::Mat(b)) => {
-                match a - b {
-                    Ok(m) => Ok(VariableUnion::Mat(m)),
-                    Err(e) => Err(CalcError::MatDim(e))
-                }
-            },
-            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("-", &a, &b, Some("operator not defined"))))
+            (Self::Mat(a), Self::Mat(b)) => (a - b).map(VariableUnion::from).map_err(BiOperationError::from),
+            (a, b) => Err(BiOperationError::new_undef("-", a.flat_type(), b.flat_type()))
         }
     }
 }
 impl Mul for VariableUnionRef<'_> {
-    type Output = CalcResult<VariableUnion>;
+    type Output = Result<VariableUnion, BiOperationError>;
     fn mul(self, rhs: Self) -> Self::Output {
         /*
             Mul is the biggest one out here. It is defined over
@@ -142,26 +139,20 @@ impl Mul for VariableUnionRef<'_> {
         match (self, rhs) {
             (Self::Sca(a), Self::Sca(b)) => Ok(VariableUnion::Sca(a * b)),
             (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a * b)),
-            (Self::Mat(a), Self::Mat(b)) => {
-                match a * b {
-                    Ok(m) => Ok(VariableUnion::Mat(m)),
-                    Err(e) => Err(CalcError::Dim(e))
-                }
-            },
-
             (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
                 let a: Complex = a.into();
-                Ok(VariableUnion::Cmp(&a * b))
+                Ok(VariableUnion::Cmp(a * b))
             },
-            (Self::Vec(a), Self::Sca(b)) | (Self::Sca(b), Self::Vec(a)) => Ok(VariableUnion::Vec(a * b)),
-            (Self::Mat(a), Self::Sca(b)) | (Self::Sca(b), Self::Mat(a)) => Ok(VariableUnion::Mat(a * b)),
+            (Self::Mat(a), Self::Mat(b)) => (a * b).map(VariableUnion::from).map_err(BiOperationError::from),
+            (Self::Vec(a), Self::Sca(b)) | (Self::Sca(b), Self::Vec(a)) => Ok(VariableUnion::Vec(a * b.as_scalar())),
+            (Self::Mat(a), Self::Sca(b)) | (Self::Sca(b), Self::Mat(a)) => Ok(VariableUnion::Mat(a * b.as_scalar())),
 
-            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("*", &a, &b, Some("operator not defined"))))
+            (a, b) => Err(BiOperationError::new_undef("*", a.flat_type(), b.flat_type()))
         }
     }
 }
 impl Div for VariableUnionRef<'_> {
-    type Output = CalcResult<VariableUnion>;
+    type Output = Result<VariableUnion, BiOperationError>;
     fn div(self, rhs: Self) -> Self::Output {
         /*
             Div is simple
@@ -178,23 +169,47 @@ impl Div for VariableUnionRef<'_> {
             (Self::Cmp(a), Self::Cmp(b)) => Ok(VariableUnion::Cmp(a / b)),
             (Self::Sca(a), Self::Cmp(b)) | (Self::Cmp(b), Self::Sca(a)) => {
                 let a: Complex = a.into();
-                Ok(VariableUnion::Cmp(&a / b))
+                Ok(VariableUnion::Cmp(a / b))
             },
-            (Self::Vec(a), Self::Sca(b)) => Ok(VariableUnion::Vec(a / b)),
-            (Self::Mat(a), Self::Sca(b)) => Ok(VariableUnion::Mat(a / b)),
-            (a, b) => Err(CalcError::Oper(OperationError::new_fmt("/", &a, &b, Some("operator not defined"))))
+            (Self::Vec(a), Self::Sca(b)) => Ok(VariableUnion::Vec(a / b.as_scalar())),
+            (Self::Mat(a), Self::Sca(b)) => Ok(VariableUnion::Mat(a / b.as_scalar())),
+            (a, b) => Err(BiOperationError::new_undef("/", a.flat_type(), b.flat_type()))
         }
     }
 }
 
 impl VariableUnionRef<'_> {
-    pub fn pow(self, rhs: Self) -> CalcResult<VariableUnion> {
+    pub fn to_union(self) -> VariableUnion {
+        use VariableUnion::*;
+        match self {
+            Self::Sca(s) => Sca(s),
+            Self::Cmp(c) => Cmp(c),
+            Self::Bool(b) => Bool(b),
+            Self::Vec(v) => Vec(v.clone()),
+            Self::Mat(m) => Mat(m.clone())
+        }
+    }
+
+    pub fn pow(self, rhs: Self) -> Result<VariableUnion, PowError> {
         match (self, rhs) {
             (Self::Sca(a), Self::Sca(b)) => Ok( a.pow(b).into() ),
             (Self::Cmp(a), Self::Sca(b)) => Ok( a.pow_sca(b).into() ),
             (Self::Cmp(a), Self::Cmp(b)) => Ok( a.pow(b).into() ),
-            (Self::Mat(a), Self::Sca(b)) => a.pow(b).map(VariableUnion::from ),
-            (a, b) => Err(OperationError::new_fmt('^', &a, &b, None).into())
+            (Self::Mat(a), Self::Sca(b)) => a.powf(b.as_scalar()).map(VariableUnion::from ).map_err(PowError::from),
+            (a, b) => Err(PowError::new_undef(a.flat_type(), b.flat_type()))
+        }
+    }
+
+    pub fn static_type() -> FlatType {
+        FlatType::Any
+    }
+    pub fn flat_type(&self) -> FlatType {
+        match self {
+            Self::Sca(_)  => FlatType::Scalar,
+            Self::Cmp(_)  => FlatType::Complex,
+            Self::Bool(_) => FlatType::Boolean,
+            Self::Vec(_)  => FlatType::Vector,
+            Self::Mat(_)  => FlatType::Matrix
         }
     }
 }
@@ -205,31 +220,30 @@ fn test_variable_union_ref() {
     //We are primarily testing the operators.
     let ar = Scalar::new(4.0);
     let br = Complex::new(1.0, 2.5);
-    let cr = MathVector::from(vec![1, 4, 3]);
-    let dr = Matrix::identity(2);
+    let cr = FloatVector::from(vec![1.0, 4.0, 3.0]);
+    let dr = FloatMatrix::identity(2);
+    let er = Boolean::True;
     
     // Conversion
-    let a = VariableUnionRef::from(&ar);
-    let b = VariableUnionRef::from(&br);
+    let a = VariableUnionRef::from(ar);
+    let b = VariableUnionRef::from(br);
     let c = VariableUnionRef::from(&cr);
     let d = VariableUnionRef::from(&dr);
+    let e = VariableUnionRef::from(er);
 
     //Printing
-    assert_eq!(format!("{:?}", &a), format!("{:?}", &ar));
-    assert_eq!(format!("{:?}", &b), format!("{:?}", &br));
-    assert_eq!(format!("{:?}", &c), format!("{:?}", &cr));
-    assert_eq!(format!("{:?}", &d), format!("{:?}", &dr));
-
     assert_eq!(format!("{}", &a), format!("{}", &ar));
     assert_eq!(format!("{}", &b), format!("{}", &br));
     assert_eq!(format!("{}", &c), format!("{}", &cr));
     assert_eq!(format!("{}", &d), format!("{}", &dr));
+    assert_eq!(format!("{}", &e), format!("{}", &er));
 
     // Negation
-    assert_eq!(-a, VariableUnion::Sca(-ar));
-    assert_eq!(-b, VariableUnion::Cmp(-br.clone()));
-    assert_eq!(-c, VariableUnion::Vec(-cr.clone()));
-    assert_eq!(-d, VariableUnion::Mat(-dr.clone()));
+    assert_eq!(-a, Ok( VariableUnion::Sca(-ar) ));
+    assert_eq!(-b, Ok( VariableUnion::Cmp(-br) ));
+    assert_eq!(-c, Ok( VariableUnion::Vec(-cr.clone()) ));
+    assert_eq!(-d, Ok( VariableUnion::Mat(-dr.clone()) ));
+    assert!((-e).is_err());
 
 
     let er = Scalar::new(1.0);

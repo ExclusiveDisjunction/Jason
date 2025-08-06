@@ -1,7 +1,7 @@
 use std::fmt::{Display, Debug, Formatter};
 use std::error::Error as StdError;
 
-use super::{matrix::MatrixDimension, VariableType};
+//use super::matrix::MatrixDimension;
 
 pub trait DimensionKind : Clone + Copy + PartialEq + Eq {}
 impl DimensionKind for usize { }
@@ -186,6 +186,7 @@ impl FeatureError {
     }
 }
 
+/*
 #[derive(PartialEq, Eq, Clone)]
 pub enum CalcError {
     Index(OutOfRangeError<usize>),
@@ -261,3 +262,4 @@ impl Debug for CalcError {
 }
 
 pub type CalcResult<T> = Result<T, CalcError>;
+ */

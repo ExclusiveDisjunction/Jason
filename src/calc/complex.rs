@@ -1,10 +1,11 @@
-use super::base::*;
+use crate::calc::num::{NullIdentity, UnitIdentity};
+
 use super::scalar::{Scalar, ScalarLike};
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize, Default)]
 pub struct Complex {
     a: f64,
     b: f64
@@ -16,16 +17,6 @@ impl Display for Complex {
         } else {
             write!(f, "{} + {}i", self.a, self.b)
         }
-    }
-}
-impl Debug for Complex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
-    }
-}
-impl VariableData for Complex {
-    fn get_type(&self) -> VariableType {
-        VariableType::Complex
     }
 }
 
@@ -97,11 +88,17 @@ impl Div for Complex {
     }
 }
 
-impl PartialEq for Complex {
-    fn eq(&self, other: &Self) -> bool {
-        self.a == other.a && self.b == other.b
+impl NullIdentity for Complex {
+    fn null_id() -> Self {
+        Self { a: 0.0, b: 0.0 }
     }
 }
+impl UnitIdentity for Complex {
+    fn unit_id() -> Self {
+        Self { a: 1.0, b: 0.0 }
+    }
+}
+
 impl Complex {
     pub fn new(a: f64, b: f64) -> Self {
         Self {

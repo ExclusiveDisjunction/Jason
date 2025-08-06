@@ -5,6 +5,7 @@ pub mod calc;
 pub mod expr;
 pub mod io;
 pub mod core;
+pub mod prelude;
 
 use crate::core::JASON_CURRENT_VERSION;
 

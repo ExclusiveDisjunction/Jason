@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
+use std::str::FromStr;
 
-use super::name::{Name, NameRef};
+use crate::prelude::{Name, NameRef};
 
 use exdisj::error::{FormattingError, NamingError};
 
@@ -37,6 +38,15 @@ impl PackageID {
             Self::Std => NameRef::std_name(),
             Self::Usr => NameRef::usr_name(),
             Self::Named(n) => n.as_name_ref()
+        }
+    }
+
+    pub fn as_id_ref(&self) -> PackageIDRef<'_> {
+        match self {
+            Self::Scope => PackageIDRef::Scope,
+            Self::Std => PackageIDRef::Std,
+            Self::Usr => PackageIDRef::Usr,
+            Self::Named(n) => PackageIDRef::Named(n.as_name_ref())
         }
     }
 }
@@ -147,18 +157,49 @@ impl ResourceKind {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Identifier {
+    parent: PackageID,
+    resource: Name,
+    kind: ResourceKind
+}
+impl FromStr for Identifier {
+    type Err = LocatorParsingError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        IdentifierRef::try_from(s).map(|x| x.to_identifer())
+    }
+}
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", &self.parent, self.kind.format(&self.resource.as_name_ref()))
+    }
+}
+impl Identifier {
+    pub fn new(parent: PackageID, resource: Name, kind: ResourceKind) -> Self {
+        Self {
+            parent,
+            resource,
+            kind
+        }
+    }
+
+    pub fn to_identifier_ref(&self) -> IdentifierRef<'_> {
+        IdentifierRef::new(self.parent.as_id_ref(), self.resource.as_name_ref(), self.kind)
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Identifier<'a> {
+pub struct IdentifierRef<'a> {
     parent: PackageIDRef<'a>,
     resource: NameRef<'a>,
     kind: ResourceKind
 }
-impl Display for Identifier<'_> {
+impl Display for IdentifierRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", &self.parent, self.kind.format(&self.resource))
     }
 }
-impl<'a> TryFrom<&'a str> for Identifier<'a> {
+impl<'a> TryFrom<&'a str> for IdentifierRef<'a> {
     type Error = LocatorParsingError;
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         /*
@@ -238,7 +279,7 @@ impl<'a> TryFrom<&'a str> for Identifier<'a> {
         )
     }
 }
-impl<'a> Identifier<'a> {
+impl<'a> IdentifierRef<'a> {
     pub fn new(parent: PackageIDRef<'a>, resource: NameRef<'a>, kind: ResourceKind) -> Self {
         Self {
             parent,
@@ -256,6 +297,14 @@ impl<'a> Identifier<'a> {
     pub fn kind(&self) -> ResourceKind {
         self.kind
     }
+    
+    pub fn to_identifer(self) -> Identifier {
+        Identifier {
+            parent: self.parent.to_package_id(),
+            resource: self.resource.to_name(),
+            kind: self.kind
+        }
+    }
 }
 
 #[cfg(test)]
@@ -268,52 +317,52 @@ mod test {
         let f_name: NameRef<'_> = "a".try_into().unwrap();
         let pack: NameRef<'_> = "pack".try_into().unwrap();
 
-        assert_eq!( Identifier::try_from(""),      Err(LocatorParsingError::Name(NamingError::Empty))                            );
-        assert_eq!( Identifier::try_from("!"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
-        assert_eq!( Identifier::try_from("$"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
-        assert_eq!( Identifier::try_from("$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                            );
-        assert_eq!( Identifier::try_from("a"),     Ok(Identifier::new(PackageIDRef::Scope, name,   ResourceKind::EnvVariable  )) );
-        assert_eq!( Identifier::try_from("!aa"),   Ok(Identifier::new(PackageIDRef::Scope, f_name, ResourceKind::FuncVariable )) ); //Special case!
-        assert_eq!( Identifier::try_from("$aa"),   Ok(Identifier::new(PackageIDRef::Scope, name,   ResourceKind::Variable     )) );  
-        assert_eq!( Identifier::try_from("$aa()"), Ok(Identifier::new(PackageIDRef::Scope, name,   ResourceKind::Function     )) );
+        assert_eq!( IdentifierRef::try_from(""),      Err(LocatorParsingError::Name(NamingError::Empty))                            );
+        assert_eq!( IdentifierRef::try_from("!"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
+        assert_eq!( IdentifierRef::try_from("$"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
+        assert_eq!( IdentifierRef::try_from("$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                            );
+        assert_eq!( IdentifierRef::try_from("a"),     Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::EnvVariable  )) );
+        assert_eq!( IdentifierRef::try_from("!aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, f_name, ResourceKind::FuncVariable )) ); //Special case!
+        assert_eq!( IdentifierRef::try_from("$aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::Variable     )) );  
+        assert_eq!( IdentifierRef::try_from("$aa()"), Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::Function     )) );
 
-        assert_eq!( Identifier::try_from("_::"),      Err(LocatorParsingError::Name(NamingError::Empty))                        );
-        assert_eq!( Identifier::try_from("_::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                        );
-        assert_eq!( Identifier::try_from("_::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                        );
-        assert_eq!( Identifier::try_from("_::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                        );
-        assert_eq!( Identifier::try_from("_::!aa"),   Ok(Identifier::new(PackageIDRef::Scope, name, ResourceKind::EnvVariable)) );
-        assert_eq!( Identifier::try_from("_::$aa"),   Ok(Identifier::new(PackageIDRef::Scope, name, ResourceKind::Variable   )) );
-        assert_eq!( Identifier::try_from("_::$aa()"), Ok(Identifier::new(PackageIDRef::Scope, name, ResourceKind::Function   )) );
+        assert_eq!( IdentifierRef::try_from("_::"),      Err(LocatorParsingError::Name(NamingError::Empty))                        );
+        assert_eq!( IdentifierRef::try_from("_::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                        );
+        assert_eq!( IdentifierRef::try_from("_::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                        );
+        assert_eq!( IdentifierRef::try_from("_::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                        );
+        assert_eq!( IdentifierRef::try_from("_::!aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, name, ResourceKind::EnvVariable)) );
+        assert_eq!( IdentifierRef::try_from("_::$aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, name, ResourceKind::Variable   )) );
+        assert_eq!( IdentifierRef::try_from("_::$aa()"), Ok(IdentifierRef::new(PackageIDRef::Scope, name, ResourceKind::Function   )) );
 
-        assert_eq!( Identifier::try_from("usr::"),      Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("usr::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("usr::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("usr::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("usr::!aa"),   Ok(Identifier::new(PackageIDRef::Usr, name, ResourceKind::EnvVariable)) );
-        assert_eq!( Identifier::try_from("usr::$aa"),   Ok(Identifier::new(PackageIDRef::Usr, name, ResourceKind::Variable   )) );
-        assert_eq!( Identifier::try_from("usr::$aa()"), Ok(Identifier::new(PackageIDRef::Usr, name, ResourceKind::Function   )) );
+        assert_eq!( IdentifierRef::try_from("usr::"),      Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("usr::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("usr::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("usr::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("usr::!aa"),   Ok(IdentifierRef::new(PackageIDRef::Usr, name, ResourceKind::EnvVariable)) );
+        assert_eq!( IdentifierRef::try_from("usr::$aa"),   Ok(IdentifierRef::new(PackageIDRef::Usr, name, ResourceKind::Variable   )) );
+        assert_eq!( IdentifierRef::try_from("usr::$aa()"), Ok(IdentifierRef::new(PackageIDRef::Usr, name, ResourceKind::Function   )) );
 
-        assert_eq!( Identifier::try_from("std::"),      Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("std::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("std::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("std::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                      );
-        assert_eq!( Identifier::try_from("std::!aa"),   Ok(Identifier::new(PackageIDRef::Std, name, ResourceKind::EnvVariable)) );
-        assert_eq!( Identifier::try_from("std::$aa"),   Ok(Identifier::new(PackageIDRef::Std, name, ResourceKind::Variable   )) );
-        assert_eq!( Identifier::try_from("std::$aa()"), Ok(Identifier::new(PackageIDRef::Std, name, ResourceKind::Function   )) );
+        assert_eq!( IdentifierRef::try_from("std::"),      Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("std::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("std::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("std::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                      );
+        assert_eq!( IdentifierRef::try_from("std::!aa"),   Ok(IdentifierRef::new(PackageIDRef::Std, name, ResourceKind::EnvVariable)) );
+        assert_eq!( IdentifierRef::try_from("std::$aa"),   Ok(IdentifierRef::new(PackageIDRef::Std, name, ResourceKind::Variable   )) );
+        assert_eq!( IdentifierRef::try_from("std::$aa()"), Ok(IdentifierRef::new(PackageIDRef::Std, name, ResourceKind::Function   )) );
 
-        assert_eq!( Identifier::try_from("pack::"),      Err(LocatorParsingError::Name(NamingError::Empty))                              );
-        assert_eq!( Identifier::try_from("pack::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                              );
-        assert_eq!( Identifier::try_from("pack::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                              );
-        assert_eq!( Identifier::try_from("pack::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                              );
-        assert_eq!( Identifier::try_from("pack::!aa"),   Ok(Identifier::new(PackageIDRef::Named(pack), name, ResourceKind::EnvVariable)) );
-        assert_eq!( Identifier::try_from("pack::$aa"),   Ok(Identifier::new(PackageIDRef::Named(pack), name, ResourceKind::Variable   )) );
-        assert_eq!( Identifier::try_from("pack::$aa()"), Ok(Identifier::new(PackageIDRef::Named(pack), name, ResourceKind::Function   )) );
+        assert_eq!( IdentifierRef::try_from("pack::"),      Err(LocatorParsingError::Name(NamingError::Empty))                              );
+        assert_eq!( IdentifierRef::try_from("pack::!"),     Err(LocatorParsingError::Name(NamingError::Empty))                              );
+        assert_eq!( IdentifierRef::try_from("pack::$"),     Err(LocatorParsingError::Name(NamingError::Empty))                              );
+        assert_eq!( IdentifierRef::try_from("pack::$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                              );
+        assert_eq!( IdentifierRef::try_from("pack::!aa"),   Ok(IdentifierRef::new(PackageIDRef::Named(pack), name, ResourceKind::EnvVariable)) );
+        assert_eq!( IdentifierRef::try_from("pack::$aa"),   Ok(IdentifierRef::new(PackageIDRef::Named(pack), name, ResourceKind::Variable   )) );
+        assert_eq!( IdentifierRef::try_from("pack::$aa()"), Ok(IdentifierRef::new(PackageIDRef::Named(pack), name, ResourceKind::Function   )) );
 
-        assert!( Identifier::try_from("usr::a").is_err() ); //Since function variables can only be accessed from scope, this is invalid.
+        assert!( IdentifierRef::try_from("usr::a").is_err() ); //Since function variables can only be accessed from scope, this is invalid.
 
-        assert_eq!( Identifier::try_from("::"),        Err(LocatorParsingError::Name(NamingError::Empty)) );
-        assert_eq!( Identifier::try_from("pack::"),    Err(LocatorParsingError::Name(NamingError::Empty)) );
-        assert!( matches!( Identifier::try_from("&"),  Err(_) )                                           );
-        assert!( matches!( Identifier::try_from("()"), Err(_) )                                           );
+        assert_eq!( IdentifierRef::try_from("::"),        Err(LocatorParsingError::Name(NamingError::Empty)) );
+        assert_eq!( IdentifierRef::try_from("pack::"),    Err(LocatorParsingError::Name(NamingError::Empty)) );
+        assert!( matches!( IdentifierRef::try_from("&"),  Err(_) )                                           );
+        assert!( matches!( IdentifierRef::try_from("()"), Err(_) )                                           );
     }
 }

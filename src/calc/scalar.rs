@@ -1,4 +1,3 @@
-use super::base::*;
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
@@ -27,7 +26,7 @@ impl ScalarLike for i64 {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Default, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialOrd, Serialize, Deserialize, Default)]
 pub struct Scalar {
     pub a: f64
 }
@@ -39,16 +38,6 @@ impl ScalarLike for Scalar {
 impl Display for Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.a)
-    }
-}
-impl Debug for Scalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
-    }
-}
-impl VariableData for Scalar {
-    fn get_type(&self) -> VariableType {
-        VariableType::Scalar
     }
 }
 

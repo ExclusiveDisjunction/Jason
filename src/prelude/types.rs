@@ -7,8 +7,7 @@ pub enum FlatType {
     Complex,
     Vector,
     Matrix,
-    Boolean,
-    Undefined
+    Boolean
 }
 impl Display for FlatType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -19,8 +18,7 @@ impl Display for FlatType {
                 Self::Complex => "Comp",
                 Self::Vector => "Vec",
                 Self::Matrix => "Mat",
-                Self::Boolean => "Bool",
-                Self::Undefined => "Undef"
+                Self::Boolean => "Bool"
             }
         )
     }

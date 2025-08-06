@@ -1,7 +1,6 @@
-pub mod name;
 pub mod ops;
 pub mod tree;
-pub mod types;
+
 
 /// This module defines identification for packages and resources. Package identification is handled with `NumericalPackageID` and `PackageID`, while resources (entries and functions) are handled with `NumericalResourceID` and `ResourceID`.
 /// `NumericalPackageID` and `NumericalResourceID` are both stored inside of objects in the data structures. They are used to uniquely identify a structure.
@@ -13,6 +12,4 @@ pub mod types;
 /// Additionally, the `PackageID` enum provided the members, `Any`, `Usr`, and `Std`. These three are special cases, and are used for faster lookup via the `Session` object.
 pub mod id;
 
-pub use id::{PackageID, PackageIDRef, Identifier, LocatorParsingError, ResourceKind};
-
-pub use name::{Name, NameRef, VerifiedPath, VerifiedPathRef, PathValidationError};
+pub use id::{PackageID, PackageIDRef, IdentifierRef, LocatorParsingError, ResourceKind};

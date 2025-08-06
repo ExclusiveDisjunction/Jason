@@ -21,6 +21,7 @@ impl MatrixDimension {
 
     pub fn is_square(&self) -> bool {
         self.rows == self.cols
+        
     }
     pub fn is_empty(&self) -> bool {
         self.rows == 0 || self.cols == 0
@@ -253,12 +254,6 @@ impl Debug for Matrix {
 impl Display for Matrix {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         (&self.as_extraction() as &dyn Display).fmt(f)
-    }
-}
-
-impl VariableData for Matrix {
-    fn get_type(&self) -> VariableType {
-        VariableType::Matrix
     }
 }
 

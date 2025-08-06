@@ -1,4 +1,5 @@
-use crate::expr::raw::{Name, NameRef, ResourceKind};
+use crate::prelude::{Name, NameRef};
+use crate::expr::raw::ResourceKind;
 
 use std::fmt::{Display, Debug};
 use std::sync::{Arc, RwLock};
