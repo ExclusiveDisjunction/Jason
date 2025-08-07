@@ -1,11 +1,11 @@
 use std::fmt::Display;
 use std::ops::{Neg, Add, Sub, Mul, Div};
 
-use super::core::LogicalCmp;
 use crate::calc::err::{BiOperationError, PowError, UndefinedBiOperation, UndefinedUniOperation};
 use crate::calc::ScalarLike;
 use crate::prelude::FlatType;
-use super::varunion::VariableUnion;
+use super::var_union::VariableUnion;
+use super::super::prelude::LogicalCmp;
 use super::super::scalar::Scalar;
 use super::super::complex::Complex;
 use super::super::bool::Boolean;

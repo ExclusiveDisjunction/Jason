@@ -1,31 +1,15 @@
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
-use serde::ser::SerializeStruct;
 use serde::{Serialize, Deserialize};
 
-use std::marker::PhantomData;
 use std::fmt::{Display, Debug, Formatter};
 use std::ops::{Add, Deref, DerefMut, Div, Index, IndexMut, Mul, Neg};
+use std::marker::PhantomData;
 
-use crate::calc::calc_error::{DimensionError, OutOfRangeError};
+use crate::calc::err::{DimensionError, OutOfRangeError};
 use crate::calc::num::{DeterminantComputable, Incrementable, NullIdentity, UnitIdentity};
 //use crate::calc::{CalcError, OperationError, VariableData, VariableType};
 use super::base::{matrix_determinant, matrix_eq, print_matrix, print_matrix_debug, MatrixLike, MatrixRowStorage};
 use super::extract::MatrixRef;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct NonInvertableError;
-impl Display for NonInvertableError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("the matrix does not have a determinant value")
-    }
-}
-impl std::error::Error for NonInvertableError { }
-
-pub enum MatrixError {
-    NonSquare,
-    OutOfBounds,
-    NonInvertable
-}
 
 /// Constructs and stores a 2d grid of numbers, with a specified number of rows and columns.
 /// This handles the creation, maintenance, access, and memory for storing the values.
@@ -33,6 +17,7 @@ pub enum MatrixError {
 /// Although not explicity required, almost all operations require that `T` is `Clone`. 
 /// For arethmatic operations, it is assumed that `T.clone()` is inexpensive, and having complex cloning can slow down this structure.
 /// Each use of `Clone` is described.
+#[derive(Serialize)] //Note that deserialize also does a check to verify that the data is grid like, so it should be kept.
 pub struct Matrix<T> {
     data: Vec<Vec<T>>
 }
@@ -72,15 +57,9 @@ impl<T> From<MatrixRef<'_, T>> for Matrix<T> where T: Clone {
             return Self::default()
         }
 
-        let mut result = Matrix::allocate(value.rows(), value.cols(), value[0][0].clone());
-
-        for (our_i, i) in value.iter().enumerate() {
-            for (our_j, j) in i.iter().enumerate() {
-                result[our_i][our_j] = j.clone()
-            }
+        Self {
+            data: value.iter().map(|x| x.iter().cloned().collect() ).collect()
         }
-
-        result
     }
 }
 
@@ -213,17 +192,6 @@ impl<'de, T> Visitor<'de> for MatrixVisitor<T> where T: Deserialize<'de> {
     }
 }
 
-impl<T> Serialize for Matrix<T> where T: Serialize {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
-        
-        let mut s = serializer.serialize_struct("Matrix<T>", 1)?;
-        s.serialize_field("data", &self.data)?;
-
-        s.end()
-    }
-}
 impl<'de, T> Deserialize<'de> for Matrix<T> where T: Deserialize<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -718,4 +686,15 @@ impl<'a, T> Iterator for MatrixIterMut<'a, T> where T: 'a {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|x| x.deref_mut())
     }
+}
+
+#[test]
+fn matrix_serde_test() {
+    use serde_json::{to_string, from_str};
+
+    let mat = Matrix::<i32>::identity(2);
+    let ser = to_string(&mat).expect("unable to serialize");
+    let der: Result<Matrix<i32>, _>  = from_str(&ser);
+
+    assert_eq!(der.ok(), Some( mat ));
 }

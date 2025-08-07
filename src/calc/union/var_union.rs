@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use std::fmt::Display;
 use std::ops::{Neg, Add, Sub, Mul, Div};
 
-use super::core::LogicalCmp;
+use super::super::prelude::LogicalCmp;
 use super::super::scalar::{Scalar, ScalarLike};
 use super::super::complex::Complex;
 use super::super::bool::Boolean;

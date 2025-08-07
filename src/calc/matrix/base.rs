@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::calc::calc_error::DimensionKind;
+use crate::calc::prelude::DimensionKind;
 use crate::calc::num::{DeterminantComputable, NullIdentity};
 
 use std::fmt::{Display, Debug};

@@ -1,5 +1,5 @@
 use super::num::NullIdentity;
-use super::calc_error::DimensionError;
+use super::err::DimensionError;
 use std::ops::{Add, Deref, DerefMut, Div, Mul, Neg, Sub};
 use std::fmt::{Display, Debug, Formatter};
 use std::iter::zip;

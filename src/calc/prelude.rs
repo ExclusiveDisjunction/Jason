@@ -1,4 +1,11 @@
-use crate::calc::err::UndefinedBiOperation;
+use super::err::UndefinedBiOperation;
+
+pub trait DimensionKind : Clone + Copy + PartialEq + Eq {}
+impl DimensionKind for usize { }
+impl DimensionKind for i32 {}
+impl DimensionKind for i64 {}
+impl DimensionKind for u32 {}
+impl DimensionKind for u64 {}
 
 pub trait LogicalCmp {
     fn oper_eq(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation>;

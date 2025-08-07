@@ -1,4 +1,4 @@
-use crate::calc::calc_error::DimensionError;
+use crate::calc::err::DimensionError;
 use crate::calc::num::NullIdentity;
 use crate::calc::MathVector;
 use super::base::{matrix_eq, MatrixDimension, MatrixLike};
