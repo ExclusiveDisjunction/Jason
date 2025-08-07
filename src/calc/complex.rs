@@ -159,16 +159,20 @@ impl Complex {
 
 #[test]
 fn complex_test() {
+    use super::scalar::Scalar;
+
     let a = Complex::new(1.0, 0.0);
     let b = Complex::new(3.0, 1.4);
     let c: Complex = Scalar::new(3.0).into();
     //let d = Complex::new_with(2.4, 3.1);
 
-    assert_eq!(a.clone() + b.clone(), Complex::new(4.0, 1.4));
-    assert_eq!(a.clone() - b.clone(), Complex::new(-2.0, -1.4));
-    assert_eq!(a.clone() + c.clone(), Complex::new(4.0, 0.0));
-    assert_eq!(a.clone() - c.clone(), Complex::new(-2.0, 0.0));
-    assert_eq!(a.clone() * c.clone(), Complex::new(3.0, 0.0));
+    assert_eq!(a + b, Complex::new(4.0, 1.4));
+    assert_eq!(a - b, Complex::new(-2.0, -1.4));
+    assert_eq!(a + c, Complex::new(4.0, 0.0));
+    assert_eq!(a - c, Complex::new(-2.0, 0.0));
+    assert_eq!(a * c, Complex::new(3.0, 0.0));
+
+    assert_eq!(Complex::new(1.0, 2.5) - Complex::from(Scalar::new(1.0)), Complex::new(0.0, 2.5));
 
     //These two are technically correct, but due to floating point errors these may fail.
     //assert_eq!(d.clone() / b.clone(), Complex::new_with(577.0/548.0, 297.0/548.0));

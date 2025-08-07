@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Not};
 use std::str::FromStr;
 
 use exdisj::error::FormattingError;
@@ -61,6 +61,15 @@ impl Display for Boolean {
         )
     }
 }
+impl Not for Boolean {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+         match self {
+            Self::True => Self::False,
+            Self::False => Self::True
+        }
+    }
+}
 impl Boolean {
     pub fn and(self, rhs: Self) -> Self {
         match (self, rhs) {
@@ -72,12 +81,6 @@ impl Boolean {
         match (self, rhs) {
             (Self::False, Self::False) => Self::False,
             _ => Self::True
-        }
-    }
-    pub fn not(self) -> Self {
-        match self {
-            Self::True => Self::False,
-            Self::False => Self::True
         }
     }
 }

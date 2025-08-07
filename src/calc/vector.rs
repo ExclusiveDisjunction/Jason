@@ -293,12 +293,12 @@ pub type ComplexVector = MathVector<crate::calc::Complex>;
 
 #[test]
 fn test_vector() {
-    let a = FloatVector::from(vec![1.0, 2.0, 3.0]);
-    let b = FloatVector::from(vec![2.0, 3.0]);
+    let a = FloatVector::from([1.0, 2.0, 3.0]);
+    let b = FloatVector::from([2.0, 3.0]);
     let c = 4.0;
 
     //Negation
-    assert_eq!(-a.clone(), MathVector::from(vec![-1.0, -2.0, -3.0]));
+    assert_eq!(-a.clone(), MathVector::from([-1.0, -2.0, -3.0]));
 
     //Index
     assert_eq!(a[0], 1.0);
@@ -306,8 +306,8 @@ fn test_vector() {
     //Other operations
     assert!(a.dot_product(&b).is_err());
     assert_eq!(a.dot_product(&a).unwrap(), (1 * 1 + 2 * 2 + 3 * 3) as f64);
-    assert_eq!(a.cross_product(&MathVector::from(vec![3.0, 2.0, 1.0])).unwrap(), MathVector::from(vec![-4.0, -8.0, -4.0]));
-    assert_eq!(b.cross_product(&MathVector::from(vec![3.0, 2.0])).unwrap(), MathVector::from(vec![0.0, 0.0, -5.0]));
+    assert_eq!(a.cross_product(&MathVector::from([3.0, 2.0, 1.0])).unwrap(), MathVector::from([-4.0, -8.0, -4.0]));
+    assert_eq!(b.cross_product(&MathVector::from([3.0, 2.0])).unwrap(), MathVector::from([0.0, 0.0, -5.0]));
 
     //Properties
     assert_eq!(a.magnitude(), ((1 * 1 + 2 * 2 + 3 * 3) as f64).sqrt());

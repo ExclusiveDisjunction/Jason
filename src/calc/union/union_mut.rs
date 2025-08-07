@@ -1,13 +1,13 @@
 use super::super::scalar::Scalar;
 use super::super::complex::Complex;
 use super::super::bool::Boolean;
-use super::super::vector::MathVector;
-use super::super::matrix::Matrix;
+use super::super::vector::FloatVector;
+use super::super::matrix::FloatMatrix;
 
 pub enum VariableUnionMut<'a> {
     Sca(&'a mut Scalar),
     Cmp(&'a mut Complex),
-    Vec(&'a mut MathVector),
-    Mat(&'a mut Matrix),
+    Vec(&'a mut FloatVector),
+    Mat(&'a mut FloatMatrix),
     Bool(&'a mut Boolean)
 }

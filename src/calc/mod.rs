@@ -3,7 +3,7 @@ pub mod complex;
 pub mod vector;
 pub mod matrix;
 pub mod calc_error;
-pub mod func;
+//pub mod func;
 pub mod bool;
 pub mod union;
 pub mod err;

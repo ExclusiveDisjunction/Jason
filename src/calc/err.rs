@@ -32,6 +32,10 @@ impl UndefinedBiOperation {
     pub fn new(oper: &'static str, a: FlatType, b: FlatType) -> Self {
         Self(oper, a, b)
     }
+
+    pub fn rename(self, new: &'static str) -> Self {
+        Self::new(new, self.1, self.2)
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
