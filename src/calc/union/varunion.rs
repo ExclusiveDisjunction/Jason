@@ -211,38 +211,6 @@ impl VariableUnion {
 
 }
 
-/*
-    (lhs[0].clone(), rhs[0].clone(), None),
-    (lhs[0].clone(), rhs[1].clone(), None),
-    (lhs[0].clone(), rhs[2].clone(), None),
-    (lhs[0].clone(), rhs[3].clone(), None),
-    (lhs[0].clone(), rhs[4].clone(), None),
-
-    (lhs[1].clone(), rhs[0].clone(), None),
-    (lhs[1].clone(), rhs[1].clone(), None)
-    (lhs[1].clone(), rhs[2].clone(), None),
-    (lhs[1].clone(), rhs[3].clone(), None),
-    (lhs[1].clone(), rhs[4].clone(), None),
-    
-    (lhs[2].clone(), rhs[0].clone(), None),
-    (lhs[2].clone(), rhs[1].clone(), None),
-    (lhs[2].clone(), rhs[2].clone(), None),
-    (lhs[2].clone(), rhs[3].clone(), None),
-    (lhs[2].clone(), rhs[4].clone(), None),
-
-    (lhs[3].clone(), rhs[0].clone(), None),
-    (lhs[3].clone(), rhs[1].clone(), None),
-    (lhs[3].clone(), rhs[2].clone(), None),
-    (lhs[3].clone(), rhs[3].clone(), None),
-    (lhs[3].clone(), rhs[4].clone(), None),
-
-    (lhs[4].clone(), rhs[0].clone(), None),
-    (lhs[4].clone(), rhs[1].clone(), None),
-    (lhs[4].clone(), rhs[2].clone(), None),
-    (lhs[4].clone(), rhs[3].clone(), None),
-    (lhs[4].clone(), rhs[4].clone(), None) 
-*/
-
 #[cfg(test)]
 mod tests {
     use super::*;

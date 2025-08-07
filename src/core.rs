@@ -1,3 +1,3 @@
 pub use exdisj::version::Version;
 
-pub const JASON_CURRENT_VERSION: Version<u16> = Version::new(1, 0, 0);
+pub const JASON_CURRENT_VERSION: Version = Version::new(1, 0, 0);

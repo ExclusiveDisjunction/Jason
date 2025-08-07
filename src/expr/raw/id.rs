@@ -321,8 +321,8 @@ mod test {
         assert_eq!( IdentifierRef::try_from("!"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
         assert_eq!( IdentifierRef::try_from("$"),     Err(LocatorParsingError::Name(NamingError::Empty))                            );
         assert_eq!( IdentifierRef::try_from("$()"),   Err(LocatorParsingError::Name(NamingError::Empty))                            );
-        assert_eq!( IdentifierRef::try_from("a"),     Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::EnvVariable  )) );
-        assert_eq!( IdentifierRef::try_from("!aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, f_name, ResourceKind::FuncVariable )) ); //Special case!
+        assert_eq!( IdentifierRef::try_from("a"),     Ok(IdentifierRef::new(PackageIDRef::Scope, f_name, ResourceKind::FuncVariable )) ); //Special case!
+        assert_eq!( IdentifierRef::try_from("!aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::EnvVariable  )) ); 
         assert_eq!( IdentifierRef::try_from("$aa"),   Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::Variable     )) );  
         assert_eq!( IdentifierRef::try_from("$aa()"), Ok(IdentifierRef::new(PackageIDRef::Scope, name,   ResourceKind::Function     )) );
 
