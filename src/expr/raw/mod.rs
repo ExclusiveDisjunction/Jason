@@ -1,7 +1,7 @@
 pub mod ops;
 pub mod tree;
 
-
+/*
 /// This module defines identification for packages and resources. Package identification is handled with `NumericalPackageID` and `PackageID`, while resources (entries and functions) are handled with `NumericalResourceID` and `ResourceID`.
 /// `NumericalPackageID` and `NumericalResourceID` are both stored inside of objects in the data structures. They are used to uniquely identify a structure.
 /// `PackageID`, `ResourceID`, `ResourceKind`, and `ResourceLocator` are all used to locate objects within the data structures. They come in a few major varieties:
@@ -13,3 +13,4 @@ pub mod tree;
 pub mod id;
 
 pub use id::{PackageID, PackageIDRef, IdentifierRef, LocatorParsingError, ResourceKind};
+*/
