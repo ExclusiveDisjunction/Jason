@@ -8,7 +8,7 @@ pub mod vector;
 pub mod matrix;
 //pub mod func;
 pub mod bool;
-pub mod union;
+pub mod literal;
 
 pub use scalar::{Scalar, ScalarLike};
 pub use complex::Complex;
@@ -16,4 +16,4 @@ pub use vector::{MathVector, FloatVector};
 pub use matrix::{Matrix, FloatMatrix};
 pub use bool::Boolean;
 
-pub use union::{VariableUnion, VariableUnionRef, VariableUnionMut};
+pub use literal::{Literal, LiteralReference};

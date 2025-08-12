@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use std::fmt::Display;
 use std::ops::{Neg, Add, Sub, Mul, Div};
 
-use super::super::prelude::LogicalCmp;
+use super::core::LogicalCmp;
 use super::super::scalar::{Scalar, ScalarLike};
 use super::super::complex::Complex;
 use super::super::bool::Boolean;
@@ -15,31 +15,31 @@ use crate::calc::err::UndefinedBiOperation;
 use crate::prelude::FlatType;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
-pub enum VariableUnion {
+pub enum Literal {
     Sca(Scalar),
     Cmp(Complex),
     Bool(Boolean),
     Vec(FloatVector),
     Mat(FloatMatrix)
 }
-impl Default for VariableUnion {
+impl Default for Literal {
     fn default() -> Self {
         Self::Sca(Scalar::default())
     }
 }
-impl Neg for VariableUnion {
-    type Output = Result<VariableUnion, UndefinedUniOperation>;
+impl Neg for Literal {
+    type Output = Result<Literal, UndefinedUniOperation>;
     fn neg(self) -> Self::Output {
         match self {
-            VariableUnion::Sca(s)     => Ok( VariableUnion::Sca(-s) ),
-            VariableUnion::Cmp(c)    => Ok( VariableUnion::Cmp(-c) ),
-            VariableUnion::Vec(v) => Ok( VariableUnion::Vec(-v) ),
-            VariableUnion::Mat(m)     => Ok( VariableUnion::Mat(-m) ),
-            VariableUnion::Bool(_)            => Err( UndefinedUniOperation::new("-", FlatType::Boolean) )
+            Literal::Sca(s)     => Ok( Literal::Sca(-s) ),
+            Literal::Cmp(c)    => Ok( Literal::Cmp(-c) ),
+            Literal::Vec(v) => Ok( Literal::Vec(-v) ),
+            Literal::Mat(m)     => Ok( Literal::Mat(-m) ),
+            Literal::Bool(_)            => Err( UndefinedUniOperation::new("-", FlatType::Boolean) )
         }
     }
 }
-impl Add for VariableUnion {
+impl Add for Literal {
     type Output = Result<Self, BiOperationError>;
     fn add(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
@@ -55,7 +55,7 @@ impl Add for VariableUnion {
         }
     }
 }
-impl Sub for VariableUnion {
+impl Sub for Literal {
     type Output = Result<Self, BiOperationError>;
     fn sub(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
@@ -71,7 +71,7 @@ impl Sub for VariableUnion {
         }
     }
 }
-impl Mul for VariableUnion {
+impl Mul for Literal {
     type Output = Result<Self, BiOperationError>;
     fn mul(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
@@ -82,29 +82,29 @@ impl Mul for VariableUnion {
         }
     }
 }
-impl Div for VariableUnion {
+impl Div for Literal {
     type Output = Result<Self, BiOperationError>;
     fn div(self, rhs: Self) -> Self::Output {
         self.get_ref().div(rhs.get_ref())
     }
 }
 
-impl<T> From<T> for VariableUnion where T: ScalarLike {
+impl<T> From<T> for Literal where T: ScalarLike {
     fn from(value: T) -> Self {
         Self::Sca(Scalar::new(value))
     }
 }
-impl From<Complex> for VariableUnion {
+impl From<Complex> for Literal {
     fn from(value: Complex) -> Self {
         Self::Cmp(value)
     }
 }
-impl From<Boolean> for VariableUnion {
+impl From<Boolean> for Literal {
     fn from(value: Boolean) -> Self {
         Self::Bool(value)
     }
 }
-impl From<bool> for VariableUnion {
+impl From<bool> for Literal {
     fn from(value: bool) -> Self {
         Self::Bool (
             if value {
@@ -116,24 +116,24 @@ impl From<bool> for VariableUnion {
         )
     }
 }
-impl From<FloatVector> for VariableUnion {
+impl From<FloatVector> for Literal {
     fn from(value: FloatVector) -> Self {
         Self::Vec(value)
     }
 }
-impl From<FloatMatrix> for VariableUnion {
+impl From<FloatMatrix> for Literal {
     fn from(value: FloatMatrix) -> Self {
         Self::Mat(value)   
     }
 }
 
-impl Display for VariableUnion {
+impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         (&self.get_ref() as &dyn Display).fmt(f)
     }
 }
 
-impl LogicalCmp for VariableUnion {
+impl LogicalCmp for Literal {
     fn oper_eq(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
         match (self, rhs) {
             (Self::Sca(a), Self::Sca(b)) => Ok( a == b ),
@@ -162,9 +162,9 @@ impl LogicalCmp for VariableUnion {
     }
 }
 
-impl VariableUnion {
-    pub fn get_ref(&self) -> super::union_ref::VariableUnionRef<'_> {
-        use super::union_ref::VariableUnionRef::*;
+impl Literal {
+    pub fn get_ref(&self) -> super::lit_ref::LiteralReference<'_> {
+        use super::lit_ref::LiteralReference::*;
         match self {
             Self::Sca(s) => Sca(*s),
             Self::Cmp(s) => Cmp(*s),
@@ -173,6 +173,7 @@ impl VariableUnion {
             Self::Mat(s) => Mat(s)
         }
     }
+    /*
     pub fn get_ref_mut(&mut self) -> super::union_mut::VariableUnionMut<'_> {
         use super::union_mut::VariableUnionMut::*;
         match self {
@@ -183,6 +184,7 @@ impl VariableUnion {
             Self::Mat(s) => Mat(s)
         }
     }
+     */
 
     pub fn pow(self, rhs: Self) -> Result<Self, PowError> {
         match (self, rhs) {
@@ -190,7 +192,7 @@ impl VariableUnion {
             (Self::Cmp(a), Self::Sca(b)) => Ok( a.pow_sca(b).into() ),
             (Self::Sca(a), Self::Cmp(b)) => Ok( Complex::from(a).pow(b).into() ),
             (Self::Cmp(a), Self::Cmp(b)) => Ok( a.pow(b).into() ),
-            (Self::Mat(a), Self::Sca(b)) => a.powf(b.as_scalar()).map(VariableUnion::from).map_err(PowError::from),
+            (Self::Mat(a), Self::Sca(b)) => a.powf(b.as_scalar()).map(Literal::from).map_err(PowError::from),
             (a, b) => Err(PowError::new_undef(a.flat_type(), b.flat_type()))
         }
     }
@@ -211,6 +213,38 @@ impl VariableUnion {
 
 }
 
+/*
+    (lhs[0].clone(), rhs[0].clone(), None),
+    (lhs[0].clone(), rhs[1].clone(), None),
+    (lhs[0].clone(), rhs[2].clone(), None),
+    (lhs[0].clone(), rhs[3].clone(), None),
+    (lhs[0].clone(), rhs[4].clone(), None),
+
+    (lhs[1].clone(), rhs[0].clone(), None),
+    (lhs[1].clone(), rhs[1].clone(), None)
+    (lhs[1].clone(), rhs[2].clone(), None),
+    (lhs[1].clone(), rhs[3].clone(), None),
+    (lhs[1].clone(), rhs[4].clone(), None),
+    
+    (lhs[2].clone(), rhs[0].clone(), None),
+    (lhs[2].clone(), rhs[1].clone(), None),
+    (lhs[2].clone(), rhs[2].clone(), None),
+    (lhs[2].clone(), rhs[3].clone(), None),
+    (lhs[2].clone(), rhs[4].clone(), None),
+
+    (lhs[3].clone(), rhs[0].clone(), None),
+    (lhs[3].clone(), rhs[1].clone(), None),
+    (lhs[3].clone(), rhs[2].clone(), None),
+    (lhs[3].clone(), rhs[3].clone(), None),
+    (lhs[3].clone(), rhs[4].clone(), None),
+
+    (lhs[4].clone(), rhs[0].clone(), None),
+    (lhs[4].clone(), rhs[1].clone(), None),
+    (lhs[4].clone(), rhs[2].clone(), None),
+    (lhs[4].clone(), rhs[3].clone(), None),
+    (lhs[4].clone(), rhs[4].clone(), None) 
+*/
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,16 +261,16 @@ mod tests {
             Boolean::True
         );
 
-        let raw_wrapped: [VariableUnion; 5] = [
-            VariableUnion::Sca(raw.0),
-            VariableUnion::Cmp(raw.1),
-            VariableUnion::Vec(raw.2.clone()),
-            VariableUnion::Mat(raw.3.clone()),
-            VariableUnion::Bool(raw.4)
+        let raw_wrapped: [Literal; 5] = [
+            Literal::Sca(raw.0),
+            Literal::Cmp(raw.1),
+            Literal::Vec(raw.2.clone()),
+            Literal::Mat(raw.3.clone()),
+            Literal::Bool(raw.4)
         ];
 
         // Conversion
-        let lhs: [VariableUnion; 5] = [raw.0.into(), raw.1.into(), raw.2.clone().into(), raw.3.clone().into(), raw.4.into()];
+        let lhs: [Literal; 5] = [raw.0.into(), raw.1.into(), raw.2.clone().into(), raw.3.clone().into(), raw.4.into()];
         assert_eq!(&raw_wrapped, &lhs);
 
         //Printing
@@ -261,7 +295,7 @@ mod tests {
             Boolean::False
         );
 
-        let rhs: [VariableUnion; 5] = [
+        let rhs: [Literal; 5] = [
             rhs_raw.0.into(),
             rhs_raw.1.into(),
             rhs_raw.2.clone().into(),
@@ -473,7 +507,7 @@ mod tests {
             FloatMatrix::identity(2)
         );
 
-        let wrap: [VariableUnion; 5] = [
+        let wrap: [Literal; 5] = [
             raw.0.into(),
             raw.1.into(),
             raw.2.into(),
@@ -493,7 +527,7 @@ mod tests {
             }
         }
 
-        let other_sca: VariableUnion = Scalar::new(1.2).into();
+        let other_sca: Literal = Scalar::new(1.2).into();
         let slice = &wrap[1..=4];
         assert_eq!(slice.len(), 4, "{:?} is not 4 elements...", &slice);
 
