@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use crate::calc::err::{DimensionError, OutOfRangeError};
 use crate::calc::num::{DeterminantComputable, Incrementable, NullIdentity, UnitIdentity};
 //use crate::calc::{CalcError, OperationError, VariableData, VariableType};
-use super::base::{matrix_determinant, matrix_eq, print_matrix, print_matrix_debug, MatrixLike, MatrixRowStorage};
+use super::base::{matrix_determinant, matrix_eq, print_matrix, MatrixLike, MatrixRowStorage};
 use super::extract::MatrixRef;
 
 /// Constructs and stores a 2d grid of numbers, with a specified number of rows and columns.
@@ -17,7 +17,7 @@ use super::extract::MatrixRef;
 /// Although not explicity required, almost all operations require that `T` is `Clone`. 
 /// For arethmatic operations, it is assumed that `T.clone()` is inexpensive, and having complex cloning can slow down this structure.
 /// Each use of `Clone` is described.
-#[derive(Serialize)] //Note that deserialize also does a check to verify that the data is grid like, so it should be kept.
+#[derive(Serialize, Debug)] //Note that deserialize also does a check to verify that the data is grid like, so it should be kept.
 pub struct Matrix<T> {
     data: Vec<Vec<T>>
 }
@@ -78,11 +78,6 @@ impl<T> IndexMut<usize> for Matrix<T> {
 impl<T> Display for Matrix<T> where T: Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         print_matrix(f, self)
-    }
-}
-impl<T> Debug for Matrix<T> where T: Debug {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        print_matrix_debug(f, self)
     }
 }
 impl<T> Clone for Matrix<T> where T: Clone {

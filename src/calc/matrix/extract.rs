@@ -4,10 +4,11 @@ use std::rc::Rc;
 use crate::calc::num::DeterminantComputable;
 
 use super::mat::Matrix;
-use super::base::{matrix_determinant, matrix_eq, print_matrix, print_matrix_debug, MatrixLike, MatrixRowStorage};
+use super::base::{matrix_determinant, matrix_eq, print_matrix, MatrixLike, MatrixRowStorage};
 
 /// An iterator over a specific `MatrixRef`, used to extract row information.
 /// Once `Self::next` returns `None`, it will never return `Some(_)` again.
+#[derive(Debug, Clone)]
 pub struct MatrixRefIter<'a, T> where T: 'a {
     host: &'a [T],
     inner: std::slice::Iter<'a, usize>
@@ -24,6 +25,7 @@ impl<'a, T> Iterator for MatrixRefIter<'a, T> where T: 'a {
 
 /// A specific row of a `MatrixRef` extraction.
 /// This provides an abstraction over the extaction.
+#[derive(Debug, PartialEq, Eq)]
 pub struct MatrixRefRow<'a, T> {
     over: &'a [T],
     cols: Rc<Vec<usize>>
@@ -73,7 +75,7 @@ impl<'a, T> MatrixRefRow<'a, T> {
 /// let extract = mat.extract(0..2, 0..2);
 /// assert_eq!(extract, Matrix::try_from(vec![1, 2], vec![4, 5]).unwrap())
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MatrixRef<'a, T> where T: 'a {
     rows: Vec<MatrixRefRow<'a, T>>,
     cols: Rc<Vec<usize>>
@@ -89,15 +91,10 @@ impl<T> PartialEq for MatrixRef<'_, T> where T: PartialEq {
         matrix_eq(self, other)
     }
 }
-impl<T> Eq for MatrixRef<'_, T> where T: Eq { }
+impl<T> Eq for MatrixRef<'_, T> where T: PartialEq + Eq { }
 impl<T> Display for MatrixRef<'_, T> where T: Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         print_matrix(f, self)
-    }
-}
-impl<T> Debug for MatrixRef<'_, T> where T: Debug {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        print_matrix_debug(f, self)
     }
 }
 impl<'a, T> MatrixLike<'a> for MatrixRef<'a, T> where T: 'a {

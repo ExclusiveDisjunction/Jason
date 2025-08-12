@@ -12,8 +12,8 @@ pub mod union;
 
 pub use scalar::{Scalar, ScalarLike};
 pub use complex::Complex;
-pub use vector::MathVector;
-pub use matrix::Matrix;
+pub use vector::{MathVector, FloatVector};
+pub use matrix::{Matrix, FloatMatrix};
 pub use bool::Boolean;
 
 pub use union::{VariableUnion, VariableUnionRef, VariableUnionMut};

@@ -210,7 +210,9 @@ pub fn print_matrix<'a, T>(f: &mut std::fmt::Formatter<'_>, target: &'a T) -> st
         rows_str.join("; ")
     )
 }
+
 /// Prints the matrix as a series of lines, one for each row. Rows are ended with ';', and the entire data set is surrounded with '[ ]'. This is Inline Printing.
+#[deprecated(note = "use the default implementation for debug instead.")]
 pub fn print_matrix_debug<'a, T>(f: &mut std::fmt::Formatter<'_>, target: &'a T) -> std::fmt::Result where T: MatrixLike<'a>, T::Storage: Debug {
     let rows_str: Vec<String> = target.iter().map(
         |x| {
