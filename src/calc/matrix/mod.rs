@@ -5,7 +5,7 @@ pub mod ops;
 
 pub use base::{MatrixDimension, MatrixLike};
 pub use extract::MatrixRef;
-pub use mat::Matrix;
+pub use mat::{Matrix, MatrixConversionError};
 
 use super::Complex;
 
@@ -88,7 +88,7 @@ mod test {
             (a, b) => panic!("Expected (ok, ok), got ({:?}, {:?})", a, b)
         }
 
-        assert_eq!(d * e, FloatMatrix::try_from(vec![vec![25.0, -5.0, 12.0], vec![-9.0, -6.0, -35.0], vec![70.0, -5.0, 69.0]]));
+        assert_eq!(d * e, Ok( FloatMatrix::try_from(vec![vec![25.0, -5.0, 12.0], vec![-9.0, -6.0, -35.0], vec![70.0, -5.0, 69.0]]).unwrap() ));
         assert_eq!(c.clone() * f.clone(), Ok(f));
         assert_eq!(a * v, Ok(MathVector::from(vec![25.0, 10.0, 22.0])));
         assert_eq!(c * s, FloatMatrix::try_from(vec![vec![4.0, 0.0], vec![0.0, 4.0]]).unwrap());

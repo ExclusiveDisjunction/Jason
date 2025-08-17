@@ -29,8 +29,28 @@ impl<T> Default for Matrix<T> {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct MatrixConversionError {
+    pub expected: usize,
+    pub found: usize
+}
+impl Display for MatrixConversionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unable to construct a matrix out of the list provided. all rows were expected to be {} item(s) long, but one row was {} item(s) long", self.expected, self.found)
+    }
+}
+impl std::error::Error for MatrixConversionError { }
+impl MatrixConversionError {
+    pub fn new(expected: usize, found: usize) -> Self {
+        Self {
+            expected,
+            found
+        }
+    }
+}
+
 impl<T> TryFrom<Vec<Vec<T>>> for Matrix<T> {
-    type Error = DimensionError<usize>;
+    type Error = MatrixConversionError;
     fn try_from(value: Vec<Vec<T>>) -> Result<Self, Self::Error> {
         if value.is_empty() {
             Ok( Self::default() )
@@ -39,7 +59,7 @@ impl<T> TryFrom<Vec<Vec<T>>> for Matrix<T> {
             let row_size: usize = value[0].len();
             for row in &value {
                 if row.len() != row_size {
-                    return Err(DimensionError::new(row_size, row.len()));
+                    return Err(MatrixConversionError::new(row_size, row.len()));
                 }
             }
 

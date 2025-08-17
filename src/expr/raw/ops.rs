@@ -40,6 +40,8 @@ pub enum BinaryOperator {
     Pow,
     Eq,
     Neq,
+    And,
+    Or,
     Le,
     Lt,
     Ge,
@@ -61,6 +63,8 @@ impl FromStr for BinaryOperator {
             "^"  => Ok( Self::Pow ),
             "==" => Ok( Self::Eq  ),
             "!=" => Ok( Self::Neq ),
+            "&&" => Ok( Self::And ),
+            "||" => Ok( Self::Or  ),
             "<"  => Ok( Self::Lt  ),
             "<=" => Ok( Self::Le  ),
             ">"  => Ok( Self::Gt  ),
@@ -79,6 +83,8 @@ impl OperatorRepresentation for BinaryOperator {
             Self::Pow => "^" ,
             Self::Eq  => "==",
             Self::Neq => "!=",
+            Self::And => "&&",
+            Self::Or  => "||",
             Self::Lt  => "<" ,
             Self::Le  => "<=",
             Self::Gt  => ">" ,
@@ -91,7 +97,7 @@ impl BinaryOperator {
         match self {
             Self::Add | Self::Sub => 1,
             Self::Mul | Self::Div | Self::Pow => 2,
-            Self::Eq | Self::Neq | Self::Le | Self::Lt | Self::Ge | Self::Gt => 3
+            Self::Eq | Self::Neq | Self::And | Self::Or | Self::Le | Self::Lt | Self::Ge | Self::Gt => 3
         }
     }
 }

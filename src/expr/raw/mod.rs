@@ -1,5 +1,6 @@
 pub mod ops;
 pub mod tree;
+pub mod prelude;
 
 /*
 /// This module defines identification for packages and resources. Package identification is handled with `NumericalPackageID` and `PackageID`, while resources (entries and functions) are handled with `NumericalResourceID` and `ResourceID`.
