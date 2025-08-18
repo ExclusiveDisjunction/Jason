@@ -17,19 +17,6 @@ pub enum RawExpression {
     BinOper(BinaryOperation<Self>),  // 2 + 4
     Wrapped(Box<Self>),              // (3+4) <- The wrap is the parenthisis 
 }
-impl Display for RawExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Scalar(v) => write!(f, "{}", v),
-            Self::Complex(v) => write!(f, "{}", v),
-            Self::Bool(v) => write!(f, "{}", v),
-            Self::Vector(v) => write!(f, "{}", v),
-            Self::Matrix(v) => write!(f, "{}", v),
-            Self::BinOper(v) => write!(f, "{}", v),
-            Self::Wrapped(b) => write!(f, "({})", b)
-        }
-    }
-}
 impl Default for RawExpression {
     fn default() -> Self {
         Self::Scalar(0.0)

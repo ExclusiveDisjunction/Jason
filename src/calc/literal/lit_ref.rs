@@ -257,6 +257,56 @@ impl LiteralReference<'_> {
     }
 }
 
+struct LiteralTester {
+    lhs_raw: (Scalar, Complex, FloatVector, FloatMatrix, Boolean),
+    lhs: [Literal; 5],
+    rhs_raw: (Scalar, Complex, FloatVector, FloatMatrix, Boolean),
+    rhs: [Literal; 5],
+    results: [[Option<Literal>; 5]; 5]
+}
+impl Default for LiteralTester {
+    fn default() -> Self {
+        let lhs_raw = (
+            Scalar::new(4.0), 
+            Complex::new(1.0, 2.5),
+            FloatVector::from([1.0, 4.0, 3.0]),
+            FloatMatrix::identity(2),
+            Boolean::True
+        );
+        let rhs_raw = (
+            Scalar::new(1.0),
+            Complex::new(2.1, 4.0),
+            FloatVector::from([2.0, 1.0, -4.0]),
+            FloatMatrix::try_from(vec![vec![1.0, 4.0], vec![5.0, 2.0]]).unwrap(),
+            Boolean::False
+        );
+
+        Self {
+            lhs: [lhs_raw.0.into(), lhs_raw.1.into(), lhs_raw.2.clone().into(), lhs_raw.3.clone().into(), lhs_raw.4.into()],
+            rhs: [rhs_raw.0.into(), rhs_raw.1.into(), rhs_raw.2.clone().into(), rhs_raw.3.clone().into(), rhs_raw.4.into()],
+            lhs_raw,
+            rhs_raw,
+            results: core::array::from_fn(|_| [const { None }; 5])
+        }
+    }
+}
+impl LiteralTester {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn perform_test<F>(val: &[(usize, usize, Option<Literal>)], oper: F) 
+        where F: Fn() -> Option<Literal> {
+
+        }
+}
 
 #[test]
 fn test_variable_union_ref() {
@@ -316,20 +366,95 @@ fn test_variable_union_ref() {
     ];
 
     let add_expect = [
-        (lhs[0], rhs[0], Some( (raw.0 + rhs_raw.0).into() ) ),
-        (lhs[0], rhs[1], None),
-        (lhs[0], rhs[2], None),
-        (lhs[0], rhs[3], None),
+        (0, 0, Some( (raw.0 + rhs_raw.0).into() ) ),
+        (0, 1, Some( (Complex::from(raw.0) + rhs_raw.1).into() ) ),
+        (0, 2, None),
+        (0, 3, None),
+        (0, 4, None),
+
+        (1, 0, Some( (raw.1 + Complex::from(rhs_raw.0)).into() ) ),
+        (1, 1, Some( (raw.1 + rhs_raw.1).into() ) ),
+        (1, 2, None),
+        (1, 3, None),
+        (1, 4, None),
+        
+        (2, 0, None),
+        (2, 1, None),
+        (2, 2, Some( (raw.2.clone() + rhs_raw.2.clone()).into() ) ),
+        (2, 3, None),
+        (2, 4, None),
+
+        (3, 0, None),
+        (3, 1, None),
+        (3, 2, None),
+        (3, 3, Some( (raw.3.clone() + rhs_raw.3.clone()).unwrap().into() ) ),
+        (3, 4, None),
+
+        (4, 0, None),
+        (4, 1, None),
+        (4, 2, None),
+        (4, 3, None),
+        (4, 4, None) 
+    ];
+    for (a, b, result) in add_expect {
+        let a_v = lhs[a];
+        let b_v = rhs[b];
+        assert_eq!( (a_v + b_v).ok(), result, "lhs: {a}, rhs: {b}");
+    }
+//Subtraction
+    let sub_expect = [
+        (0, 0, Some( (raw.0 - rhs_raw.0).into() ) ),
+        (0, 1, Some( (Complex::from(raw.0) - rhs_raw.1).into() ) ),
+        (0, 2, None),
+        (0, 3, None),
+        (0, 4, None),
+
+        (1, 0, Some( (raw.1 - Complex::from(rhs_raw.0)).into() ) ),
+        (1, 1, Some( (raw.1 - rhs_raw.1).into() ) ),
+        (1, 2, None),
+        (1, 3, None),
+        (1, 4, None),
+        
+        (2, 0, None),
+        (2, 1, None),
+        (2, 2, Some( (raw.2.clone() - rhs_raw.2.clone()).into() ) ),
+        (2, 3, None),
+        (2, 4, None),
+
+        (3, 0, None),
+        (3, 1, None),
+        (3, 2, None),
+        (3, 3, Some( (raw.3.clone() - rhs_raw.3.clone()).unwrap().into() ) ),
+        (3, 4, None),
+
+        (4, 0, None),
+        (4, 1, None),
+        (4, 2, None),
+        (4, 3, None),
+        (4, 4, None) 
+    ];
+    for (a, b, result) in sub_expect {
+        let a_v = lhs[a];
+        let b_v = rhs[b];
+        assert_eq!( (a_v - b_v).ok(), result, "lhs: {a}, rhs: {b}");
+    }
+
+    //Multiplication
+    let mul_expect = [
+        (lhs[0], rhs[0], Some( (raw.0 * rhs_raw.0).into() ) ), //Sca sca
+        (lhs[0], rhs[1], Some( (Complex::from(raw.0) * rhs_raw.1).into() ) ), //Sca cmp
+        (lhs[0], rhs[2], Some( (rhs_raw.2.clone() * raw.0.as_scalar()).into() ) ), //Sca vec
+        (lhs[0], rhs[3], Some( (rhs_raw.3.clone() * raw.0.as_scalar()).into() ) ), //Sca mat
         (lhs[0], rhs[4], None),
 
-        (lhs[1], rhs[0], None),
-        (lhs[1], rhs[1], Some( (raw.1 + rhs_raw.1).into() ) ),
+        (lhs[1], rhs[0], Some( (rhs_raw.1 * Complex::from(raw.0)).into() ) ), //Cmp sca
+        (lhs[1], rhs[1], Some( (raw.1 * rhs_raw.1).into() ) ), //Cmp cmp
         (lhs[1], rhs[2], None),
         (lhs[1], rhs[3], None),
         (lhs[1], rhs[4], None),
         
-        (lhs[2], rhs[0], None),
-        (lhs[2], rhs[1], Some( (raw.2.clone() + rhs_raw.2.clone()).into() ) ),
+        (lhs[2], rhs[0], Some( (raw.2.clone() * rhs_raw.0.as_scalar()).into() ) ),
+        (lhs[2], rhs[1], None),
         (lhs[2], rhs[2], None),
         (lhs[2], rhs[3], None),
         (lhs[2], rhs[4], None),
@@ -337,7 +462,7 @@ fn test_variable_union_ref() {
         (lhs[3], rhs[0], None),
         (lhs[3], rhs[1], None),
         (lhs[3], rhs[2], None),
-        (lhs[3], rhs[3], Some( (raw.3.clone() + rhs_raw.3.clone()).unwrap().into() ) ),
+        (lhs[3], rhs[3], (raw.3.clone() * rhs_raw.3.clone()).ok().map(|x| x.into()) ), //Mat mat
         (lhs[3], rhs[4], None),
 
         (lhs[4], rhs[0], None),
@@ -346,153 +471,82 @@ fn test_variable_union_ref() {
         (lhs[4], rhs[3], None),
         (lhs[4], rhs[4], None) 
     ];
-    for (a, b, result) in add_expect {
-        assert_eq!( (a + b).ok(), result );
+
+    for (a, b, result) in mul_expect {
+        assert_eq!( (a * b).ok(), result );
     }
-//Subtraction
-        let sub_expect = [
-            (lhs[0], rhs[0], Some( (raw.0 - rhs_raw.0).into() ) ),
-            (lhs[0], rhs[1], None),
-            (lhs[0], rhs[2], None),
-            (lhs[0], rhs[3], None),
-            (lhs[0], rhs[4], None),
 
-            (lhs[1], rhs[0], None),
-            (lhs[1], rhs[1], Some( (raw.1 - rhs_raw.1).into() ) ),
-            (lhs[1], rhs[2], None),
-            (lhs[1], rhs[3], None),
-            (lhs[1], rhs[4], None),
-            
-            (lhs[2], rhs[0], None),
-            (lhs[2], rhs[1], Some( (raw.2.clone() - rhs_raw.2.clone()).into() ) ),
-            (lhs[2], rhs[2], None),
-            (lhs[2], rhs[3], None),
-            (lhs[2], rhs[4], None),
+    //Division
+    let div_expect = [
+        (lhs[0], rhs[0], Some( (raw.0 / rhs_raw.0).into() ) ), //Sca sca
+        (lhs[0], rhs[1], Some( (Complex::from(raw.0) / rhs_raw.1 ).into() ) ), //Sca cmp
+        (lhs[0], rhs[2], Some( (raw.2.clone() / raw.0.as_scalar()).into() ) ), //Sca vec
+        (lhs[0], rhs[3], Some( (raw.3.clone() / raw.0.as_scalar()).into() ) ), //Sca mat
+        (lhs[0], rhs[4], None),
 
-            (lhs[3], rhs[0], None),
-            (lhs[3], rhs[1], None),
-            (lhs[3], rhs[2], None),
-            (lhs[3], rhs[3], Some( (raw.3.clone() - rhs_raw.3.clone()).unwrap().into() ) ),
-            (lhs[3], rhs[4], None),
-
-            (lhs[4], rhs[0], None),
-            (lhs[4], rhs[1], None),
-            (lhs[4], rhs[2], None),
-            (lhs[4], rhs[3], None),
-            (lhs[4], rhs[4], None) 
-        ];
-        for (a, b, result) in sub_expect {
-            assert_eq!( (a - b).ok(), result );
-        }
-
-        //Multiplication
-        let mul_expect = [
-            (lhs[0], rhs[0], Some( (raw.0 * rhs_raw.0).into() ) ), //Sca sca
-            (lhs[0], rhs[1], Some( (Complex::from(raw.0) * rhs_raw.1).into() ) ), //Sca cmp
-            (lhs[0], rhs[2], Some( (rhs_raw.2.clone() * raw.0.as_scalar()).into() ) ), //Sca vec
-            (lhs[0], rhs[3], Some( (rhs_raw.3.clone() * raw.0.as_scalar()).into() ) ), //Sca mat
-            (lhs[0], rhs[4], None),
-
-            (lhs[1], rhs[0], Some( (rhs_raw.1 * Complex::from(raw.0)).into() ) ), //Cmp sca
-            (lhs[1], rhs[1], Some( (raw.1 * rhs_raw.1).into() ) ), //Cmp cmp
-            (lhs[1], rhs[2], None),
-            (lhs[1], rhs[3], None),
-            (lhs[1], rhs[4], None),
-            
-            (lhs[2], rhs[0], None),
-            (lhs[2], rhs[1], None),
-            (lhs[2], rhs[2], None),
-            (lhs[2], rhs[3], None),
-            (lhs[2], rhs[4], None),
-
-            (lhs[3], rhs[0], None),
-            (lhs[3], rhs[1], None),
-            (lhs[3], rhs[2], None),
-            (lhs[3], rhs[3], (raw.3.clone() * rhs_raw.3.clone()).ok().map(|x| x.into()) ), //Mat mat
-            (lhs[3], rhs[4], None),
-
-            (lhs[4], rhs[0], None),
-            (lhs[4], rhs[1], None),
-            (lhs[4], rhs[2], None),
-            (lhs[4], rhs[3], None),
-            (lhs[4], rhs[4], None) 
-        ];
-
-        for (a, b, result) in mul_expect {
-            assert_eq!( (a * b).ok(), result );
-        }
-
-        //Division
-        let div_expect = [
-            (lhs[0], rhs[0], Some( (raw.0 / rhs_raw.0).into() ) ), //Sca sca
-            (lhs[0], rhs[1], Some( (Complex::from(raw.0) / rhs_raw.1 ).into() ) ), //Sca cmp
-            (lhs[0], rhs[2], Some( (raw.2.clone() / raw.0.as_scalar()).into() ) ), //Sca vec
-            (lhs[0], rhs[3], Some( (raw.3.clone() / raw.0.as_scalar()).into() ) ), //Sca mat
-            (lhs[0], rhs[4], None),
-
-            (lhs[1], rhs[0], Some( (raw.1 / Complex::from(rhs_raw.0) ).into() ) ), //Cmp sca
-            (lhs[1], rhs[1], Some( (raw.1 / rhs_raw.1).into() ) ), //Cmp cmp
-            (lhs[1], rhs[2], None),
-            (lhs[1], rhs[3], None),
-            (lhs[1], rhs[4], None),
-            
-            (lhs[2], rhs[0], Some( (raw.2.clone() / raw.0.as_scalar()).into() ) ), //Vec sca
-            (lhs[2], rhs[1], None),
-            (lhs[2], rhs[2], None),
-            (lhs[2], rhs[3], None),
-            (lhs[2], rhs[4], None),
-
-            (lhs[3], rhs[0], Some( (raw.3.clone() / raw.0.as_scalar()).into() ) ), //Mat sca
-            (lhs[3], rhs[1], None),
-            (lhs[3], rhs[2], None),
-            (lhs[3], rhs[3], None),
-            (lhs[3], rhs[4], None),
-
-            (lhs[4], rhs[0], None),
-            (lhs[4], rhs[1], None),
-            (lhs[4], rhs[2], None),
-            (lhs[4], rhs[3], None),
-            (lhs[4], rhs[4], None)
-        ];
+        (lhs[1], rhs[0], Some( (raw.1 / Complex::from(rhs_raw.0) ).into() ) ), //Cmp sca
+        (lhs[1], rhs[1], Some( (raw.1 / rhs_raw.1).into() ) ), //Cmp cmp
+        (lhs[1], rhs[2], None),
+        (lhs[1], rhs[3], None),
+        (lhs[1], rhs[4], None),
         
-        for (a, b, result) in div_expect {
-            assert_eq!( (a / b).ok(), result );
-        }
+        (lhs[2], rhs[0], Some( (raw.2.clone() / raw.0.as_scalar()).into() ) ), //Vec sca
+        (lhs[2], rhs[1], None),
+        (lhs[2], rhs[2], None),
+        (lhs[2], rhs[3], None),
+        (lhs[2], rhs[4], None),
 
-        //Pow
-        let pow_expect = [
-            (lhs[0], rhs[0], Some( (raw.0.pow(rhs_raw.0)).into() ) ), //Sca sca
-            (lhs[0], rhs[1], Some( rhs_raw.1.pow_sca(raw.0).into() ) ), //Sca cmp
-            (lhs[0], rhs[2], None),
-            (lhs[0], rhs[3], None),
-            (lhs[0], rhs[4], None),
+        (lhs[3], rhs[0], Some( (raw.3.clone() / raw.0.as_scalar()).into() ) ), //Mat sca
+        (lhs[3], rhs[1], None),
+        (lhs[3], rhs[2], None),
+        (lhs[3], rhs[3], None),
+        (lhs[3], rhs[4], None),
 
-            (lhs[1], rhs[0], Some( raw.1.pow_sca(rhs_raw.0).into() ) ), //Cmp sca
-            (lhs[1], rhs[1], Some( raw.1.pow(rhs_raw.1).into() ) ), //Cmp cmp
-            (lhs[1], rhs[2], None),
-            (lhs[1], rhs[3], None),
-            (lhs[1], rhs[4], None),
-            
-            (lhs[2], rhs[0], None),
-            (lhs[2], rhs[1], None),
-            (lhs[2], rhs[2], None),
-            (lhs[2], rhs[3], None),
-            (lhs[2], rhs[4], None),
+        (lhs[4], rhs[0], None),
+        (lhs[4], rhs[1], None),
+        (lhs[4], rhs[2], None),
+        (lhs[4], rhs[3], None),
+        (lhs[4], rhs[4], None)
+    ];
+    
+    for (a, b, result) in div_expect {
+        assert_eq!( (a / b).ok(), result );
+    }
 
-            (lhs[3], rhs[0], raw.3.powf(rhs_raw.0.as_scalar()).ok().map(|x| x.into()) ), //Mat sca
-            (lhs[3], rhs[1], None),
-            (lhs[3], rhs[2], None),
-            (lhs[3], rhs[3], None),
-            (lhs[3], rhs[4], None),
+    //Pow
+    let pow_expect = [
+        (lhs[0], rhs[0], Some( (raw.0.pow(rhs_raw.0)).into() ) ), //Sca sca
+        (lhs[0], rhs[1], Some( rhs_raw.1.pow_sca(raw.0).into() ) ), //Sca cmp
+        (lhs[0], rhs[2], None),
+        (lhs[0], rhs[3], None),
+        (lhs[0], rhs[4], None),
 
-            (lhs[4], rhs[0], None),
-            (lhs[4], rhs[1], None),
-            (lhs[4], rhs[2], None),
-            (lhs[4], rhs[3], None),
-            (lhs[4], rhs[4], None)
-        ];
+        (lhs[1], rhs[0], Some( raw.1.pow_sca(rhs_raw.0).into() ) ), //Cmp sca
+        (lhs[1], rhs[1], Some( raw.1.pow(rhs_raw.1).into() ) ), //Cmp cmp
+        (lhs[1], rhs[2], None),
+        (lhs[1], rhs[3], None),
+        (lhs[1], rhs[4], None),
+        
+        (lhs[2], rhs[0], None),
+        (lhs[2], rhs[1], None),
+        (lhs[2], rhs[2], None),
+        (lhs[2], rhs[3], None),
+        (lhs[2], rhs[4], None),
 
-        for (a, b, result) in pow_expect {
-            assert_eq!( a.pow(b).ok(), result );
-        }
+        (lhs[3], rhs[0], raw.3.powf(rhs_raw.0.as_scalar()).ok().map(|x| x.into()) ), //Mat sca
+        (lhs[3], rhs[1], None),
+        (lhs[3], rhs[2], None),
+        (lhs[3], rhs[3], None),
+        (lhs[3], rhs[4], None),
+
+        (lhs[4], rhs[0], None),
+        (lhs[4], rhs[1], None),
+        (lhs[4], rhs[2], None),
+        (lhs[4], rhs[3], None),
+        (lhs[4], rhs[4], None)
+    ];
+
+    for (a, b, result) in pow_expect {
+        assert_eq!( a.pow(b).ok(), result );
+    }
 }
