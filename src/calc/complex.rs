@@ -66,6 +66,12 @@ impl Sub for Complex {
 impl Mul for Complex {
     type Output = Complex;
     fn mul(self, rhs: Self) -> Self::Output {
+        /*
+            (a+bi) * (c + di)
+            (ac + adi + bci + bdi^2)
+            (ac - bd) + (ad + bc)i
+         */
+
         Complex::new(
             self.a * rhs.a - self.b * rhs.b,
             self.a * rhs.b + self.b * rhs.a
@@ -171,6 +177,8 @@ fn complex_test() {
     assert_eq!(a + c, Complex::new(4.0, 0.0));
     assert_eq!(a - c, Complex::new(-2.0, 0.0));
     assert_eq!(a * c, Complex::new(3.0, 0.0));
+    assert_eq!(a * b, b);
+    assert_eq!(b * a, b);
 
     assert_eq!(Complex::new(1.0, 2.5) - Complex::from(Scalar::new(1.0)), Complex::new(0.0, 2.5));
 

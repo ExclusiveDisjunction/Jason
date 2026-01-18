@@ -1,12 +1,31 @@
+//! Includes a series of utilities to store an extraction (minor) of a matrix. 
+//! This provides the [`MatrixRef`] structure, which holds a reference to an owning matrix. 
+//! If required, future versions will include operations on these extractions.
+
+/*
+    Copyright 2025 Hollan Sellars, Dr. Dipali Swain
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 use std::fmt::{Display, Debug, Formatter};
 use std::ops::Index;
 use std::rc::Rc;
-use crate::calc::num::DeterminantComputable;
 
 use super::mat::Matrix;
-use super::base::{matrix_determinant, matrix_eq, print_matrix, MatrixLike, MatrixRowStorage};
+use super::prelude::{matrix_determinant, matrix_eq, print_matrix, MatrixLike, MatrixRowStorage, DeterminantComputable};
 
-/// An iterator over a specific `MatrixRef`, used to extract row information.
+/// An iterator over a specific [`MatrixRef`], used to extract row information.
 /// Once `Self::next` returns `None`, it will never return `Some(_)` again.
 #[derive(Debug, Clone)]
 pub struct MatrixRefIter<'a, T> where T: 'a {
@@ -23,11 +42,13 @@ impl<'a, T> Iterator for MatrixRefIter<'a, T> where T: 'a {
     }
 }
 
-/// A specific row of a `MatrixRef` extraction.
+/// A specific row of a [`MatrixRef`] extraction.
 /// This provides an abstraction over the extaction.
 #[derive(Debug, PartialEq, Eq)]
 pub struct MatrixRefRow<'a, T> {
+    /// The target full row used.
     over: &'a [T],
+    /// The shared columns used by the overall extraction.
     cols: Rc<Vec<usize>>
 }
 impl<T> Clone for MatrixRefRow<'_, T> {
@@ -77,7 +98,9 @@ impl<'a, T> MatrixRefRow<'a, T> {
 /// ```
 #[derive(Clone, Debug)]
 pub struct MatrixRef<'a, T> where T: 'a {
+    /// The rows included in this extraction
     rows: Vec<MatrixRefRow<'a, T>>,
+    /// A shared access to the columns of the extraction 
     cols: Rc<Vec<usize>>
 }
 impl<'a, T> Index<usize> for MatrixRef<'a, T> where T: 'a {
@@ -91,7 +114,7 @@ impl<T> PartialEq for MatrixRef<'_, T> where T: PartialEq {
         matrix_eq(self, other)
     }
 }
-impl<T> Eq for MatrixRef<'_, T> where T: PartialEq + Eq { }
+impl<T> Eq for MatrixRef<'_, T> where T: Eq { }
 impl<T> Display for MatrixRef<'_, T> where T: Display {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         print_matrix(f, self)
@@ -107,7 +130,7 @@ impl<'a, T> MatrixLike<'a> for MatrixRef<'a, T> where T: 'a {
         let mut new_rows: Vec<MatrixRefRow<'a, T>> = rows.into_iter().filter_map( |x| self.rows.get(x)).cloned().collect();
         let cols: Vec<usize> = cols.into_iter().collect();
 
-        let rc = Rc::new(cols.clone());
+        let rc = Rc::new(cols);
         for row  in &mut new_rows {
             row.cols = Rc::clone(&rc)
         };
@@ -134,6 +157,7 @@ impl<'a, T> MatrixLike<'a> for MatrixRef<'a, T> where T: 'a {
     }
 }
 impl<'a, T> MatrixRef<'a, T> where T: 'a {
+    /// Constructs a new extraction assuming that the rows and columns are within range for the matrix.
     pub(super) fn new<T1, T2>(target: &'a Matrix<T>, rows: T1, cols: T2) -> Self where T1: IntoIterator<Item=usize>, T2: IntoIterator<Item=usize> {
         let mapped_rows = rows.into_iter().filter_map(|x| target.get_row(x));
         let cols = Rc::new(cols.into_iter().collect());
@@ -150,4 +174,31 @@ impl<'a, T> MatrixRef<'a, T> where T: 'a {
             cols
         }
     }
+}
+
+impl<'a, 'b, T> IntoIterator for &'b MatrixRef<'a, T> where 'b: 'a {
+    type IntoIter = std::slice::Iter<'a, MatrixRefRow<'a, T>>;
+    type Item = &'a MatrixRefRow<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[test]
+fn extraction_tester() {
+    let mat: Matrix<i8> = Matrix::identity(3);
+    let extr = mat.as_extraction();
+    assert_eq!(extr[0][0], mat[0][0]);
+    assert_eq!(extr, mat);
+
+    let sub_extr = extr.extract(0..1, 0..1);
+    assert_eq!(sub_extr, mat.extract(0..1, 0..1));
+
+    let sub_mat: Matrix<_> = sub_extr.clone().into();
+    assert_eq!(sub_mat, sub_extr);
+    assert_ne!(sub_extr, extr);
+
+    let det = extr.determinant();
+    assert_eq!(det, Some(1));
 }

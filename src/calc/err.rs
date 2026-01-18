@@ -1,8 +1,7 @@
 use std::fmt::{Display, Debug, Formatter};
 use std::error::Error as StdError;
 
-use crate::calc::matrix::mat::MatrixPowError;
-use crate::calc::matrix::MatrixDimension;
+use crate::calc::matrix::{MatrixPowError, MatrixDimension};
 use crate::prelude::FlatType;
 use super::prelude::DimensionKind;
 

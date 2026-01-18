@@ -1,15 +1,38 @@
+//! The `mat` module provides the [`Matrix`] struct, a utility for storing a 2d grid. 
+//! The structure provides many functionalities, such as serde `Serialize` and `Deserialize`, as well as many mathematical operations.
+//! To see the list of provided operators, see the [`super::ops`] module.
+//! 
+//! Note on deserialization: The matrix will check the internal buffer to ensure it is in proper format. 
+//! Deserialization will fail if the check does not pass. 
+
+/*
+    Copyright 2025 Hollan Sellars, Dr. Dipali Swain
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Serialize, Deserialize};
 
 use std::fmt::{Display, Debug, Formatter};
-use std::ops::{Add, Deref, DerefMut, Div, Index, IndexMut, Mul, Neg};
+use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul};
 use std::marker::PhantomData;
+use std::str::FromStr;
 
-use crate::calc::err::{DimensionError, OutOfRangeError};
-use crate::calc::num::{DeterminantComputable, Incrementable, NullIdentity, UnitIdentity};
-//use crate::calc::{CalcError, OperationError, VariableData, VariableType};
-use super::base::{matrix_determinant, matrix_eq, print_matrix, MatrixLike, MatrixRowStorage};
+use super::prelude::{matrix_determinant, print_matrix, MatrixLike, MatrixRowStorage, DeterminantComputable};
+use super::super::num::{NullIdentity, UnitIdentity};
 use super::extract::MatrixRef;
+use super::err::{OutOfRangeError, MatrixConversionError, MatrixParseError};
 
 /// Constructs and stores a 2d grid of numbers, with a specified number of rows and columns.
 /// This handles the creation, maintenance, access, and memory for storing the values.
@@ -17,7 +40,7 @@ use super::extract::MatrixRef;
 /// Although not explicity required, almost all operations require that `T` is `Clone`. 
 /// For arethmatic operations, it is assumed that `T.clone()` is inexpensive, and having complex cloning can slow down this structure.
 /// Each use of `Clone` is described.
-#[derive(Serialize, Debug)] //Note that deserialize also does a check to verify that the data is grid like, so it should be kept.
+#[derive(Serialize, Debug, PartialEq, Hash, Eq)] //Note that deserialize also does a check to verify that the data is grid like, so it should be kept.
 pub struct Matrix<T> {
     data: Vec<Vec<T>>
 }
@@ -29,28 +52,9 @@ impl<T> Default for Matrix<T> {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct MatrixConversionError {
-    pub expected: usize,
-    pub found: usize
-}
-impl Display for MatrixConversionError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unable to construct a matrix out of the list provided. all rows were expected to be {} item(s) long, but one row was {} item(s) long", self.expected, self.found)
-    }
-}
-impl std::error::Error for MatrixConversionError { }
-impl MatrixConversionError {
-    pub fn new(expected: usize, found: usize) -> Self {
-        Self {
-            expected,
-            found
-        }
-    }
-}
-
 impl<T> TryFrom<Vec<Vec<T>>> for Matrix<T> {
     type Error = MatrixConversionError;
+    /// Performs the conversion from `Vec<Vec<T>>` to [`Matrix`]. If the input data is invalid, it will return [`MatrixConversionError`].
     fn try_from(value: Vec<Vec<T>>) -> Result<Self, Self::Error> {
         if value.is_empty() {
             Ok( Self::default() )
@@ -69,6 +73,88 @@ impl<T> TryFrom<Vec<Vec<T>>> for Matrix<T> {
                 }
             )
         }
+    }
+}
+impl<T> FromStr for Matrix<T> where T: FromStr {
+    type Err = MatrixParseError<<T as FromStr>::Err>;
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        /*
+            The table is in the form
+            [[...], [...], ...]
+
+            So we do not know the order or the elements count for each row. We must assume this each time.
+        */
+        let mut raw_table = raw.trim();
+        if !raw_table.starts_with('[') || !raw_table.ends_with(']') {
+            return Err( MatrixParseError::NonOpenedMatrix );
+        }
+
+        raw_table = &raw_table[1..(raw_table.len() - 1)]; //Remove the [ ] surrounding the data.
+        if raw_table.is_empty() {
+            return Err( MatrixParseError::EmptyMatrix );
+        }
+
+        let mut table: Vec<Vec<T>> = vec![];
+        let mut current: Vec<T> = vec![];
+        let mut in_a_set: bool = false;
+        let mut current_value = String::new();
+
+        for char in raw_table.chars() {
+            match char {
+                '[' => {
+                    if in_a_set {
+                        return Err( MatrixParseError::OpeningSetInSet );
+                    }
+                    if !current.is_empty() {
+                        return Err( MatrixParseError::ClosingSetWithoutOpeningSet );
+                    }
+
+                    in_a_set = true;
+                }
+                ',' => {
+                    if in_a_set {
+                        let parsed: T = current_value.parse()
+                                .map_err(MatrixParseError::Inner)?;
+
+                        current_value.clear();
+                        current.push(parsed);
+                    }
+                    else {
+                        let mut new_current = vec![];
+                        std::mem::swap(&mut new_current, &mut current);
+                        table.push(new_current);
+                    }
+                }
+                ']' => {
+                    if !in_a_set {
+                        return Err( MatrixParseError::ClosingSetWithoutOpeningSet );
+                    }
+
+                    if !current_value.is_empty() {
+                        let parsed: T = current_value.parse()
+                                .map_err(MatrixParseError::Inner)?;
+
+                        current_value.clear();
+                        current.push(parsed);
+                    }
+
+                    in_a_set = false;
+                },
+                x if x.is_whitespace() => continue,
+                x=> {
+                    if !in_a_set {
+                        return Err( MatrixParseError::ValueOutsideOfRow );
+                    }
+
+                    current_value.push(x)
+                },
+            }
+        }
+
+        table.push(current);
+        
+        Self::try_from(table)
+            .map_err(MatrixParseError::Conv)
     }
 }
 impl<T> From<MatrixRef<'_, T>> for Matrix<T> where T: Clone {
@@ -107,11 +193,6 @@ impl<T> Clone for Matrix<T> where T: Clone {
         }
     }
 }
-impl<T> PartialEq for Matrix<T> where T: PartialEq {
-    fn eq(&self, other: &Self) -> bool {
-       matrix_eq(self, other)
-    }
-} 
 
 impl<'a, T> MatrixLike<'a> for Matrix<T> where T: 'a {
     type Storage = T;
@@ -217,11 +298,27 @@ impl<'de, T> Deserialize<'de> for Matrix<T> where T: Deserialize<'de> {
     }
 }
 
-impl<T> IntoIterator for Matrix<T> {
-    type IntoIter = std::vec::IntoIter<Vec<T>>;
-    type Item = Vec<T>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
+/// A data type that abstracts the iteration over a Matrix's rows. 
+pub struct MatrixIter<'a, T> where T: 'a {
+    iter: std::slice::Iter<'a, Vec<T>>
+}
+impl<'a, T> Iterator for MatrixIter<'a, T> where T: 'a {
+    type Item = &'a [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|x| x.deref())
+    }
+}
+
+/// A data type that abstracts the iteration over a Matrix's rows, providing mutable access.
+pub struct MatrixIterMut<'a, T> where T: 'a {
+    iter: std::slice::IterMut<'a, Vec<T>>
+}
+impl<'a, T> Iterator for MatrixIterMut<'a, T> where T: 'a {
+    type Item = &'a mut [T];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|x| x.deref_mut())
     }
 }
 
@@ -331,52 +428,6 @@ impl<T> Matrix<T> where T: Clone {
 
         result
     }
-    /// Combines two same-row matricies (but not same column) together into one matrix. The resultant matrix will have:
-    /// 1) the same rows as both `self` and `rhs`.
-    /// 2) The sum of `self.cols() + rhs.cols()` for its cols.
-    /// ```
-    /// let lhs = Matrix::try_from(vec![vec![1, 2], vec![3, 4]]).unwrap();
-    /// let rhs = Matrix::try_from(vec![vec![5], vec![6]]).unwrap();
-    /// 
-    /// let aug = lhs.agument(&rhs).unwrap();
-    /// assert_eq!(aug, Matrix::try_from(vec![vec![1, 2, 5], vec![3, 4, 6]]).unwrap());
-    /// assert_eq!(aug.rows(), lhs.rows());
-    /// assert_eq!(aug.cols(), lhs.cols() + rhs.cols());
-    /// ```
-    /// This will fail if and only if:
-    /// 1) `self` or `rhs` is empty
-    /// 2) `self.rows() != rhs.rows()`
-    /// 
-    /// Since the elements are stored behind a reference, the elements of both `self` and `rhs` are cloned into the new matrix. 
-    /// If cloning is not cheap, do not use this function.
-    pub fn augment(&self, rhs: &Self) -> Result<Self, DimensionError<usize>> {
-        let lhs = self;
-        if lhs.rows() != rhs.rows() || lhs.is_empty() || rhs.is_empty() {
-            return Err(DimensionError::new(lhs.rows(), rhs.rows()))
-        }
-
-        let one_rows = lhs.rows();
-        let one_cols = lhs.cols();
-        let two_cols = rhs.cols();
-
-        let mut result = Self::allocate(one_rows, one_cols + two_cols, lhs[0][0].clone());
-        assert!(!result.is_empty());
-
-        for i in 0..one_rows {
-            let mut j: usize = 0;
-            for sources_col in &lhs[i] {
-                result[i][j] = sources_col.clone();
-                j += 1;
-            }
-
-            for sources_col in &rhs[i] {
-                result[i][j] = sources_col.clone();
-                j += 1;
-            }
-        }
-        
-        Ok(result)
-    }
 }
 
 impl<T> Matrix<T> where T: Add<Output=T> + Clone {
@@ -420,286 +471,27 @@ impl<T> Matrix<T> where T: UnitIdentity + NullIdentity + Clone {
     }
 }
 
-impl<T> Matrix<T> where T: Clone + PartialEq + UnitIdentity + NullIdentity + Neg<Output = T> + Add<Output=T> + Mul<Output=T> + Div<Output=T> {
-    /// Puts the matrix into reduced row echelon form. This should not return Err. If it does, please report this issue.
-    pub fn row_echelon_form(&mut self) -> Result<(), OutOfRangeError<usize>> {
-        if self.is_empty() {
-            return Ok(());
-        }
-
-        let rows = self.rows();
-        let cols = self.cols();
-
-        for i in 0..rows {
-            let mut pivot_col = None;
-            for col in 0..cols {
-                if self.data[i][col] != T::null_id() {
-                    pivot_col = Some(col);
-                    break;
-                }
-            }
-
-            if let Some(p) = pivot_col {
-                if self.data[i][p] != T::unit_id() {
-                    let fac = self.data[i][p].clone(); //We need to reduce the pivot to one.
-                    for k in 0..cols {
-                        let result = self.data[i][k].clone() / fac.clone();
-                        self.data[i][k] = result;
-                    }
-                }
-
-                for below_row in (i+1)..rows { //Every row under our row needs to have the 'p' value eliminated.
-                    let fac = -self.data[below_row][p].clone();
-                    if fac == T::null_id() || fac == -T::null_id(){
-                        continue;
-                    }
-
-                    self.row_fac_add(p, fac, below_row)?;
-                }
-            }
-        }
-
-        let mut rows: usize = rows;
-
-        let mut i: usize = 0;
-        loop {
-            if i >= rows || i >= cols {
-                break;
-            }
-
-            let mut pivot = None;
-            for j in 0..cols {
-                if self.data[i][j] != T::null_id() {
-                    pivot = Some(j);
-                    break;
-                }
-            }
-
-            let switch_with_last: bool;
-
-            if let Some(p) = pivot {
-                if p < rows && p > i {
-                    self.row_swap(p, i)?;
-                    i += 1;
-                    switch_with_last = false;
-                }
-                else if p >= rows && p < cols {
-                    switch_with_last = true;
-                }
-                else {
-                    switch_with_last = false;
-                    i += 1;
-                }
-                
-            }
-            else {
-                switch_with_last = true;
-            }
-
-            if switch_with_last {
-                let with = rows - 1;
-                if with != i && with < rows {
-                    self.row_swap(with, i)?;
-                    rows -= 1; //This shrinks the rows, so that we dont double count that row.
-                }
-                else {
-                    i += 1; //We increment when we dont swap with a zero row. 
-                }
-            }
-        }
-
-        Ok(())
-    }
-    /// Puts the matrix into reduced row echelon form. This should not return an error, and if it does, please report it.
-    pub fn reduced_row_echelon_form(&mut self) -> Result<(), OutOfRangeError<usize>>{
-        if self.is_empty() {
-            return Ok(());
-        }
-
-        self.row_echelon_form()?;
-
-        /*
-
-            The row echelon form provides the following functionalities:
-                1. All pivots are one.
-                2. All values under a pivot are zero.
-                3. All zeroes rows are at the bottom.
-                4. All pivots are in decending order. 
-
-            Therefore, to convert this into reduced row echelon form:
-                1. All values above a pivot must be zero.
-         */
-
-        let rows = self.rows();
-        let cols = self.cols();
-
-        for i in 0..rows {
-            //Pivot is a column position
-            let mut pivot = None;
-            for j in 0..cols {
-                if self.data[i][j] != T::null_id() {
-                    pivot = Some(j);
-                    break;
-                }
-            }
-
-            if let Some(p) = pivot {
-                //We need to go above this pivot
-                for row in 0..p {
-                    let fac = -self.data[row][p].clone();
-                    self.row_fac_add(i, fac, row)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Using the reduced row echelon form, computes the inverse of this matrix. 
-    /// If the current matrix is `A`, then this finds `A^-1`, such that `A * A^-1 == A^-1 * A == I_n`, where `n` is the dimension of the matrix.
-    /// This will return `None` if:
-    /// 1. The matrix is not square
-    /// 2. The determinant is zero
-    /// 
-    /// Note that this does not compute the determinant. It uses the reduced row echelon form for computation.
-    /// To compute this value, the augment of `self` and `I_n` must be created. This will clone all elements of the current matrix,
-    /// and will clone `T::null_id()`, `T::unit_id()` `n x n` times.
-    pub fn inverse(&self) -> Option<Self> where T: PartialEq {
-        if !self.is_square() { return None; }
-        if self.is_empty() { return Some(Self::default()); }
-
-        let identity = Self::identity(self.rows());
-        let mut augmented = match Self::augment(&identity, self) {
-            Ok(m) => m,
-            Err(_) => return None
-        };
-
-        augmented.reduced_row_echelon_form().ok()?;
-
-        let cols_index = 0..self.rows();
-        let left_index = 0..self.rows();
-        let right_index = self.rows()..(2 * self.rows());
-
-        let left = augmented.extract(left_index, cols_index.clone());
-        let right = augmented.extract(right_index, cols_index);
-
-        if !matrix_eq(&right, &identity) {
-            None
-        }
-        else {
-            Some( left.into() )
-        }
+impl<T> IntoIterator for Matrix<T> {
+    type IntoIter = std::vec::IntoIter<Vec<T>>;
+    type Item = Vec<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct NonSquareError;
-impl Display for NonSquareError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("the matrix is not square")
-    }
-}
-impl std::error::Error for NonSquareError { }
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum MatrixPowError {
-    NonSquare,
-    NonInvertable
-}
-impl Display for MatrixPowError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(
-            match self {
-                Self::NonInvertable => "the matrix is non-invertable, but the power provided is negative",
-                Self::NonSquare => "the matrix is not square"
-            }
-        )
-    }
-}
-impl std::error::Error for MatrixPowError { }
-
-impl<T> Matrix<T> where T: Clone + NullIdentity + UnitIdentity + Add<Output=T> + Mul<Output=T> {
-    /// Applies the pow operation on the specified matrix until a counter (starting at `P::default()`) reaches `amount`.
-    fn pow_base<P>(mut on: Matrix<T>, amount: P) -> Result<Self, NonSquareError> where P : Default + Incrementable + PartialOrd {
-        if !on.is_square() {
-            return Err(NonSquareError)
-        }
-        if on.is_empty() {
-            return Ok(on)
-        }
-
-        let mut countdown = P::default();
-
-        if amount == countdown {
-            return Ok( Self::identity(on.rows() ) )
-        }
-
-        countdown.increment(); //If we want to raise to the 2nd power, we apply this loop once. 
-        //So, for any given `amount`, we run this `amount - 1` times.
-        while countdown < amount {
-            on = (&on * &on).unwrap(); //Since matrix multiplcation can only fail IF the matrix is not of the right dimensions, but square matricies can always be multiplied... this is redundant. 
-            countdown.increment();
-        }
-
-        Ok( on )
-    }
-
-    /// Computes the result of multiplying `self` `amount` times.
-    pub fn powi<P>(&self, amount: P) -> Result<Self, NonSquareError> where P : Default + Incrementable + PartialOrd {
-        Self::pow_base(self.clone(), amount)
-    }
-
-    /// Computes the result of multiplying `self` `amount` times, considering if `amount == P::default()`, `amount == P::unit_id()` or if `amount < P::default()`.
-    /// If `amount < P::default()`, then the inverse of the matrix will be computed instead, and the operation placed on it. 
-    /// Due to this, the value of `T` must support inverse operations. Please see `Matrix<T>::inverse()` for more info.
-    pub fn powf<P>(&self, mut amount: P) -> Result<Self, MatrixPowError> 
-    where P : Default + Incrementable + PartialOrd + UnitIdentity + Neg<Output=P> + Debug,
-    T: Div<Output=T> + Neg<Output=T> + PartialEq {
-        if !self.is_square() {
-            return Err(MatrixPowError::NonSquare)
-        }
-
-        let acting: Self;
-
-        if amount == P::default() {
-            return Ok( Matrix::identity(self.rows()) );
-        }
-        else if amount == P::unit_id() {
-            return Ok( self.clone() );
-        }
-        else if amount < P::default() {
-            amount = amount.neg();
-            acting = self.inverse().ok_or(MatrixPowError::NonInvertable)?;
-        }
-        else {
-            acting = self.clone();
-        }
-
-        Ok( Self::pow_base(acting, amount).unwrap() ) //Since pow_base will return NonSquareError, and we already checked if our matrix is square, this will never fail.
-    }
-}
-
-/// A data type that abstracts the iteration over a Matrix's rows. 
-pub struct MatrixIter<'a, T> where T: 'a {
-    iter: std::slice::Iter<'a, Vec<T>>
-}
-impl<'a, T> Iterator for MatrixIter<'a, T> where T: 'a {
+impl<'a, T> IntoIterator for &'a Matrix<T> {
+    type IntoIter = MatrixIter<'a, T>;
     type Item = &'a [T];
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| x.deref())
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
-
-/// A data type that abstracts the iteration over a Matrix's rows, providing mutable access.
-pub struct MatrixIterMut<'a, T> where T: 'a {
-    iter: std::slice::IterMut<'a, Vec<T>>
-}
-impl<'a, T> Iterator for MatrixIterMut<'a, T> where T: 'a {
+impl<'a, T> IntoIterator for &'a mut Matrix<T> {
+    type IntoIter = MatrixIterMut<'a, T>;
     type Item = &'a mut [T];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| x.deref_mut())
+    
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -712,4 +504,69 @@ fn matrix_serde_test() {
     let der: Result<Matrix<i32>, _>  = from_str(&ser);
 
     assert_eq!(der.ok(), Some( mat ));
+}
+#[test]
+fn matrix_tester() {
+    let a = Matrix::try_from(vec![vec![1.0, 3.0, 6.0], vec![-1.0, 4.0, 1.0], vec![6.0, 2.0, 4.0]]).unwrap();
+    let b = Matrix::try_from(vec![vec![0.0, 4.0, 6.0], vec![-1.0, -2.0, -1.0], vec![1.0, -3.0, 6.0]]).unwrap();
+    let c = Matrix::identity(2);
+    let d = Matrix::try_from(vec![vec![1.0, 3.0], vec![-4.0, 1.0], vec![7.0, 6.0]]).unwrap();
+    let e = Matrix::try_from(vec![vec![4.0, 1.0, 9.0], vec![7.0, -2.0, 1.0]]).unwrap();
+    let f = Matrix::try_from(vec![vec![2.0, 6.0], vec![1.0, 4.0]]).unwrap();
+    let s = 4.0;
+
+    assert!(a.is_square() && !a.is_empty());
+    assert!(Matrix::<u8>::default().is_empty());
+
+    match (a.clone() + b, Matrix::try_from(vec![vec![1.0, 7.0, 12.0], vec![-2.0, 2.0, 0.0], vec![7.0, -1.0, 10.0]])) {
+        (Ok(m1), Ok(m2)) => assert_eq!(m1, m2),
+        (a, b) => panic!("Expected (ok, ok), got ({:?}, {:?})", a, b)
+    }
+
+    assert_eq!(d * e, Ok( Matrix::try_from(vec![vec![25.0, -5.0, 12.0], vec![-9.0, -6.0, -35.0], vec![70.0, -5.0, 69.0]]).unwrap() ));
+    assert_eq!(c.clone() * f.clone(), Ok(f));
+    assert_eq!(c * s, Matrix::try_from(vec![vec![4.0, 0.0], vec![0.0, 4.0]]).unwrap());
+}
+
+#[test]
+fn text_matrix_parse() {
+    let cases = [
+        ("[]", None),
+        ("", None),
+        ("[[][]]", Some(Matrix::try_from(vec![vec![]]).unwrap())),
+        ("[[],[]]", Some(Matrix::try_from(vec![vec![], vec![]]).unwrap())),
+        ("[[1, 1], [2, 2]]", Some(Matrix::try_from(vec![vec![1, 1], vec![2, 2]]).unwrap())),
+        ("[[1, 1], [], [2, 2]]", None),
+        ("[[a, b]]", None)
+    ];
+
+    for (raw, result) in cases {
+        let parsed = Matrix::from_str(raw).ok();
+
+        assert_eq!(parsed, result, "Raw: {raw}");
+    }
+}
+
+#[test]
+fn rref_tester() {
+    let mut l = Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![-2.0, 1.0, 0.0], vec![0.0, -3.0, -6.0]]).unwrap();
+    l.row_echelon_form();
+    let as_ref = Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 1.0, 2.0], vec![0.0, 0.0, 0.0]]).unwrap();
+    assert_eq!(l, as_ref);
+
+    let mut m = Matrix::try_from(vec![vec![1.0, 4.0, 9.0], vec![0.0, 0.0, 0.0], vec![0.0, 1.0, 2.0]]).unwrap();
+    m.row_echelon_form();
+    assert_eq!(m, as_ref);
+
+    let mut r = Matrix::try_from(vec![vec![0.0, 0.0, 0.0], vec![4.0, 8.0, 16.0], vec![0.0, 0.0, 0.0]]).unwrap();
+    r.row_echelon_form();
+    assert_eq!(r, Matrix::try_from(vec![vec![1.0, 2.0, 4.0], vec![0.0, 0.0, 0.0], vec![0.0, 0.0, 0.0]]).unwrap());
+
+    let mut t = Matrix::try_from(vec![vec![1.0, 0.0, 0.0, 0.0, 0.0], vec![0.0, 0.0, 0.0, 0.0, 1.0], vec![0.0, 1.0, 0.0, 0.0, 0.0]]).unwrap();
+    t.row_echelon_form();
+    assert_eq!(t, Matrix::try_from(vec![vec![1.0, 0.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0, 0.0], vec![0.0, 0.0, 0.0, 0.0, 1.0]]).unwrap());
+
+    l.reduced_row_echelon_form();
+    let rref = Matrix::try_from(vec![vec![1.0, 0.0, 1.0], vec![0.0, 1.0, 2.0], vec![0.0, 0.0, 0.0]]).unwrap();
+    assert_eq!(l, rref);
 }

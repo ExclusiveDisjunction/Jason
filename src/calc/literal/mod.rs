@@ -1,4 +1,7 @@
 pub mod core;
+pub mod numeric;
+pub mod composite;
+pub mod sequence;
 pub mod lit;
 pub mod lit_ref;
 // pub mod union_mut;
