@@ -168,6 +168,18 @@ impl<T> From<MatrixRef<'_, T>> for Matrix<T> where T: Clone {
         }
     }
 }
+impl<T> Matrix<T> {
+    pub fn transform<V>(self) -> Matrix<V> where V: From<T> {
+        Matrix {
+            data: self.data.into_iter()
+                .map(|x| x.into_iter()
+                    .map(V::from)
+                    .collect()
+                )
+                .collect()
+        }
+    }
+}
 
 impl<T> Index<usize> for Matrix<T> {
     type Output = [T];

@@ -124,7 +124,7 @@ impl<T1, T2> Sub<Matrix<T2>> for Matrix<T1> where T1: Sub<T2> {
         Ok( Matrix::direct(result_data) )
     }
 }
-impl<T> Mul for Matrix<T> where T:  Clone + NullIdentity + Add<Output=T> + Mul<Output=T> {
+impl<T> Mul for Matrix<T> where T: Clone + NullIdentity + Add<Output=T> + Mul<Output=T> {
     type Output = Result<Self, DimensionError<usize>>;
     fn mul(self, rhs: Self) -> Result<Self, DimensionError<usize>> {
         (&self).mul(&rhs)

@@ -1,6 +1,5 @@
 use crate::calc::num::{NullIdentity, UnitIdentity};
 
-use super::scalar::{Scalar, ScalarLike};
 use std::ops::{Add, Sub, Mul, Div, Neg};
 use std::fmt::{Display, Debug, Formatter};
 use serde::{Deserialize, Serialize};
@@ -33,14 +32,19 @@ impl Display for Complex {
     The approach includes converting scalars to complex numbers, saving the number of operators.
  */
 
-impl<T> From<T> for Complex where T: ScalarLike{
-    fn from(value: T) -> Self {
-        Self { a: value.as_scalar(), b: 0.0 }
+impl From<f64> for Complex where {
+    fn from(value: f64) -> Self {
+        Self { a: value, b: 0.0 }
     }
 }
-impl<T, U> From<(T, U)> for Complex where T: ScalarLike, U: ScalarLike {
-    fn from(value: (T, U)) -> Self {
-        Self { a: value.0.as_scalar(), b: value.1.as_scalar() }
+impl From<f32> for Complex where {
+    fn from(value: f32) -> Self {
+        Self { a: value as f64, b: 0.0 }
+    }
+}
+impl From<i64> for Complex {
+    fn from(value: i64) -> Self {
+        Self { a: value as f64, b: 0.0 }
     }
 }
 
@@ -88,7 +92,7 @@ impl Div for Complex {
          */
 
         let starting = self * rhs.conjugate();
-        let fac = rhs.mul_conjugate().as_scalar();
+        let fac = rhs.mul_conjugate();
 
         Complex { a: starting.a / fac, b: starting.b / fac }
     }
@@ -116,8 +120,8 @@ impl Complex {
     pub fn conjugate(self) -> Complex {
         Complex::new(self.a, -self.b)
     }
-    pub fn mul_conjugate(self) -> Scalar {
-        Scalar::new(self.a.powi(2) + self.b.powi(2))
+    pub fn mul_conjugate(self) -> f64 {
+        self.a.powi(2) + self.b.powi(2)
     }
     pub fn argument(&self) -> f64 {
         self.b.atan2(self.a)
@@ -133,8 +137,8 @@ impl Complex {
         }
     }
 
-    pub fn pow_sca<T>(self, b: T) -> Self where T: ScalarLike {
-        let b = b.as_scalar();
+    pub fn pow_sca<T>(self, b: T) -> Self where T: Into<f64> {
+        let b = b.into();
         let r = self.magnitude().powf(b);
         let theta = self.argument() * b;
         
@@ -165,11 +169,9 @@ impl Complex {
 
 #[test]
 fn complex_test() {
-    use super::scalar::Scalar;
-
     let a = Complex::new(1.0, 0.0);
     let b = Complex::new(3.0, 1.4);
-    let c: Complex = Scalar::new(3.0).into();
+    let c: Complex = 3.0.into();
     //let d = Complex::new_with(2.4, 3.1);
 
     assert_eq!(a + b, Complex::new(4.0, 1.4));
@@ -180,7 +182,7 @@ fn complex_test() {
     assert_eq!(a * b, b);
     assert_eq!(b * a, b);
 
-    assert_eq!(Complex::new(1.0, 2.5) - Complex::from(Scalar::new(1.0)), Complex::new(0.0, 2.5));
+    assert_eq!(Complex::new(1.0, 2.5) - Complex::from(1.0), Complex::new(0.0, 2.5));
 
     //These two are technically correct, but due to floating point errors these may fail.
     //assert_eq!(d.clone() / b.clone(), Complex::new_with(577.0/548.0, 297.0/548.0));

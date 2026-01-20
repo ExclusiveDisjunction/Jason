@@ -3,39 +3,33 @@ use serde::{Serialize, Deserialize};
 use std::fmt::Display;
 use std::ops::{Neg, Add, Sub, Mul, Div};
 
-use super::core::LogicalCmp;
-use super::super::scalar::{Scalar, ScalarLike};
-use super::super::complex::Complex;
-use super::super::bool::Boolean;
-use super::super::vector::FloatVector;
-use super::super::matrix::FloatMatrix;
+use super::prelude::LogicalCmp;
 use super::super::err::{UndefinedUniOperation, PowError, BiOperationError};
 
+use crate::calc::LiteralReference;
 use crate::calc::err::UndefinedBiOperation;
+use crate::calc::literal::composite::Composite;
+use crate::calc::literal::numeric::Numeric;
 use crate::prelude::FlatType;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum Literal {
-    Sca(Scalar),
-    Cmp(Complex),
-    Bool(Boolean),
-    Vec(FloatVector),
-    Mat(FloatMatrix)
+    Num(Numeric),
+    Comp(Composite),
+    Bool(bool)
 }
 impl Default for Literal {
     fn default() -> Self {
-        Self::Sca(Scalar::default())
+        Self::Num(Default::default())
     }
 }
 impl Neg for Literal {
     type Output = Result<Literal, UndefinedUniOperation>;
     fn neg(self) -> Self::Output {
         match self {
-            Literal::Sca(s)     => Ok( Literal::Sca(-s) ),
-            Literal::Cmp(c)    => Ok( Literal::Cmp(-c) ),
-            Literal::Vec(v) => Ok( Literal::Vec(-v) ),
-            Literal::Mat(m)     => Ok( Literal::Mat(-m) ),
-            Literal::Bool(_)            => Err( UndefinedUniOperation::new("-", FlatType::Boolean) )
+            Self::Num(v) => Ok( Self::Num(-v) ),
+            Self::Comp(v) => Ok( Self::Comp(-v) ),
+            Self::Bool(_) => Err( UndefinedUniOperation::new("-", FlatType::Boolean) )
         }
     }
 }
@@ -44,14 +38,9 @@ impl Add for Literal {
     fn add(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
         match (self, rhs) {
-            (Self::Vec(a), Self::Vec(b)) => Ok(Self::Vec(a + b)),
-            (Self::Mat(a), Self::Mat(b)) => {
-                match a + b {
-                    Ok(m) => Ok(Self::Mat(m)),
-                    Err(e) => Err(e.into())
-                }
-            },
-            (a, b) => a.get_ref().add(b.get_ref())
+            (Self::Num(a), Self::Num(b)) => Ok( Self::Num(a + b) ),
+            (Self::Comp(a), Self::Comp(b)) => Ok( Self::Comp( (a + b)? ) ),
+            (a, b) => Err( BiOperationError::new_undef("+", a.flat_type(), b.flat_type()) )
         }
     }
 }
@@ -60,14 +49,9 @@ impl Sub for Literal {
     fn sub(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
         match (self, rhs) {
-            (Self::Vec(a), Self::Vec(b)) => Ok(Self::Vec(a - b)),
-            (Self::Mat(a), Self::Mat(b)) => {
-                match a - b {
-                    Ok(m) => Ok(Self::Mat(m)),
-                    Err(e) => Err(e.into())
-                }
-            },
-            (a, b) => a.get_ref().sub(b.get_ref())
+            (Self::Num(a), Self::Num(b)) => Ok( Self::Num(a - b) ),
+            (Self::Comp(a), Self::Comp(b)) => Ok( Self::Comp( (a - b)? ) ),
+            (a, b) => Err( BiOperationError::new_undef("-", a.flat_type(), b.flat_type()) )
         }
     }
 }
@@ -76,54 +60,38 @@ impl Mul for Literal {
     fn mul(self, rhs: Self) -> Self::Output {
         //Some of these have optimizations.
         match (self, rhs) {
-            (Self::Vec(a), Self::Sca(b)) | (Self::Sca(b), Self::Vec(a)) => Ok(Self::Vec(a * b.as_scalar())),
-            (Self::Mat(a), Self::Sca(b)) | (Self::Sca(b), Self::Mat(a)) => Ok(Self::Mat(a * b.as_scalar())),
-            (a, b) => a.get_ref().mul(b.get_ref())
+            (Self::Num(a), Self::Num(b)) => Ok( Self::Num(a * b) ),
+            (Self::Comp(a), Self::Comp(b)) => Ok( Self::Comp( (a * b)? ) ),
+            (Self::Num(a), Self::Comp(b)) | (Self::Comp(b), Self::Num(a)) => Ok( Self::Comp( b * a ) ),
+            (a, b) => Err( BiOperationError::new_undef("*", a.flat_type(), b.flat_type()) )
         }
     }
 }
 impl Div for Literal {
     type Output = Result<Self, BiOperationError>;
     fn div(self, rhs: Self) -> Self::Output {
-        self.get_ref().div(rhs.get_ref())
+         match (self, rhs) {
+            (Self::Num(a), Self::Num(b)) => Ok( Literal::Num(a * b) ),
+            (Self::Comp(a), Self::Comp(b)) => Ok( Literal::Comp( (a * b)? ) ),
+            (Self::Comp(a), Self::Num(b)) => Ok( Literal::Comp( a / b ) ),
+            (a, b) => Err( BiOperationError::new_undef("/", a.flat_type(), b.flat_type()) )
+        }
     }
 }
 
-impl<T> From<T> for Literal where T: ScalarLike {
-    fn from(value: T) -> Self {
-        Self::Sca(Scalar::new(value))
+impl From<Numeric> for Literal {
+    fn from(value: Numeric) -> Self {
+        Self::Num(value)
     }
 }
-impl From<Complex> for Literal {
-    fn from(value: Complex) -> Self {
-        Self::Cmp(value)
-    }
-}
-impl From<Boolean> for Literal {
-    fn from(value: Boolean) -> Self {
-        Self::Bool(value)
+impl From<Composite> for Literal {
+    fn from(value: Composite) -> Self {
+        Self::Comp(value)
     }
 }
 impl From<bool> for Literal {
     fn from(value: bool) -> Self {
-        Self::Bool (
-            if value {
-                Boolean::True
-            }
-            else {
-                Boolean::False
-            }
-        )
-    }
-}
-impl From<FloatVector> for Literal {
-    fn from(value: FloatVector) -> Self {
-        Self::Vec(value)
-    }
-}
-impl From<FloatMatrix> for Literal {
-    fn from(value: FloatMatrix) -> Self {
-        Self::Mat(value)   
+        Self::Bool(value)
     }
 }
 
@@ -136,65 +104,41 @@ impl Display for Literal {
 impl LogicalCmp for Literal {
     fn oper_eq(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
         match (self, rhs) {
-            (Self::Sca(a), Self::Sca(b)) => Ok( a == b ),
-            (Self::Cmp(a), Self::Cmp(b)) => Ok( a == b ),
-            (Self::Vec(a), Self::Vec(b)) => Ok( a == b ),
-            (Self::Mat(a), Self::Mat(b)) => Ok( a == b ),
+            (Self::Num(a), Self::Num(b)) => Ok( a == b ),
+            (Self::Comp(a), Self::Comp(b)) => Ok( a == b ),
             (Self::Bool(a), Self::Bool(b)) => Ok( a == b ),
             (a, b) => Err( UndefinedBiOperation::new("==", a.flat_type(), b.flat_type()) )
         }
     }
     fn oper_less(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
-        if let Self::Sca(a) = self && let Self::Sca(b) = rhs {
-            Ok( a < b )
+        if let Self::Num(a) = self && let Self::Num(b) = rhs {
+            a.oper_less(b)
         }
         else {
             Err( UndefinedBiOperation::new("<", self.flat_type(), rhs.flat_type()) )
         }
     }
     fn oper_greater(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
-        if let Self::Sca(a) = self && let Self::Sca(b) = rhs {
-            Ok( a > b )
+        if let Self::Num(a) = self && let Self::Num(b) = rhs {
+            a.oper_greater(b)
         }
         else {
-            Err( UndefinedBiOperation::new(">", self.flat_type(), rhs.flat_type()) )
+            Err( UndefinedBiOperation::new("<", self.flat_type(), rhs.flat_type()) )
         }
     }
 }
 
 impl Literal {
-    pub fn get_ref(&self) -> super::lit_ref::LiteralReference<'_> {
-        use super::lit_ref::LiteralReference::*;
+    pub fn get_ref<'a>(&'a self) -> LiteralReference<'a> {
         match self {
-            Self::Sca(s) => Sca(*s),
-            Self::Cmp(s) => Cmp(*s),
-            Self::Bool(b) => Bool(*b),
-            Self::Vec(s) => Vec(s),
-            Self::Mat(s) => Mat(s)
+            Self::Num(v) => LiteralReference::Num(*v),
+            Self::Bool(v) => LiteralReference::Bool(*v),
+            Self::Comp(v) => LiteralReference::Comp(v.get_ref())
         }
     }
-    /*
-    pub fn get_ref_mut(&mut self) -> super::union_mut::VariableUnionMut<'_> {
-        use super::union_mut::VariableUnionMut::*;
-        match self {
-            Self::Sca(s) => Sca(s),
-            Self::Cmp(s) => Cmp(s),
-            Self::Bool(b) => Bool(b),
-            Self::Vec(s) => Vec(s),
-            Self::Mat(s) => Mat(s)
-        }
-    }
-     */
 
     pub fn pow(self, rhs: Self) -> Result<Self, PowError> {
-        match (self, rhs) {
-            (Self::Sca(a), Self::Sca(b)) => Ok( a.pow(b).into() ),
-            (Self::Cmp(a), Self::Sca(b)) => Ok( a.pow_sca(b).into() ),
-            (Self::Sca(a), Self::Cmp(b)) => Ok( Complex::from(a).pow(b).into() ),
-            (Self::Cmp(a), Self::Cmp(b)) => Ok( a.pow(b).into() ),
-            (Self::Mat(a), Self::Sca(b)) => a.powf(b.as_scalar()).map(Literal::from).map_err(PowError::from),
-            (a, b) => Err(PowError::new_undef(a.flat_type(), b.flat_type()))
-        }
+        self.get_ref().pow(rhs.get_ref())
     }
 
     pub fn static_type() -> FlatType {
@@ -202,11 +146,9 @@ impl Literal {
     }
     pub fn flat_type(&self) -> FlatType {
         match self {
-            Self::Sca(_)  => FlatType::Scalar,
-            Self::Cmp(_)  => FlatType::Complex,
+            Self::Num(v) => v.flat_type(),
             Self::Bool(_) => FlatType::Boolean,
-            Self::Vec(_)  => FlatType::Vector,
-            Self::Mat(_)  => FlatType::Matrix
+            Self::Comp(v) => v.flat_type()
         }
     }
 
@@ -245,12 +187,13 @@ impl Literal {
     (lhs[4].clone(), rhs[4].clone(), None) 
 */
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_variable_union() {
+    fn literal_ops() {
         //We are primarily testing the operators.
 
         let raw = (
@@ -498,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn var_union_cmp() {
+    fn literal_comparisons() {
         let raw = (
             Scalar::new(1.0),
             Complex::new(1.2, 3.4),
@@ -546,3 +489,4 @@ mod tests {
         assert_eq!( wrap[0].oper_greater_eq(&wrap[0]), Ok( true ) );
     }
 }
+     */

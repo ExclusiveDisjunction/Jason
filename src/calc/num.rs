@@ -27,12 +27,14 @@ impl SqrtComputable for f32 {
 macro_rules! create_null_unit {
     ($item: ty, $v: expr, $n: expr) => {
         impl NullIdentity for $item {
+            #[inline(always)]
             fn null_id() -> $item {
                 $v
             }
         }
 
         impl UnitIdentity for $item {
+            #[inline(always)]
             fn unit_id() -> $item {
                 $n
             }
@@ -136,6 +138,7 @@ pub trait Incrementable {
 macro_rules! make_increment {
     ($on: ty, $v: expr) => {
         impl Incrementable for $on {
+            #[inline(always)]
             fn increment(&mut self) {
                 self.add_assign($v);
             }
