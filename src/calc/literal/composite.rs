@@ -230,3 +230,74 @@ impl Div<Numeric> for CompositeRef<'_>  {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::numeric::Numeric;
+
+    fn raw_data() -> ((MathVector<Numeric>, MathVector<Numeric>), (Matrix<Numeric>, Matrix<Numeric>)) {
+        (
+            (
+                MathVector::from(vec![1.into(), 2.into(), 3.into()]).into(),
+                MathVector::from([Numeric::from(-1), Numeric::from(-2), Numeric::from(-3)]).into(),
+            ),
+            (
+                Matrix::try_from(
+                    vec![
+                        vec![
+                            1.into(), 3.into()
+                        ],
+                        vec![
+                            4.into(), 3.into()
+                        ]
+                    ]
+                ).unwrap().into(),
+                Matrix::identity(2).into()
+            )
+        )
+    }
+    fn make_data() -> ([Composite; 2], [Composite; 2]) {
+        let (vec, mat) = raw_data();
+
+        (
+            [
+                vec.0.into(),
+                mat.0.into()
+            ],
+            [
+                vec.1.into(),
+                mat.1.into()
+            ]
+        )
+    }
+
+    fn ops_evaluator<T>(cases: T, lhs: &[Composite], rhs: &[Composite], op: fn(Composite, Composite) -> Result<Composite, BiOperationError>) where T: IntoIterator<Item = (usize, usize, Option<Composite>)> {
+        for (lhs_index, rhs_index, expected) in cases {
+            let lhs_value = lhs[lhs_index].clone();
+            let rhs_value = rhs[rhs_index].clone();
+            let value = op(lhs_value, rhs_value).ok();
+
+            assert_eq!(&value, &expected, "Value: {value:?}, Expected: {expected:?}")
+        }
+    }
+
+    #[test]
+    fn composite_ops() {
+        let raw = raw_data();
+        let (lhs_raw, rhs_raw) = ((raw.0.0, raw.1.0), (raw.0.1, raw.1.1));
+        let (lhs, rhs) = make_data();
+
+
+    }
+
+    #[test]
+    fn composite_ref_ops() {
+
+    }
+
+    #[test]
+    fn composite_numeric_ops() {
+
+    }
+}
+

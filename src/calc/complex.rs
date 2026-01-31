@@ -110,7 +110,7 @@ impl UnitIdentity for Complex {
 }
 
 impl Complex {
-    pub fn new(a: f64, b: f64) -> Self {
+    pub const fn new(a: f64, b: f64) -> Self {
         Self {
             a,
             b

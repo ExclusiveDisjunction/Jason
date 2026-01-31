@@ -95,39 +95,27 @@ impl LogicalCmp for Numeric {
             (Self::Integer(a), Self::Integer(b)) => Ok( a == b ),
             (Self::Integer(a), Self::Real(b)) | (Self::Real(b), Self::Integer(a)) => Ok(*a as f64 == *b),
             (Self::Real(a), Self::Real(b)) => Ok( a == b ),
-            (a, b) => Err( UndefinedBiOperation::new("==", a.flat_type(), b.flat_type() ) )
+            (Self::Complex(a), Self::Integer(b)) | ( Self::Integer(b), Self::Complex(a)) => Ok( *a == Complex::from(*b) ),
+            (Self::Complex(a), Self::Real(b)) | (Self::Real(b), Self::Complex(a)) => Ok( *a == Complex::from(*b) ),
+            (Self::Complex(a), Self::Complex(b)) => Ok( a == b )
         }
     }
     fn oper_greater(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
         match (self, rhs) {
             (Self::Integer(a), Self::Integer(b)) => Ok( a > b ),
-            (Self::Integer(a), Self::Real(b)) | (Self::Real(b), Self::Integer(a)) => Ok(*a as f64 > *b),
+            (Self::Integer(a), Self::Real(b)) => Ok(*a as f64 > *b),
+            (Self::Real(a), Self::Integer(b)) => Ok(*a > *b as f64),
             (Self::Real(a), Self::Real(b)) => Ok( a > b ),
             (a, b) => Err( UndefinedBiOperation::new(">", a.flat_type(), b.flat_type() ) )
         }
     }
-    fn oper_greater_eq(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
-        match (self, rhs) {
-            (Self::Integer(a), Self::Integer(b)) => Ok( a >= b ),
-            (Self::Integer(a), Self::Real(b)) | (Self::Real(b), Self::Integer(a)) => Ok(*a as f64 >= *b),
-            (Self::Real(a), Self::Real(b)) => Ok( a >= b ),
-            (a, b) => Err( UndefinedBiOperation::new(">=", a.flat_type(), b.flat_type() ) )
-        }
-    }
     fn oper_less(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
         match (self, rhs) {
-            (Self::Integer(a), Self::Integer(b)) => Ok( a < b ),
-            (Self::Integer(a), Self::Real(b)) | (Self::Real(b), Self::Integer(a)) => Ok((*a as f64) < *b),
+             (Self::Integer(a), Self::Integer(b)) => Ok( a < b ),
+            (Self::Integer(a), Self::Real(b)) => Ok((*a as f64) < *b),
+            (Self::Real(a), Self::Integer(b)) => Ok(*a < *b as f64),
             (Self::Real(a), Self::Real(b)) => Ok( a < b ),
             (a, b) => Err( UndefinedBiOperation::new("<", a.flat_type(), b.flat_type() ) )
-        }
-    }
-    fn oper_less_eq(&self, rhs: &Self) -> Result<bool, UndefinedBiOperation> {
-        match (self, rhs) {
-            (Self::Integer(a), Self::Integer(b)) => Ok( a <= b ),
-            (Self::Integer(a), Self::Real(b)) | (Self::Real(b), Self::Integer(a)) => Ok(*a as f64 <= *b),
-            (Self::Real(a), Self::Real(b)) => Ok( a <= b ),
-            (a, b) => Err( UndefinedBiOperation::new("<=", a.flat_type(), b.flat_type() ) )
         }
     }
 }
@@ -161,8 +149,9 @@ impl Numeric {
         }
     }
 
+    #[inline(always)]
     pub fn flat_type(&self) -> FlatType {
-        todo!()
+        FlatType::Scalar
     }
 }
 
@@ -259,130 +248,229 @@ mod tests {
     use super::*;
     use super::super::super::Complex;
 
-    fn test_values<const N: usize>(all_values: [(usize, usize, Numeric); N], lhs: &[Numeric], rhs: &[Numeric], op: fn(Numeric, Numeric) -> Numeric, name: &str) {
+    fn test_values_ops<const N: usize>(all_values: [(usize, usize, Numeric); N], op: fn(Numeric, Numeric) -> Numeric, name: &str) {
         for (lhs_index, rhs_index, expected) in all_values {
-            let lhs_value = lhs[lhs_index];
-            let rhs_value =  rhs[rhs_index];
+            let lhs_value = LHS[lhs_index];
+            let rhs_value =  RHS[rhs_index];
             let value = op(lhs_value, rhs_value);
 
             assert!(expected == value, "LHS: {lhs_value:?}, RHS: {rhs_value:?}, RESULT: {value:?}, EXPECTED: {expected:?}, on index ({lhs_index}, {rhs_index}), test: {name}");
         }
     }
+    fn test_values_cmp<T>(all_values: T, op: fn(&Numeric, &Numeric) -> Result<bool, UndefinedBiOperation>, name: &str) where T: IntoIterator<Item = (usize, usize, Option<bool>)> {
+        for (lhs_index, rhs_index, expected) in all_values {
+            let lhs_value = &LHS[lhs_index];
+            let rhs_value = &RHS[rhs_index];
+            let value = op(lhs_value, rhs_value).ok();
+
+            assert_eq!(expected, value, "LHS: {lhs_value:?}, RHS: {rhs_value:?}, RESULT: {value:?}, EXPECTED: {expected:?}, on index ({lhs_index}, {rhs_index}), test: {name}");
+        }
+    }
+
+    const LHS_RAW: (f64, i64, Complex) = (
+        3.25,
+        30i64,
+        Complex::new(1.0, 3.0)
+    );
+    const RHS_RAW: (f64, i64, Complex) = (
+        1.65,
+        10i64,
+        Complex::new(2.1, 4.3)
+    );
+    const LHS: [Numeric; 3] = [
+        Numeric::Real(3.25),
+        Numeric::Integer(30),
+        Numeric::Complex(Complex::new(1.0, 3.0))
+    ];
+    const RHS: [Numeric; 3] = [
+        Numeric::Real(1.65),
+        Numeric::Integer(10),
+        Numeric::Complex(Complex::new(2.1, 4.3))
+    ];
 
     #[test]
     fn numeric_ops() {
-        let lhs_raw = (
-            3.25,
-            30i64,
-            Complex::new(1.0, 3.0)
-        );
-        let rhs_raw = (
-            1.65,
-            10i64,
-            Complex::new(2.1, 4.3)
-        );
-
-        let lhs: [Numeric; _] = [lhs_raw.0.into(), lhs_raw.1.into(), lhs_raw.2.into()];
-        let rhs: [Numeric; _] = [rhs_raw.0.into(), rhs_raw.1.into(), rhs_raw.2.into()];
-
-        test_values(
+        test_values_ops(
             [
-                (0, 0, (lhs_raw.0 + rhs_raw.0).into()),
-                (0, 1, (lhs_raw.0 + rhs_raw.1 as f64).into()),
-                (0, 2, (Complex::from(lhs_raw.0) + rhs_raw.2).into()),
+                (0, 0, (LHS_RAW.0 + RHS_RAW.0).into()),
+                (0, 1, (LHS_RAW.0 + RHS_RAW.1 as f64).into()),
+                (0, 2, (Complex::from(LHS_RAW.0) + RHS_RAW.2).into()),
 
-                (1, 0, (lhs_raw.1 as f64 + rhs_raw.0).into()),
-                (1, 1, (lhs_raw.1 + rhs_raw.1).into()),
-                (1, 2, (Complex::from(lhs_raw.1) + rhs_raw.2).into()),
+                (1, 0, (LHS_RAW.1 as f64 + RHS_RAW.0).into()),
+                (1, 1, (LHS_RAW.1 + RHS_RAW.1).into()),
+                (1, 2, (Complex::from(LHS_RAW.1) + RHS_RAW.2).into()),
 
-                (2, 0, (lhs_raw.2 + Complex::from(rhs_raw.0)).into()),
-                (2, 1, (lhs_raw.2 + Complex::from(rhs_raw.1)).into()),
-                (2, 2, (lhs_raw.2 + rhs_raw.2).into()),
+                (2, 0, (LHS_RAW.2 + Complex::from(RHS_RAW.0)).into()),
+                (2, 1, (LHS_RAW.2 + Complex::from(RHS_RAW.1)).into()),
+                (2, 2, (LHS_RAW.2 + RHS_RAW.2).into()),
             ],
-            &lhs,
-            &rhs,
             Numeric::add,
             "add"
         );
 
-        test_values(
+        test_values_ops(
             [
-                (0, 0, (lhs_raw.0 - rhs_raw.0).into()),
-                (0, 1, (lhs_raw.0 - rhs_raw.1 as f64).into()),
-                (0, 2, (Complex::from(lhs_raw.0) - rhs_raw.2).into()),
+                (0, 0, (LHS_RAW.0 - RHS_RAW.0).into()),
+                (0, 1, (LHS_RAW.0 - RHS_RAW.1 as f64).into()),
+                (0, 2, (Complex::from(LHS_RAW.0) - RHS_RAW.2).into()),
 
-                (1, 0, (lhs_raw.1 as f64 - rhs_raw.0).into()),
-                (1, 1, (lhs_raw.1 - rhs_raw.1).into()),
-                (1, 2, (Complex::from(lhs_raw.1) - rhs_raw.2).into()),
+                (1, 0, (LHS_RAW.1 as f64 - RHS_RAW.0).into()),
+                (1, 1, (LHS_RAW.1 - RHS_RAW.1).into()),
+                (1, 2, (Complex::from(LHS_RAW.1) - RHS_RAW.2).into()),
 
-                (2, 0, (lhs_raw.2 - Complex::from(rhs_raw.0)).into()),
-                (2, 1, (lhs_raw.2 - Complex::from(rhs_raw.1)).into()),
-                (2, 2, (lhs_raw.2 - rhs_raw.2).into()),
+                (2, 0, (LHS_RAW.2 - Complex::from(RHS_RAW.0)).into()),
+                (2, 1, (LHS_RAW.2 - Complex::from(RHS_RAW.1)).into()),
+                (2, 2, (LHS_RAW.2 - RHS_RAW.2).into()),
             ],
-            &lhs,
-            &rhs,
             Numeric::sub,
             "sub"
         );
 
-        test_values(
+        test_values_ops(
             [
-                (0, 0, (lhs_raw.0 * rhs_raw.0).into()),
-                (0, 1, (lhs_raw.0 * rhs_raw.1 as f64).into()),
-                (0, 2, (Complex::from(lhs_raw.0) * rhs_raw.2).into()),
+                (0, 0, (LHS_RAW.0 * RHS_RAW.0).into()),
+                (0, 1, (LHS_RAW.0 * RHS_RAW.1 as f64).into()),
+                (0, 2, (Complex::from(LHS_RAW.0) * RHS_RAW.2).into()),
 
-                (1, 0, (lhs_raw.1 as f64 * rhs_raw.0).into()),
-                (1, 1, (lhs_raw.1 * rhs_raw.1).into()),
-                (1, 2, (Complex::from(lhs_raw.1) * rhs_raw.2).into()),
+                (1, 0, (LHS_RAW.1 as f64 * RHS_RAW.0).into()),
+                (1, 1, (LHS_RAW.1 * RHS_RAW.1).into()),
+                (1, 2, (Complex::from(LHS_RAW.1) * RHS_RAW.2).into()),
 
-                (2, 0, (lhs_raw.2 * Complex::from(rhs_raw.0)).into()),
-                (2, 1, (lhs_raw.2 * Complex::from(rhs_raw.1)).into()),
-                (2, 2, (lhs_raw.2 * rhs_raw.2).into()),
+                (2, 0, (LHS_RAW.2 * Complex::from(RHS_RAW.0)).into()),
+                (2, 1, (LHS_RAW.2 * Complex::from(RHS_RAW.1)).into()),
+                (2, 2, (LHS_RAW.2 * RHS_RAW.2).into()),
             ],
-            &lhs,
-            &rhs,
             Numeric::mul,
             "mul"
         );
 
-        test_values(
+        test_values_ops(
             [
-                (0, 0, (lhs_raw.0 / rhs_raw.0).into()),
-                (0, 1, (lhs_raw.0 / rhs_raw.1 as f64).into()),
-                (0, 2, (Complex::from(lhs_raw.0) / rhs_raw.2).into()),
+                (0, 0, (LHS_RAW.0 / RHS_RAW.0).into()),
+                (0, 1, (LHS_RAW.0 / RHS_RAW.1 as f64).into()),
+                (0, 2, (Complex::from(LHS_RAW.0) / RHS_RAW.2).into()),
 
-                (1, 0, (lhs_raw.1 as f64 / rhs_raw.0).into()),
-                (1, 1, (lhs_raw.1 as f64 / rhs_raw.1 as f64).into()),
-                (1, 2, (Complex::from(lhs_raw.1) / rhs_raw.2).into()),
+                (1, 0, (LHS_RAW.1 as f64 / RHS_RAW.0).into()),
+                (1, 1, (LHS_RAW.1 as f64 / RHS_RAW.1 as f64).into()),
+                (1, 2, (Complex::from(LHS_RAW.1) / RHS_RAW.2).into()),
 
-                (2, 0, (lhs_raw.2 / Complex::from(rhs_raw.0)).into()),
-                (2, 1, (lhs_raw.2 / Complex::from(rhs_raw.1)).into()),
-                (2, 2, (lhs_raw.2 / rhs_raw.2).into()),
+                (2, 0, (LHS_RAW.2 / Complex::from(RHS_RAW.0)).into()),
+                (2, 1, (LHS_RAW.2 / Complex::from(RHS_RAW.1)).into()),
+                (2, 2, (LHS_RAW.2 / RHS_RAW.2).into()),
             ],
-            &lhs,
-            &rhs,
             Numeric::div,
             "div"
         );
 
-        test_values(
+        test_values_ops(
             [
-                (0, 0, (lhs_raw.0.powf(rhs_raw.0)).into()),
-                (0, 1, (lhs_raw.0.powf(rhs_raw.1 as f64)).into()),
-                (0, 2, (Complex::from(lhs_raw.0).pow(rhs_raw.2)).into()),
+                (0, 0, (LHS_RAW.0.powf(RHS_RAW.0)).into()),
+                (0, 1, (LHS_RAW.0.powf(RHS_RAW.1 as f64)).into()),
+                (0, 2, (Complex::from(LHS_RAW.0).pow(RHS_RAW.2)).into()),
 
-                (1, 0, ((lhs_raw.1 as f64).powf(rhs_raw.0)).into()),
-                (1, 1, (lhs_raw.1.pow(rhs_raw.1 as u32)).into()),
-                (1, 2, (Complex::from(lhs_raw.1).pow(rhs_raw.2)).into()),
+                (1, 0, ((LHS_RAW.1 as f64).powf(RHS_RAW.0)).into()),
+                (1, 1, (LHS_RAW.1.pow(RHS_RAW.1 as u32)).into()),
+                (1, 2, (Complex::from(LHS_RAW.1).pow(RHS_RAW.2)).into()),
 
-                (2, 0, (lhs_raw.2.pow_sca(rhs_raw.0)).into()),
-                (2, 1, (lhs_raw.2.pow_sca(rhs_raw.1 as f64)).into()),
-                (2, 2, (lhs_raw.2.pow(rhs_raw.2)).into()),
+                (2, 0, (LHS_RAW.2.pow_sca(RHS_RAW.0)).into()),
+                (2, 1, (LHS_RAW.2.pow_sca(RHS_RAW.1 as f64)).into()),
+                (2, 2, (LHS_RAW.2.pow(RHS_RAW.2)).into()),
             ],
-            &lhs,
-            &rhs,
             Numeric::pow,
             "pow"
+        );
+    }
+
+    #[test]
+    fn numeric_cmp() {
+        test_values_cmp(
+            [
+                (0, 0, Some(false)),
+                (0, 1, Some(false)),
+                (0, 2, Some(false)),
+
+                (1, 0, Some(false)),
+                (1, 1, Some(false)),
+                (1, 2, Some(false)),
+
+                (2, 0, Some(false)),
+                (2, 1, Some(false)),
+                (2, 2, Some(false)),
+            ],
+            Numeric::oper_eq,
+            "=="
+        );
+
+        test_values_cmp(
+            [
+                (0, 0, Some(true)),
+                (0, 1, Some(false)),
+                (0, 2, None),
+
+                (1, 0, Some(true)),
+                (1, 1, Some(true)),
+                (1, 2, None),
+
+                (2, 0, None),
+                (2, 1, None),
+                (2, 2, None),
+            ],
+            Numeric::oper_greater,
+            ">"
+        );
+
+        test_values_cmp(
+            [
+                (0, 0, Some(true)),
+                (0, 1, Some(false)),
+                (0, 2, None),
+
+                (1, 0, Some(true)),
+                (1, 1, Some(true)),
+                (1, 2, None),
+
+                (2, 0, None),
+                (2, 1, None),
+                (2, 2, None),
+            ],
+            Numeric::oper_greater_eq,
+            ">="
+        );
+
+        test_values_cmp(
+            [
+                (0, 0, Some(false)),
+                (0, 1, Some(true)),
+                (0, 2, None),
+
+                (1, 0, Some(false)),
+                (1, 1, Some(false)),
+                (1, 2, None),
+
+                (2, 0, None),
+                (2, 1, None),
+                (2, 2, None),
+            ],
+            Numeric::oper_less,
+            "<"
+        );
+
+        test_values_cmp(
+            [
+                (0, 0, Some(false)),
+                (0, 1, Some(true)),
+                (0, 2, None),
+
+                (1, 0, Some(false)),
+                (1, 1, Some(false)),
+                (1, 2, None),
+
+                (2, 0, None),
+                (2, 1, None),
+                (2, 2, None),
+            ],
+            Numeric::oper_less_eq,
+            "<="
         );
     }
 }
